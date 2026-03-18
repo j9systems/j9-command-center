@@ -35,12 +35,12 @@ interface AccountCardProps {
 
 export default function AccountCard({ account }: AccountCardProps) {
   return (
-    <div className="flex items-center gap-5 px-6 py-5 bg-surface rounded-xl border border-border hover:border-border-emphasis hover:bg-elevated transition-all duration-150 cursor-pointer">
+    <div className="flex items-center gap-6 px-8 py-6 bg-surface rounded-xl border border-border hover:border-border-emphasis hover:bg-elevated transition-all duration-150 cursor-pointer">
       {account.logo_path ? (
         <img
           src={account.logo_path}
           alt={account.company_name ?? 'Account logo'}
-          className="w-10 h-10 rounded-full object-cover bg-canvas flex-shrink-0"
+          className="w-11 h-11 rounded-full object-cover bg-canvas flex-shrink-0"
           onError={(e) => {
             const target = e.currentTarget
             target.style.display = 'none'
@@ -49,18 +49,18 @@ export default function AccountCard({ account }: AccountCardProps) {
         />
       ) : null}
       <div
-        className={`w-10 h-10 rounded-full bg-gradient-to-br from-accent to-accent-deep flex items-center justify-center text-white text-xs font-bold flex-shrink-0 ${account.logo_path ? 'hidden' : ''}`}
+        className={`w-11 h-11 rounded-full bg-gradient-to-br from-accent to-accent-deep flex items-center justify-center text-white text-sm font-bold flex-shrink-0 ${account.logo_path ? 'hidden' : ''}`}
       >
         {getInitials(account.company_name)}
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-base font-medium text-text-primary truncate">
+        <p className="text-md font-medium text-text-primary truncate">
           {account.company_name ?? 'Unnamed Account'}
         </p>
       </div>
       {account.status_label && (
         <span
-          className={`text-xs font-semibold tracking-wide uppercase px-4 py-1.5 rounded-full flex-shrink-0 ${getStatusColor(account.status_key)}`}
+          className={`text-xs font-semibold tracking-wide uppercase px-5 py-2 rounded-full flex-shrink-0 ${getStatusColor(account.status_key)}`}
         >
           {account.status_label}
         </span>
