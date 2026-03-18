@@ -35,7 +35,7 @@ interface AccountCardProps {
 
 export default function AccountCard({ account }: AccountCardProps) {
   return (
-    <div className="flex items-center gap-4 px-5 py-4 bg-surface rounded-xl border border-border hover:border-border-emphasis hover:bg-elevated transition-all duration-150 cursor-pointer">
+    <div className="flex items-center gap-5 px-6 py-5 bg-surface rounded-xl border border-border hover:border-border-emphasis hover:bg-elevated transition-all duration-150 cursor-pointer">
       {account.logo_path ? (
         <img
           src={account.logo_path}
@@ -60,7 +60,7 @@ export default function AccountCard({ account }: AccountCardProps) {
       </div>
       {account.status_label && (
         <span
-          className={`text-xs font-semibold tracking-wide uppercase px-3 py-1 rounded-full flex-shrink-0 ${getStatusColor(account.status_key)}`}
+          className={`text-xs font-semibold tracking-wide uppercase px-4 py-1.5 rounded-full flex-shrink-0 ${getStatusColor(account.status_key)}`}
         >
           {account.status_label}
         </span>

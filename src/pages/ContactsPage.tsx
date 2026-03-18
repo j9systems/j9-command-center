@@ -1,6 +1,6 @@
 export default function ContactsPage() {
   return (
-    <div className="p-6 md:p-10 max-w-4xl mx-auto">
+    <div className="p-8 md:p-12 max-w-5xl mx-auto">
       <h2 className="text-2xl font-bold mb-2 text-text-primary tracking-tight leading-tight">
         Contacts
       </h2>

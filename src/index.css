@@ -2,12 +2,12 @@
 
 @theme {
   /* ── Backgrounds (black / off-black base) ── */
-  --color-canvas: #000000;
-  --color-page: #050505;
-  --color-surface: #0a0a0a;
-  --color-elevated: #111111;
-  --color-overlay: #1a1a1a;
-  --color-input: #0d0d0d;
+  --color-canvas: #0a0a0a;
+  --color-page: #0a0a0a;
+  --color-surface: #111111;
+  --color-elevated: #181818;
+  --color-overlay: #202020;
+  --color-input: #0e0e0e;
   --color-sidebar: #050505;
 
   /* ── Accent / Brand ── */
