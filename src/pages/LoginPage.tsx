@@ -103,9 +103,9 @@ export default function LoginPage() {
               </p>
               <input
                 type="text"
-                placeholder="Enter 6-digit code"
+                placeholder="Enter 8-digit code"
                 value={otpCode}
-                onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 8))}
                 required
                 autoFocus
                 inputMode="numeric"
@@ -116,7 +116,7 @@ export default function LoginPage() {
               )}
               <button
                 type="submit"
-                disabled={loading || otpCode.length < 6}
+                disabled={loading || otpCode.length < 8}
                 className="w-full mt-4 py-2.5 bg-purple hover:bg-purple-hover disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors"
               >
                 {loading ? 'Verifying...' : 'Verify code'}
