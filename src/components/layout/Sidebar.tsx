@@ -1,5 +1,6 @@
 import { NavLink } from 'react-router-dom'
-import { Home, Building2, Users, UserCog } from 'lucide-react'
+import { Home, Building2, Users, UserCog, LogOut } from 'lucide-react'
+import { useAuth } from '@/context/AuthContext'
 
 const navItems = [
   { to: '/', icon: Home, label: 'Home' },
@@ -9,6 +10,8 @@ const navItems = [
 ]
 
 export default function Sidebar() {
+  const { signOut } = useAuth()
+
   return (
     <aside className="hidden md:flex flex-col w-56 bg-surface border-r border-border h-full">
       <div className="p-5 border-b border-border">
@@ -35,6 +38,15 @@ export default function Sidebar() {
           </NavLink>
         ))}
       </nav>
+      <div className="p-3 border-t border-border">
+        <button
+          onClick={signOut}
+          className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-text-secondary hover:text-text-primary hover:bg-surface-hover transition-all duration-200 w-full"
+        >
+          <LogOut size={20} />
+          Sign out
+        </button>
+      </div>
     </aside>
   )
 }
