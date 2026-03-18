@@ -15,8 +15,8 @@ export default defineConfig({
         name: 'J9 Command Center',
         short_name: 'J9 CC',
         description: 'Agency management app',
-        theme_color: '#7C3AED',
-        background_color: '#000000',
+        theme_color: '#0B1437',
+        background_color: '#060d25',
         display: 'standalone',
         icons: [
           {

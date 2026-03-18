@@ -42,27 +42,27 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex items-center justify-center h-full px-4">
+    <div className="flex items-center justify-center h-full px-4 bg-canvas">
       <div className="w-full max-w-sm">
         {/* Branding */}
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold text-text-primary">
-            <span className="text-purple">J9</span> Command Center
+          <h1 className="text-2xl font-bold text-text-primary tracking-tight leading-tight">
+            <span className="text-accent">J9</span> Command Center
           </h1>
           <p className="text-text-secondary text-sm mt-1">Agency management</p>
         </div>
 
         {/* Card */}
-        <div className="bg-surface border border-border rounded-2xl p-6">
+        <div className="bg-surface border border-border rounded-xl p-6 shadow-card">
           {step === 'email' ? (
             <form onSubmit={handleSendCode}>
               <div className="flex items-center gap-2 mb-4">
-                <Mail size={18} className="text-purple" />
-                <h2 className="text-sm font-medium text-text-primary">
+                <Mail size={18} className="text-accent" />
+                <h2 className="text-base font-semibold text-text-primary">
                   Sign in with email
                 </h2>
               </div>
-              <p className="text-text-secondary text-xs mb-4">
+              <p className="text-text-secondary text-sm mb-4">
                 Enter your email to receive a login code.
               </p>
               <input
@@ -72,15 +72,15 @@ export default function LoginPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 autoFocus
-                className="w-full px-3 py-2.5 bg-black border border-border rounded-lg text-sm text-text-primary placeholder:text-text-secondary focus:outline-none focus:border-purple/50 focus:ring-1 focus:ring-purple/25 transition-colors"
+                className="w-full px-3.5 py-2.5 bg-input border border-border rounded-md text-base text-text-primary placeholder:text-text-tertiary focus:outline-none focus:border-border-accent focus:shadow-focus transition-all duration-150"
               />
               {error && (
-                <p className="text-red-400 text-xs mt-2">{error}</p>
+                <p className="text-danger text-sm mt-2">{error}</p>
               )}
               <button
                 type="submit"
                 disabled={loading || !email}
-                className="w-full mt-4 py-2.5 bg-purple hover:bg-purple-hover disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors"
+                className="w-full mt-4 py-2.5 bg-accent hover:bg-accent-light disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-md shadow-accent hover:shadow-[0_6px_24px_rgba(123,97,255,0.45)] transition-all duration-150"
               >
                 {loading ? 'Sending...' : 'Send login code'}
               </button>
@@ -90,15 +90,15 @@ export default function LoginPage() {
               <button
                 type="button"
                 onClick={() => { setStep('email'); setError(null); setOtpCode('') }}
-                className="flex items-center gap-1 text-text-secondary hover:text-text-primary text-xs mb-4 transition-colors"
+                className="flex items-center gap-1 text-text-secondary hover:text-text-primary text-sm mb-4 transition-colors duration-150"
               >
                 <ArrowLeft size={14} />
                 Back
               </button>
-              <h2 className="text-sm font-medium text-text-primary mb-1">
+              <h2 className="text-base font-semibold text-text-primary mb-1">
                 Check your email
               </h2>
-              <p className="text-text-secondary text-xs mb-4">
+              <p className="text-text-secondary text-sm mb-4">
                 Enter the code sent to <span className="text-text-primary">{email}</span>
               </p>
               <input
@@ -109,15 +109,15 @@ export default function LoginPage() {
                 required
                 autoFocus
                 inputMode="numeric"
-                className="w-full px-3 py-2.5 bg-black border border-border rounded-lg text-sm text-text-primary text-center tracking-[0.3em] placeholder:tracking-normal placeholder:text-text-secondary focus:outline-none focus:border-purple/50 focus:ring-1 focus:ring-purple/25 transition-colors"
+                className="w-full px-3.5 py-2.5 bg-input border border-border rounded-md text-base text-text-primary text-center tracking-[0.3em] placeholder:tracking-normal placeholder:text-text-tertiary focus:outline-none focus:border-border-accent focus:shadow-focus transition-all duration-150"
               />
               {error && (
-                <p className="text-red-400 text-xs mt-2">{error}</p>
+                <p className="text-danger text-sm mt-2">{error}</p>
               )}
               <button
                 type="submit"
                 disabled={loading || otpCode.length < 8}
-                className="w-full mt-4 py-2.5 bg-purple hover:bg-purple-hover disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors"
+                className="w-full mt-4 py-2.5 bg-accent hover:bg-accent-light disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-md shadow-accent hover:shadow-[0_6px_24px_rgba(123,97,255,0.45)] transition-all duration-150"
               >
                 {loading ? 'Verifying...' : 'Verify code'}
               </button>

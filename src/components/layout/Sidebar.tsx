@@ -13,10 +13,10 @@ export default function Sidebar() {
   const { signOut } = useAuth()
 
   return (
-    <aside className="hidden md:flex flex-col w-56 bg-surface border-r border-border h-full">
-      <div className="p-5 border-b border-border">
-        <h1 className="text-lg font-bold tracking-tight text-text-primary">
-          <span className="text-purple">J9</span> Command Center
+    <aside className="hidden md:flex flex-col w-60 bg-sidebar border-r border-border h-full">
+      <div className="px-6 py-5 border-b border-border">
+        <h1 className="text-lg font-bold tracking-tight text-text-primary leading-tight">
+          <span className="text-accent">J9</span> Command Center
         </h1>
       </div>
       <nav className="flex-1 p-3 flex flex-col gap-1">
@@ -26,10 +26,10 @@ export default function Sidebar() {
             to={to}
             end={to === '/'}
             className={({ isActive }) =>
-              `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
+              `flex items-center gap-3 px-3.5 py-2.5 rounded-md text-base font-medium transition-all duration-150 ${
                 isActive
-                  ? 'bg-purple-muted text-purple'
-                  : 'text-text-secondary hover:text-text-primary hover:bg-surface-hover'
+                  ? 'bg-gradient-to-br from-accent/20 to-accent-deep/12 text-text-primary border border-accent/25 shadow-[inset_0_0_0_1px_rgba(123,97,255,0.15)]'
+                  : 'text-text-secondary hover:text-text-primary hover:bg-overlay'
               }`
             }
           >
@@ -41,7 +41,7 @@ export default function Sidebar() {
       <div className="p-3 border-t border-border">
         <button
           onClick={signOut}
-          className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-text-secondary hover:text-text-primary hover:bg-surface-hover transition-all duration-200 w-full"
+          className="flex items-center gap-3 px-3.5 py-2.5 rounded-md text-base font-medium text-text-secondary hover:text-text-primary hover:bg-overlay transition-all duration-150 w-full"
         >
           <LogOut size={20} />
           Sign out

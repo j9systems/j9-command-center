@@ -1,20 +1,20 @@
 import type { AccountWithStatus } from '@/types/database'
 
 const statusColors: Record<string, string> = {
-  active: 'bg-emerald-500/15 text-emerald-400',
-  inactive: 'bg-zinc-500/15 text-zinc-400',
-  lead: 'bg-amber-500/15 text-amber-400',
-  prospect: 'bg-blue-500/15 text-blue-400',
-  churned: 'bg-red-500/15 text-red-400',
+  active: 'bg-success-bg text-success',
+  inactive: 'bg-[rgba(255,255,255,0.06)] text-text-secondary',
+  lead: 'bg-warning-bg text-warning',
+  prospect: 'bg-info-bg text-info',
+  churned: 'bg-danger-bg text-danger',
 }
 
 function getStatusColor(key: string | null): string {
-  if (!key) return 'bg-zinc-500/15 text-zinc-400'
+  if (!key) return 'bg-[rgba(255,255,255,0.06)] text-text-secondary'
   const lower = key.toLowerCase()
   for (const [k, v] of Object.entries(statusColors)) {
     if (lower.includes(k)) return v
   }
-  return 'bg-purple-muted text-purple'
+  return 'bg-accent-glow text-accent'
 }
 
 function getInitials(name: string | null): string {
@@ -33,12 +33,12 @@ interface AccountCardProps {
 
 export default function AccountCard({ account }: AccountCardProps) {
   return (
-    <div className="flex items-center gap-4 p-4 bg-surface rounded-xl border border-border hover:border-purple/30 hover:bg-surface-hover transition-all duration-200 cursor-pointer">
+    <div className="flex items-center gap-4 p-4 bg-surface rounded-xl border border-border hover:border-border-emphasis hover:bg-elevated shadow-card transition-all duration-150 cursor-pointer">
       {account.logo_path ? (
         <img
           src={account.logo_path}
           alt={account.company_name ?? 'Account logo'}
-          className="w-11 h-11 rounded-lg object-cover bg-black flex-shrink-0"
+          className="w-9 h-9 rounded-full object-cover bg-canvas flex-shrink-0"
           onError={(e) => {
             const target = e.currentTarget
             target.style.display = 'none'
@@ -47,18 +47,18 @@ export default function AccountCard({ account }: AccountCardProps) {
         />
       ) : null}
       <div
-        className={`w-11 h-11 rounded-lg bg-purple-muted flex items-center justify-center text-purple text-sm font-semibold flex-shrink-0 ${account.logo_path ? 'hidden' : ''}`}
+        className={`w-9 h-9 rounded-full bg-gradient-to-br from-accent to-accent-deep flex items-center justify-center text-white text-xs font-bold flex-shrink-0 ${account.logo_path ? 'hidden' : ''}`}
       >
         {getInitials(account.company_name)}
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-text-primary truncate">
+        <p className="text-base font-medium text-text-primary truncate">
           {account.company_name ?? 'Unnamed Account'}
         </p>
       </div>
       {account.status_label && (
         <span
-          className={`text-xs font-medium px-2.5 py-1 rounded-full flex-shrink-0 ${getStatusColor(account.status_key)}`}
+          className={`text-xs font-semibold tracking-wide uppercase px-2.5 py-0.5 rounded-full flex-shrink-0 ${getStatusColor(account.status_key)}`}
         >
           {account.status_label}
         </span>

@@ -1,14 +1,88 @@
 @import "tailwindcss";
 
 @theme {
-  --color-surface: #111111;
-  --color-surface-hover: #1a1a1a;
-  --color-border: #222222;
-  --color-text-primary: #f5f5f5;
-  --color-text-secondary: #a3a3a3;
-  --color-purple: #7C3AED;
-  --color-purple-hover: #6D28D9;
-  --color-purple-muted: rgba(124, 58, 237, 0.12);
+  /* ── Backgrounds ── */
+  --color-canvas: #060d25;
+  --color-page: #0B1437;
+  --color-surface: #111C44;
+  --color-elevated: #1B254B;
+  --color-overlay: #212E5E;
+  --color-input: #0F1B45;
+  --color-sidebar: #0E1538;
+
+  /* ── Accent / Brand ── */
+  --color-accent: #7B61FF;
+  --color-accent-light: #A183FF;
+  --color-accent-deep: #4318FF;
+  --color-accent-glow: rgba(123, 97, 255, 0.20);
+
+  /* ── Semantic ── */
+  --color-success: #01B574;
+  --color-success-bg: rgba(1, 181, 116, 0.12);
+  --color-warning: #FFB547;
+  --color-warning-bg: rgba(255, 181, 71, 0.12);
+  --color-danger: #EE5D50;
+  --color-danger-bg: rgba(238, 93, 80, 0.12);
+  --color-info: #4299E1;
+  --color-info-bg: rgba(66, 153, 225, 0.12);
+
+  /* ── Text ── */
+  --color-text-primary: #FFFFFF;
+  --color-text-secondary: #A3AED0;
+  --color-text-tertiary: #6B7DB3;
+  --color-text-accent: #7B61FF;
+
+  /* ── Borders ── */
+  --color-border: rgba(255, 255, 255, 0.06);
+  --color-border-subtle: rgba(255, 255, 255, 0.04);
+  --color-border-emphasis: rgba(255, 255, 255, 0.12);
+  --color-border-accent: rgba(123, 97, 255, 0.40);
+
+  /* ── Font families ── */
+  --font-sans: 'DM Sans', system-ui, -apple-system, sans-serif;
+  --font-mono: 'DM Mono', ui-monospace, 'Fira Code', monospace;
+
+  /* ── Font sizes ── */
+  --text-xs: 11px;
+  --text-sm: 13px;
+  --text-base: 14px;
+  --text-md: 15px;
+  --text-lg: 18px;
+  --text-xl: 22px;
+  --text-2xl: 28px;
+  --text-3xl: 36px;
+
+  /* ── Line height ── */
+  --leading-tight: 1.2;
+  --leading-snug: 1.4;
+  --leading-normal: 1.6;
+  --leading-relaxed: 1.75;
+
+  /* ── Letter spacing ── */
+  --tracking-tight: -0.02em;
+  --tracking-normal: -0.01em;
+  --tracking-wide: 0.04em;
+  --tracking-wider: 0.08em;
+  --tracking-widest: 0.12em;
+
+  /* ── Border radius ── */
+  --radius-xs: 4px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-2xl: 24px;
+  --radius-full: 9999px;
+
+  /* ── Shadows ── */
+  --shadow-xs: 0 1px 3px rgba(0, 0, 0, 0.35);
+  --shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.40);
+  --shadow-card: 0 2px 8px rgba(0, 0, 0, 0.30), 0 0 0 1px rgba(255, 255, 255, 0.05);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.50);
+  --shadow-float: 0 20px 60px rgba(0, 0, 0, 0.60);
+  --shadow-accent: 0 4px 20px rgba(123, 97, 255, 0.35);
+  --shadow-focus: 0 0 0 3px rgba(123, 97, 255, 0.30);
 }
 
 * {
@@ -19,14 +93,14 @@
 
 html, body, #root {
   height: 100%;
-  background-color: #000000;
+  background-color: var(--color-canvas);
   color: var(--color-text-primary);
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Scrollbar styling */
+/* Scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
 }
@@ -34,9 +108,9 @@ html, body, #root {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #333;
+  background: rgba(255, 255, 255, 0.08);
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #555;
+  background: rgba(255, 255, 255, 0.15);
 }

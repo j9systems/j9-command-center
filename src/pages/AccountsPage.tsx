@@ -54,37 +54,39 @@ export default function AccountsPage() {
   })
 
   return (
-    <div className="p-4 md:p-8 max-w-4xl mx-auto">
-      <h2 className="text-2xl font-bold mb-6 text-text-primary">Accounts</h2>
+    <div className="p-5 md:p-8 max-w-4xl mx-auto">
+      <h2 className="text-2xl font-bold mb-6 text-text-primary tracking-tight leading-tight">
+        Accounts
+      </h2>
 
       {/* Search bar */}
       <div className="relative mb-6">
         <Search
           size={18}
-          className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary"
+          className="absolute left-3.5 top-1/2 -translate-y-1/2 text-text-tertiary"
         />
         <input
           type="text"
           placeholder="Search accounts..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full pl-10 pr-4 py-2.5 bg-surface border border-border rounded-lg text-sm text-text-primary placeholder:text-text-secondary focus:outline-none focus:border-purple/50 focus:ring-1 focus:ring-purple/25 transition-colors"
+          className="w-full pl-10 pr-4 py-2.5 bg-input border border-border rounded-md text-base text-text-primary placeholder:text-text-tertiary focus:outline-none focus:border-border-accent focus:shadow-focus transition-all duration-150"
         />
       </div>
 
       {/* Loading skeletons */}
       {loading && (
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-4">
           {Array.from({ length: 6 }).map((_, i) => (
             <div
               key={i}
-              className="flex items-center gap-4 p-4 bg-surface rounded-xl border border-border animate-pulse"
+              className="flex items-center gap-4 p-4 bg-surface rounded-xl border border-border shadow-card animate-pulse"
             >
-              <div className="w-11 h-11 rounded-lg bg-border" />
+              <div className="w-9 h-9 rounded-full bg-overlay" />
               <div className="flex-1">
-                <div className="h-4 w-40 bg-border rounded" />
+                <div className="h-4 w-40 bg-overlay rounded" />
               </div>
-              <div className="h-6 w-16 bg-border rounded-full" />
+              <div className="h-5 w-16 bg-overlay rounded-full" />
             </div>
           ))}
         </div>
@@ -92,7 +94,7 @@ export default function AccountsPage() {
 
       {/* Account list */}
       {!loading && filtered.length > 0 && (
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-4">
           {filtered.map((account) => (
             <AccountCard key={account.id} account={account} />
           ))}
@@ -102,7 +104,7 @@ export default function AccountsPage() {
       {/* Empty state */}
       {!loading && filtered.length === 0 && (
         <div className="text-center py-16">
-          <p className="text-text-secondary text-sm">
+          <p className="text-text-secondary text-base">
             {search ? 'No accounts match your search.' : 'No accounts found.'}
           </p>
         </div>
