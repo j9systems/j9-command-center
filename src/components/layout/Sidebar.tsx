@@ -1,0 +1,40 @@
+import { NavLink } from 'react-router-dom'
+import { Home, Building2, Users, UserCog } from 'lucide-react'
+
+const navItems = [
+  { to: '/', icon: Home, label: 'Home' },
+  { to: '/accounts', icon: Building2, label: 'Accounts' },
+  { to: '/contacts', icon: Users, label: 'Contacts' },
+  { to: '/team', icon: UserCog, label: 'Team' },
+]
+
+export default function Sidebar() {
+  return (
+    <aside className="hidden md:flex flex-col w-56 bg-surface border-r border-border h-full">
+      <div className="p-5 border-b border-border">
+        <h1 className="text-lg font-bold tracking-tight text-text-primary">
+          <span className="text-purple">J9</span> Command Center
+        </h1>
+      </div>
+      <nav className="flex-1 p-3 flex flex-col gap-1">
+        {navItems.map(({ to, icon: Icon, label }) => (
+          <NavLink
+            key={to}
+            to={to}
+            end={to === '/'}
+            className={({ isActive }) =>
+              `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
+                isActive
+                  ? 'bg-purple-muted text-purple'
+                  : 'text-text-secondary hover:text-text-primary hover:bg-surface-hover'
+              }`
+            }
+          >
+            <Icon size={20} />
+            {label}
+          </NavLink>
+        ))}
+      </nav>
+    </aside>
+  )
+}
