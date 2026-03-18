@@ -11,6 +11,11 @@ export default function AccountsPage() {
 
   useEffect(() => {
     async function fetchAccounts() {
+      if (!supabase) {
+        setLoading(false)
+        return
+      }
+
       const { data, error } = await supabase
         .from('accounts')
         .select('*, options!fk_accounts_status(option_key, option_label)')
