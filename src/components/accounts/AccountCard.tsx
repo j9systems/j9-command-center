@@ -6,6 +6,8 @@ const statusColors: Record<string, string> = {
   lead: 'bg-warning-bg text-warning',
   prospect: 'bg-info-bg text-info',
   churned: 'bg-danger-bg text-danger',
+  new: 'bg-info-bg text-info',
+  support: 'bg-accent-glow text-accent',
 }
 
 function getStatusColor(key: string | null): string {
@@ -33,12 +35,12 @@ interface AccountCardProps {
 
 export default function AccountCard({ account }: AccountCardProps) {
   return (
-    <div className="flex items-center gap-4 p-4 bg-surface rounded-xl border border-border hover:border-border-emphasis hover:bg-elevated shadow-card transition-all duration-150 cursor-pointer">
+    <div className="flex items-center gap-4 px-5 py-4 bg-surface rounded-xl border border-border hover:border-border-emphasis hover:bg-elevated transition-all duration-150 cursor-pointer">
       {account.logo_path ? (
         <img
           src={account.logo_path}
           alt={account.company_name ?? 'Account logo'}
-          className="w-9 h-9 rounded-full object-cover bg-canvas flex-shrink-0"
+          className="w-10 h-10 rounded-full object-cover bg-canvas flex-shrink-0"
           onError={(e) => {
             const target = e.currentTarget
             target.style.display = 'none'
@@ -47,7 +49,7 @@ export default function AccountCard({ account }: AccountCardProps) {
         />
       ) : null}
       <div
-        className={`w-9 h-9 rounded-full bg-gradient-to-br from-accent to-accent-deep flex items-center justify-center text-white text-xs font-bold flex-shrink-0 ${account.logo_path ? 'hidden' : ''}`}
+        className={`w-10 h-10 rounded-full bg-gradient-to-br from-accent to-accent-deep flex items-center justify-center text-white text-xs font-bold flex-shrink-0 ${account.logo_path ? 'hidden' : ''}`}
       >
         {getInitials(account.company_name)}
       </div>
@@ -58,7 +60,7 @@ export default function AccountCard({ account }: AccountCardProps) {
       </div>
       {account.status_label && (
         <span
-          className={`text-xs font-semibold tracking-wide uppercase px-2.5 py-0.5 rounded-full flex-shrink-0 ${getStatusColor(account.status_key)}`}
+          className={`text-xs font-semibold tracking-wide uppercase px-3 py-1 rounded-full flex-shrink-0 ${getStatusColor(account.status_key)}`}
         >
           {account.status_label}
         </span>

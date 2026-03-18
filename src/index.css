@@ -1,20 +1,20 @@
 @import "tailwindcss";
 
 @theme {
-  /* ── Backgrounds ── */
-  --color-canvas: #060d25;
-  --color-page: #0B1437;
-  --color-surface: #111C44;
-  --color-elevated: #1B254B;
-  --color-overlay: #212E5E;
-  --color-input: #0F1B45;
-  --color-sidebar: #0E1538;
+  /* ── Backgrounds (black / off-black base) ── */
+  --color-canvas: #000000;
+  --color-page: #050505;
+  --color-surface: #0a0a0a;
+  --color-elevated: #111111;
+  --color-overlay: #1a1a1a;
+  --color-input: #0d0d0d;
+  --color-sidebar: #050505;
 
   /* ── Accent / Brand ── */
   --color-accent: #7B61FF;
   --color-accent-light: #A183FF;
   --color-accent-deep: #4318FF;
-  --color-accent-glow: rgba(123, 97, 255, 0.20);
+  --color-accent-glow: rgba(123, 97, 255, 0.15);
 
   /* ── Semantic ── */
   --color-success: #01B574;
@@ -28,14 +28,14 @@
 
   /* ── Text ── */
   --color-text-primary: #FFFFFF;
-  --color-text-secondary: #A3AED0;
-  --color-text-tertiary: #6B7DB3;
+  --color-text-secondary: #888888;
+  --color-text-tertiary: #555555;
   --color-text-accent: #7B61FF;
 
   /* ── Borders ── */
-  --color-border: rgba(255, 255, 255, 0.06);
+  --color-border: rgba(255, 255, 255, 0.08);
   --color-border-subtle: rgba(255, 255, 255, 0.04);
-  --color-border-emphasis: rgba(255, 255, 255, 0.12);
+  --color-border-emphasis: rgba(255, 255, 255, 0.14);
   --color-border-accent: rgba(123, 97, 255, 0.40);
 
   /* ── Font families ── */
@@ -75,14 +75,14 @@
   --radius-full: 9999px;
 
   /* ── Shadows ── */
-  --shadow-xs: 0 1px 3px rgba(0, 0, 0, 0.35);
-  --shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.40);
-  --shadow-card: 0 2px 8px rgba(0, 0, 0, 0.30), 0 0 0 1px rgba(255, 255, 255, 0.05);
-  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.45);
-  --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.50);
-  --shadow-float: 0 20px 60px rgba(0, 0, 0, 0.60);
-  --shadow-accent: 0 4px 20px rgba(123, 97, 255, 0.35);
-  --shadow-focus: 0 0 0 3px rgba(123, 97, 255, 0.30);
+  --shadow-xs: 0 1px 3px rgba(0, 0, 0, 0.5);
+  --shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.5);
+  --shadow-card: 0 2px 8px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.04);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.6);
+  --shadow-float: 0 20px 60px rgba(0, 0, 0, 0.7);
+  --shadow-accent: 0 4px 20px rgba(123, 97, 255, 0.30);
+  --shadow-focus: 0 0 0 3px rgba(123, 97, 255, 0.25);
 }
 
 * {
