@@ -54,13 +54,13 @@ export default function AccountsPage() {
   })
 
   return (
-    <div className="px-10 py-12 md:px-16 md:py-14 max-w-5xl">
-      <h2 className="text-2xl font-bold mb-10 text-text-primary tracking-tight leading-tight">
+    <div className="px-6 py-8 md:px-10 md:py-10 max-w-5xl">
+      <h2 className="text-2xl font-bold mb-8 text-text-primary tracking-tight leading-tight">
         Accounts
       </h2>
 
       {/* Search bar */}
-      <div className="relative mb-10">
+      <div className="relative mb-8">
         <Search
           size={20}
           className="absolute left-5 top-1/2 -translate-y-1/2 text-text-tertiary"

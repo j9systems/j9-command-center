@@ -1,6 +1,6 @@
 export default function TeamPage() {
   return (
-    <div className="px-10 py-12 md:px-16 md:py-14 max-w-5xl">
+    <div className="px-6 py-8 md:px-10 md:py-10 max-w-5xl">
       <h2 className="text-2xl font-bold mb-2 text-text-primary tracking-tight leading-tight">
         Team
       </h2>

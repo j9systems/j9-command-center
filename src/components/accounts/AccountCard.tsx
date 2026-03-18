@@ -35,7 +35,7 @@ interface AccountCardProps {
 
 export default function AccountCard({ account }: AccountCardProps) {
   return (
-    <div className="flex items-center gap-6 px-8 py-6 bg-surface rounded-xl border border-border hover:border-border-emphasis hover:bg-elevated transition-all duration-150 cursor-pointer">
+    <div className="flex items-center gap-5 pl-6 pr-8 py-5 bg-surface rounded-xl border border-border hover:border-border-emphasis hover:bg-elevated transition-all duration-150 cursor-pointer">
       {account.logo_path ? (
         <img
           src={account.logo_path}
