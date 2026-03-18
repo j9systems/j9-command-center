@@ -85,11 +85,7 @@
   --shadow-focus: 0 0 0 3px rgba(123, 97, 255, 0.25);
 }
 
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
+/* Tailwind's preflight handles margin/padding/box-sizing reset */
 
 html, body, #root {
   height: 100%;
