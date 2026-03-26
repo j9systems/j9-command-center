@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, Link, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft,
   CalendarDays,
@@ -23,6 +23,7 @@ const featureStatusColors: Record<string, string> = {
 
 export default function ProjectDetailPage() {
   const { id: accountId, projectId } = useParams<{ id: string; projectId: string }>()
+  const navigate = useNavigate()
   const [project, setProject] = useState<(Project & { project_manager?: TeamMember | null }) | null>(null)
   const [features, setFeatures] = useState<(Feature & { status_option?: Option | null })[]>([])
   const [featureStatuses, setFeatureStatuses] = useState<Option[]>([])
@@ -303,7 +304,8 @@ export default function ProjectDetailPage() {
                 return (
                   <div
                     key={feature.id}
-                    className="flex items-center gap-4 p-3 bg-black/20 rounded-lg border border-border/50"
+                    onClick={() => navigate(`/accounts/${accountId}/projects/${projectId}/features/${feature.id}`)}
+                    className="flex items-center gap-4 p-3 bg-black/20 rounded-lg border border-border/50 hover:border-purple/20 transition-colors cursor-pointer"
                   >
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-text-primary truncate">

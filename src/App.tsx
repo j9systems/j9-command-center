@@ -5,6 +5,7 @@ import AccountsPage from './pages/AccountsPage'
 import AccountDetailPage from './pages/AccountDetailPage'
 import ContactsPage from './pages/ContactsPage'
 import ProjectDetailPage from './pages/ProjectDetailPage'
+import FeatureDetailPage from './pages/FeatureDetailPage'
 import TeamPage from './pages/TeamPage'
 
 export default function App() {
@@ -15,6 +16,7 @@ export default function App() {
         <Route path="/accounts" element={<AccountsPage />} />
         <Route path="/accounts/:id" element={<AccountDetailPage />} />
         <Route path="/accounts/:id/projects/:projectId" element={<ProjectDetailPage />} />
+        <Route path="/accounts/:id/projects/:projectId/features/:featureId" element={<FeatureDetailPage />} />
         <Route path="/contacts" element={<ContactsPage />} />
         <Route path="/team" element={<TeamPage />} />
       </Route>

@@ -214,7 +214,7 @@ export default function AccountDetailPage() {
       // Fetch account team members with roles
       const { data: accountTeamData } = await supabase
         .from('account_team')
-        .select('id, expected_weekly_hrs, team(id, first_name, last_name, email, photo, role), account_roles(id, name)')
+        .select('id, expected_weekly_hrs, team!account_team_Team Member ID_fkey(id, first_name, last_name, email, photo), account_roles!account_team_role_id_fkey(id, name)')
         .eq('account_id', id!)
 
       if (accountTeamData) {
