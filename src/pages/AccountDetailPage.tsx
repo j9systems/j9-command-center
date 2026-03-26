@@ -221,8 +221,8 @@ export default function AccountDetailPage() {
         setAccountTeamMembers(
           accountTeamData.map((at) => ({
             id: at.id,
-            team_member: at.team as TeamMember | null,
-            role: at.account_roles as AccountRole | null,
+            team_member: at.team as unknown as TeamMember | null,
+            role: at.account_roles as unknown as AccountRole | null,
             expected_weekly_hrs: at.expected_weekly_hrs,
           }))
         )
