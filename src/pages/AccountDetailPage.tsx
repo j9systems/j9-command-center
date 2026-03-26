@@ -77,7 +77,7 @@ export default function AccountDetailPage() {
   const [account, setAccount] = useState<AccountWithStatus | null>(null)
   const [primaryContact, setPrimaryContact] = useState<Contact | null>(null)
   const [tasks, setTasks] = useState<(Task & { assigned_to?: TeamMember | null })[]>([])
-  const [projects, setProjects] = useState<(Project & { project_manager?: TeamMember | null })[]>([])
+  const [projects, setProjects] = useState<(Project & { project_manager?: TeamMember | null; logged_hours: number })[]>([])
   const [timeLogs, setTimeLogs] = useState<(TimeLog & { team_member?: TeamMember | null; project?: { name: string | null } | null })[]>([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<'projects' | 'time_logs'>('projects')
@@ -142,20 +142,27 @@ export default function AccountDetailPage() {
         )
       }
 
-      // Fetch projects
+      // Fetch projects with time log hours
       const { data: projectsData } = await supabase
         .from('projects')
-        .select('*, team_members!projects_project_manager_id_fkey(first_name, last_name)')
+        .select('*, team_members!projects_project_manager_id_fkey(first_name, last_name), time_logs(hours)')
         .eq('account_id', id!)
         .order('project_start', { ascending: false })
 
       if (projectsData) {
         setProjects(
-          projectsData.map((p) => ({
-            ...p,
-            project_manager: p.team_members as TeamMember | null,
-            team_members: undefined,
-          })) as (Project & { project_manager?: TeamMember | null })[]
+          projectsData.map((p) => {
+            const loggedHours = Array.isArray(p.time_logs)
+              ? (p.time_logs as { hours: number | null }[]).reduce((sum, tl) => sum + (tl.hours ?? 0), 0)
+              : 0
+            return {
+              ...p,
+              project_manager: p.team_members as TeamMember | null,
+              logged_hours: loggedHours,
+              team_members: undefined,
+              time_logs: undefined,
+            }
+          }) as (Project & { project_manager?: TeamMember | null; logged_hours: number })[]
         )
       }
 
@@ -404,10 +411,24 @@ export default function AccountDetailPage() {
   )
 }
 
+const statusOrder: Record<string, number> = {
+  active: 0,
+  on_hold: 1,
+  completed: 2,
+  cancelled: 3,
+}
+
+const statusGroupLabels: Record<string, string> = {
+  active: 'Active',
+  on_hold: 'On Hold',
+  completed: 'Completed',
+  cancelled: 'Cancelled',
+}
+
 function ProjectsTab({
   projects,
 }: {
-  projects: (Project & { project_manager?: TeamMember | null })[]
+  projects: (Project & { project_manager?: TeamMember | null; logged_hours: number })[]
 }) {
   if (projects.length === 0) {
     return (
@@ -417,42 +438,113 @@ function ProjectsTab({
     )
   }
 
+  // Group projects by status
+  const grouped = projects.reduce<Record<string, typeof projects>>((acc, project) => {
+    const key = project.status?.toLowerCase() ?? 'unknown'
+    if (!acc[key]) acc[key] = []
+    acc[key].push(project)
+    return acc
+  }, {})
+
+  // Sort groups: active first, then on_hold, completed, cancelled, then any unknown
+  const sortedGroups = Object.entries(grouped).sort(([a], [b]) => {
+    const orderA = statusOrder[a] ?? 99
+    const orderB = statusOrder[b] ?? 99
+    return orderA - orderB
+  })
+
   return (
-    <div className="space-y-3">
-      {projects.map((project) => (
-        <div
-          key={project.id}
-          className="flex items-center gap-4 p-4 bg-black/20 rounded-lg border border-border/50 hover:border-purple/20 transition-colors"
-        >
-          <FolderKanban size={18} className="text-text-secondary flex-shrink-0" />
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-text-primary truncate">
-              {project.name ?? 'Unnamed Project'}
-            </p>
-            <div className="flex items-center gap-3 mt-0.5">
-              {project.project_manager && (
-                <span className="text-xs text-text-secondary">
-                  PM: {[project.project_manager.first_name, project.project_manager.last_name]
-                    .filter(Boolean)
-                    .join(' ')}
-                </span>
-              )}
-              {project.project_start && (
-                <span className="text-xs text-text-secondary flex items-center gap-1">
-                  <CalendarDays size={10} />
-                  {new Date(project.project_start).toLocaleDateString()}
-                  {project.project_end && ` - ${new Date(project.project_end).toLocaleDateString()}`}
-                </span>
-              )}
-            </div>
-          </div>
-          {project.status && (
+    <div className="space-y-6">
+      {sortedGroups.map(([status, groupProjects]) => (
+        <div key={status}>
+          <div className="flex items-center gap-2 mb-3">
             <span
-              className={`text-xs font-medium px-2.5 py-1 rounded-full flex-shrink-0 ${getProjectStatusColor(project.status)}`}
+              className={`text-xs font-semibold px-2.5 py-1 rounded-full ${getProjectStatusColor(status)}`}
             >
-              {project.status.replace(/_/g, ' ')}
+              {statusGroupLabels[status] ?? status.replace(/_/g, ' ')}
             </span>
-          )}
+            <span className="text-xs text-text-secondary">
+              {groupProjects.length} {groupProjects.length === 1 ? 'project' : 'projects'}
+            </span>
+          </div>
+          <div className="space-y-3">
+            {groupProjects.map((project) => {
+              const estimated = project.estimated_hours_to_complete
+                ? parseFloat(project.estimated_hours_to_complete)
+                : null
+              const pct = estimated && estimated > 0
+                ? Math.min(Math.round((project.logged_hours / estimated) * 100), 100)
+                : null
+              const isOver = estimated != null && estimated > 0 && project.logged_hours > estimated
+
+              return (
+                <div
+                  key={project.id}
+                  className="flex items-start gap-4 p-4 bg-black/20 rounded-lg border border-border/50 hover:border-purple/20 transition-colors"
+                >
+                  <FolderKanban size={18} className="text-text-secondary flex-shrink-0 mt-0.5" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-text-primary truncate">
+                      {project.name ?? 'Unnamed Project'}
+                    </p>
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1">
+                      {project.project_manager && (
+                        <span className="text-xs text-text-secondary">
+                          PM: {[project.project_manager.first_name, project.project_manager.last_name]
+                            .filter(Boolean)
+                            .join(' ')}
+                        </span>
+                      )}
+                      {(project.project_start || project.project_end) && (
+                        <span className="text-xs text-text-secondary flex items-center gap-1">
+                          <CalendarDays size={10} />
+                          {project.project_start
+                            ? new Date(project.project_start).toLocaleDateString()
+                            : 'TBD'}
+                          {' - '}
+                          {project.project_end
+                            ? new Date(project.project_end).toLocaleDateString()
+                            : 'Ongoing'}
+                        </span>
+                      )}
+                    </div>
+                    {/* Hours progress */}
+                    <div className="flex items-center gap-2 mt-2">
+                      <Clock size={12} className="text-text-secondary flex-shrink-0" />
+                      <span className={`text-xs font-medium ${isOver ? 'text-red-400' : 'text-text-primary'}`}>
+                        {project.logged_hours.toFixed(1)}h
+                      </span>
+                      {estimated != null && (
+                        <>
+                          <span className="text-xs text-text-secondary">
+                            / {estimated.toFixed(1)}h est.
+                          </span>
+                          <div className="flex-1 max-w-[120px] h-1.5 bg-border rounded-full overflow-hidden">
+                            <div
+                              className={`h-full rounded-full transition-all ${
+                                isOver ? 'bg-red-400' : pct != null && pct >= 80 ? 'bg-amber-400' : 'bg-emerald-400'
+                              }`}
+                              style={{ width: `${Math.min(pct ?? 0, 100)}%` }}
+                            />
+                          </div>
+                          {pct != null && (
+                            <span className={`text-[10px] ${isOver ? 'text-red-400' : 'text-text-secondary'}`}>
+                              {isOver
+                                ? `${Math.round((project.logged_hours / estimated) * 100)}%`
+                                : `${pct}%`}
+                            </span>
+                          )}
+                        </>
+                      )}
+                      {estimated == null && (
+                        <span className="text-xs text-text-secondary">logged</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
         </div>
       ))}
     </div>
