@@ -878,18 +878,6 @@ function TimeLogsTab({
           onSubmit={handleCreateLog}
           className="mb-6 p-4 bg-black/20 rounded-lg border border-border/50 space-y-3"
         >
-          <div className="flex items-center gap-2 mb-1">
-            <div className="w-6 h-6 rounded-full bg-purple-muted flex items-center justify-center flex-shrink-0">
-              {currentTeamMember.photo ? (
-                <img src={currentTeamMember.photo} alt="" className="w-6 h-6 rounded-full object-cover" />
-              ) : (
-                <User size={12} className="text-purple" />
-              )}
-            </div>
-            <span className="text-xs text-text-secondary">
-              Logging as {[currentTeamMember.first_name, currentTeamMember.last_name].filter(Boolean).join(' ')}
-            </span>
-          </div>
           <div>
             <input
               type="text"

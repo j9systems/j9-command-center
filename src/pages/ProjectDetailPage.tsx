@@ -4,6 +4,7 @@ import {
   ArrowLeft,
   CalendarDays,
   FolderKanban,
+  Pencil,
   Plus,
   X,
 } from 'lucide-react'
@@ -37,6 +38,10 @@ export default function ProjectDetailPage() {
     end_date: '',
     status_id: 0,
   })
+  const [editingDates, setEditingDates] = useState(false)
+  const [editStart, setEditStart] = useState('')
+  const [editEnd, setEditEnd] = useState('')
+  const [savingDates, setSavingDates] = useState(false)
 
   useEffect(() => {
     if (!projectId) return
@@ -128,6 +133,37 @@ export default function ProjectDetailPage() {
     setSaving(false)
   }
 
+  function toInputDate(val: string | null): string {
+    if (!val) return ''
+    if (/^\d{4}-\d{2}-\d{2}$/.test(val)) return val
+    const d = new Date(val)
+    if (isNaN(d.getTime())) return ''
+    return d.toISOString().slice(0, 10)
+  }
+
+  function startEditingDates() {
+    setEditStart(toInputDate(project?.project_start ?? null))
+    setEditEnd(toInputDate(project?.project_end ?? null))
+    setEditingDates(true)
+  }
+
+  async function handleSaveDates() {
+    if (!projectId || !project) return
+    setSavingDates(true)
+    const { error } = await supabase
+      .from('projects')
+      .update({
+        project_start: editStart || null,
+        project_end: editEnd || null,
+      })
+      .eq('id', projectId)
+    if (!error) {
+      setProject({ ...project, project_start: editStart || null, project_end: editEnd || null })
+      setEditingDates(false)
+    }
+    setSavingDates(false)
+  }
+
   if (loading) {
     return (
       <div className="p-4 md:p-8 max-w-4xl mx-auto">
@@ -184,7 +220,7 @@ export default function ProjectDetailPage() {
                   .join(' ')}
               </span>
             )}
-            {(project.project_start || project.project_end) && (
+            {!editingDates ? (
               <span className="text-sm text-text-secondary flex items-center gap-1">
                 <CalendarDays size={12} />
                 {project.project_start
@@ -194,7 +230,42 @@ export default function ProjectDetailPage() {
                 {project.project_end
                   ? new Date(project.project_end).toLocaleDateString()
                   : 'Ongoing'}
+                <button
+                  onClick={startEditingDates}
+                  className="ml-1 text-text-secondary hover:text-purple transition-colors"
+                >
+                  <Pencil size={12} />
+                </button>
               </span>
+            ) : (
+              <div className="flex items-center gap-2">
+                <input
+                  type="date"
+                  value={editStart}
+                  onChange={(e) => setEditStart(e.target.value)}
+                  className="text-xs bg-surface border border-border rounded px-2 py-1 text-text-primary focus:outline-none focus:border-purple/50"
+                />
+                <span className="text-text-secondary text-xs">-</span>
+                <input
+                  type="date"
+                  value={editEnd}
+                  onChange={(e) => setEditEnd(e.target.value)}
+                  className="text-xs bg-surface border border-border rounded px-2 py-1 text-text-primary focus:outline-none focus:border-purple/50"
+                />
+                <button
+                  onClick={handleSaveDates}
+                  disabled={savingDates}
+                  className="text-[11px] font-medium px-2.5 py-1 rounded bg-purple text-white hover:bg-purple-hover transition-colors disabled:opacity-50"
+                >
+                  {savingDates ? '...' : 'Save'}
+                </button>
+                <button
+                  onClick={() => setEditingDates(false)}
+                  className="text-text-secondary hover:text-text-primary transition-colors"
+                >
+                  <X size={14} />
+                </button>
+              </div>
             )}
           </div>
         </div>

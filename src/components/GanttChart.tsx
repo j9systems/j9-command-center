@@ -100,8 +100,17 @@ function fmtDisplay(d: Date) {
 }
 function parseDate(s: string | null): Date | null {
   if (!s) return null
-  const d = new Date(s + 'T00:00:00')
-  return isNaN(d.getTime()) ? null : d
+  // Handle ISO format "2026-03-26"
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+    const d = new Date(s + 'T00:00:00')
+    return isNaN(d.getTime()) ? null : d
+  }
+  // Handle US locale format "1/13/2026, 12:00:00 AM"
+  const d = new Date(s)
+  if (!isNaN(d.getTime())) {
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate())
+  }
+  return null
 }
 
 /* ------------------------------------------------------------------ */
@@ -239,18 +248,22 @@ export default function GanttChart({
     return start <= rangeEnd && end >= rangeStart
   }
 
-  /* Build rows — only include projects that have dates in range or features in range */
+  /* Build rows — include projects if their dates or any feature dates overlap the range.
+     Once a project is visible, show ALL its features that have dates. */
   const rows: GanttRow[] = []
   for (const proj of projectsWithFeatures) {
     const projStart = parseDate(proj.project_start)
     const projEnd = parseDate(proj.project_end)
     const projectInRange = overlapsRange(projStart, projEnd)
 
-    const visibleFeatures = proj.features.filter((feat) =>
+    const featuresWithDates = proj.features.filter((feat) =>
+      parseDate(feat.start_date) && parseDate(feat.end_date)
+    )
+    const anyFeatureInRange = featuresWithDates.some((feat) =>
       overlapsRange(parseDate(feat.start_date), parseDate(feat.end_date))
     )
 
-    if (!projectInRange && visibleFeatures.length === 0) continue
+    if (!projectInRange && !anyFeatureInRange) continue
 
     rows.push({
       type: 'project',
@@ -261,7 +274,7 @@ export default function GanttChart({
       status: proj.status,
       projectId: proj.id,
     })
-    for (const feat of visibleFeatures) {
+    for (const feat of featuresWithDates) {
       rows.push({
         type: 'feature',
         id: feat.id,
@@ -502,6 +515,26 @@ export default function GanttChart({
 
   const svgHeight = rows.length * ROW_HEIGHT
 
+  /* Wheel handler — scroll horizontally to shift the date range */
+  const wheelRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const el = wheelRef.current
+    if (!el) return
+    function onWheel(e: WheelEvent) {
+      if (dragRef.current) return
+      // Only handle horizontal-ish scroll or shift+scroll
+      const dx = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.shiftKey ? e.deltaX || e.deltaY : e.deltaY
+      if (Math.abs(dx) < 5) return
+      e.preventDefault()
+      setOffset((o) => o + (dx > 0 ? 1 : -1))
+    }
+    el.addEventListener('wheel', onWheel, { passive: false })
+    return () => el.removeEventListener('wheel', onWheel)
+  }, [])
+
+  /* Whether today is in the current view */
+  const todayInView = today >= rangeStart && today <= rangeEnd
+
   if (loading) {
     return (
       <div className="bg-surface rounded-xl border border-border p-5 mb-8">
@@ -540,6 +573,14 @@ export default function GanttChart({
           >
             &rarr;
           </button>
+          {!todayInView && (
+            <button
+              onClick={() => setOffset(0)}
+              className="text-[11px] px-2.5 py-1 font-medium rounded border border-purple/30 text-purple hover:bg-purple/10 transition-colors"
+            >
+              Today
+            </button>
+          )}
           <div className="flex ml-2 border border-border rounded overflow-hidden">
             {(['week', 'month', 'quarter'] as Timeframe[]).map((tf) => (
               <button
@@ -562,7 +603,7 @@ export default function GanttChart({
       </div>
 
       {/* Chart */}
-      <div className="flex overflow-x-auto relative select-none">
+      <div ref={wheelRef} className="flex overflow-hidden relative select-none">
         {/* Labels column */}
         <div className="flex-shrink-0" style={{ width: LABEL_WIDTH }}>
           {rows.map((row) => (
