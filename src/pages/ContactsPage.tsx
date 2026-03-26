@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import {
   Search,
-  User,
   Mail,
   Phone,
   Building2,
