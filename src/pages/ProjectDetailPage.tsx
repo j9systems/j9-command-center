@@ -64,6 +64,10 @@ export default function ProjectDetailPage() {
 
       if (statusOptions) {
         setFeatureStatuses(statusOptions as Option[])
+        const backlog = statusOptions.find((s) => s.option_key === 'backlog')
+        if (backlog) {
+          setNewFeature((prev) => ({ ...prev, status_id: backlog.id }))
+        }
       }
 
       const { data: featuresData } = await supabase
@@ -116,7 +120,8 @@ export default function ProjectDetailPage() {
           options: undefined,
         } as Feature & { status_option?: Option | null },
       ])
-      setNewFeature({ name: '', description: '', start_date: '', end_date: '', status_id: 0 })
+      const backlog = featureStatuses.find((s) => s.option_key === 'backlog')
+      setNewFeature({ name: '', description: '', start_date: '', end_date: '', status_id: backlog?.id ?? 0 })
       setShowAddForm(false)
     }
     setSaving(false)

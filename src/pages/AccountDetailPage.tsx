@@ -192,7 +192,7 @@ export default function AccountDetailPage() {
       // Fetch time logs with status option
       const { data: timeLogsData } = await supabase
         .from('time_logs')
-        .select('*, team(first_name, last_name), projects(name), options(id, option_key, option_label)')
+        .select('*, team(first_name, last_name, photo), projects(name), options(id, option_key, option_label)')
         .eq('account_id', id!)
         .order('date', { ascending: false })
         .limit(50)
@@ -676,6 +676,17 @@ function TimeLogsTab({
               key={log.id}
               className="flex items-center gap-4 p-3 bg-black/20 rounded-lg border border-border/50"
             >
+              <div className="w-7 h-7 rounded-full bg-purple-muted flex items-center justify-center flex-shrink-0">
+                {log.team_member?.photo ? (
+                  <img
+                    src={log.team_member.photo}
+                    alt=""
+                    className="w-7 h-7 rounded-full object-cover"
+                  />
+                ) : (
+                  <User size={14} className="text-purple" />
+                )}
+              </div>
               <div className="text-right flex-shrink-0 w-14">
                 <span className="text-sm font-semibold text-purple">
                   {log.hours?.toFixed(1) ?? '0.0'}h
@@ -786,14 +797,9 @@ function AccountTeamTab({
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-text-primary truncate">{name}</p>
-              <div className="flex items-center gap-2 mt-0.5">
-                {member.team_member?.role && (
-                  <span className="text-xs text-text-secondary">{member.team_member.role}</span>
-                )}
-                {member.team_member?.email && (
-                  <span className="text-xs text-text-secondary truncate">{member.team_member.email}</span>
-                )}
-              </div>
+              {member.team_member?.email && (
+                <p className="text-xs text-text-secondary truncate mt-0.5">{member.team_member.email}</p>
+              )}
             </div>
             <div className="flex items-center gap-3 flex-shrink-0">
               {member.expected_weekly_hrs && (
