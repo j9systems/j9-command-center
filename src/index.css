@@ -71,6 +71,11 @@
   padding-bottom: max(2rem, env(safe-area-inset-bottom, 0px));
 }
 
+/* Safe area bottom for bottom nav (no minimum) */
+.safe-bottom-nav {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
 /* Scrollbar styling */
 ::-webkit-scrollbar {
   width: 6px;

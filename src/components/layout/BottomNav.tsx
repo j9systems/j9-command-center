@@ -10,7 +10,7 @@ const navItems = [
 
 export default function BottomNav() {
   return (
-    <nav className="md:hidden bg-surface border-t border-border flex-shrink-0 safe-bottom">
+    <nav className="md:hidden bg-surface border-t border-border flex-shrink-0 safe-bottom-nav">
       <div className="flex justify-around items-center h-14">
         {navItems.map(({ to, icon: Icon, label }) => (
           <NavLink
