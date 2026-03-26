@@ -24,7 +24,7 @@ export default function MobileHeader() {
   }
 
   return (
-    <header className="md:hidden sticky top-0 z-50 flex items-center justify-between px-4 h-14 bg-surface border-b border-border">
+    <header className="md:hidden sticky top-0 z-50 flex items-center justify-between px-4 h-14 pt-[env(safe-area-inset-top)] bg-surface border-b border-border">
       <div className="flex items-center gap-2">
         <img
           src="https://res.cloudinary.com/duy32f0q4/image/upload/v1773874676/20A38445-8946-49E1-8330-AA60BFA12F74_1_1_fuobbj.png"
