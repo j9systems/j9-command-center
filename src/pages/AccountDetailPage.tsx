@@ -142,27 +142,36 @@ export default function AccountDetailPage() {
         )
       }
 
-      // Fetch projects with time log hours
+      // Fetch projects
       const { data: projectsData } = await supabase
         .from('projects')
-        .select('*, team_members!projects_project_manager_id_fkey(first_name, last_name), time_logs(hours)')
+        .select('*, team_members!projects_project_manager_id_fkey(first_name, last_name)')
         .eq('account_id', id!)
         .order('project_start', { ascending: false })
 
+      // Fetch time log hours grouped by project
+      const { data: projectHoursData } = await supabase
+        .from('time_logs')
+        .select('project_id, hours')
+        .eq('account_id', id!)
+
+      const hoursByProject: Record<string, number> = {}
+      if (projectHoursData) {
+        for (const tl of projectHoursData) {
+          if (tl.project_id) {
+            hoursByProject[tl.project_id] = (hoursByProject[tl.project_id] ?? 0) + (tl.hours ?? 0)
+          }
+        }
+      }
+
       if (projectsData) {
         setProjects(
-          projectsData.map((p) => {
-            const loggedHours = Array.isArray(p.time_logs)
-              ? (p.time_logs as { hours: number | null }[]).reduce((sum, tl) => sum + (tl.hours ?? 0), 0)
-              : 0
-            return {
-              ...p,
-              project_manager: p.team_members as TeamMember | null,
-              logged_hours: loggedHours,
-              team_members: undefined,
-              time_logs: undefined,
-            }
-          }) as (Project & { project_manager?: TeamMember | null; logged_hours: number })[]
+          projectsData.map((p) => ({
+            ...p,
+            project_manager: p.team_members as TeamMember | null,
+            logged_hours: hoursByProject[p.id] ?? 0,
+            team_members: undefined,
+          })) as (Project & { project_manager?: TeamMember | null; logged_hours: number })[]
         )
       }
 
