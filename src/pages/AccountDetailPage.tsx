@@ -145,9 +145,8 @@ export default function AccountDetailPage() {
       // Fetch projects
       const { data: projectsData } = await supabase
         .from('projects')
-        .select('*, team_members!projects_project_manager_id_fkey(first_name, last_name)')
+        .select('*, team(first_name, last_name)')
         .eq('account_id', id!)
-        .order('project_start', { ascending: false })
 
       // Fetch time log hours grouped by project
       const { data: projectHoursData } = await supabase
@@ -168,9 +167,9 @@ export default function AccountDetailPage() {
         setProjects(
           projectsData.map((p) => ({
             ...p,
-            project_manager: p.team_members as TeamMember | null,
+            project_manager: p.team as TeamMember | null,
             logged_hours: hoursByProject[p.id] ?? 0,
-            team_members: undefined,
+            team: undefined,
           })) as (Project & { project_manager?: TeamMember | null; logged_hours: number })[]
         )
       }
@@ -178,7 +177,7 @@ export default function AccountDetailPage() {
       // Fetch time logs
       const { data: timeLogsData } = await supabase
         .from('time_logs')
-        .select('*, team_members!time_logs_team_member_id_fkey(first_name, last_name), projects!time_logs_project_id_fkey(name)')
+        .select('*, team(first_name, last_name), projects(name)')
         .eq('account_id', id!)
         .order('date', { ascending: false })
         .limit(50)
@@ -187,9 +186,9 @@ export default function AccountDetailPage() {
         setTimeLogs(
           timeLogsData.map((tl) => ({
             ...tl,
-            team_member: tl.team_members as TeamMember | null,
+            team_member: tl.team as TeamMember | null,
             project: tl.projects as { name: string | null } | null,
-            team_members: undefined,
+            team: undefined,
             projects: undefined,
           })) as (TimeLog & { team_member?: TeamMember | null; project?: { name: string | null } | null })[]
         )
