@@ -44,6 +44,33 @@
 }
 
 
+/* Hide scrollbar utility (for horizontal tab scrolling on mobile) */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Mobile form overlay slide-up animation */
+@keyframes slide-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+.animate-slide-up {
+  animation: slide-up 0.25s ease-out;
+}
+
+/* Safe area bottom for overlay sheets */
+.safe-bottom {
+  padding-bottom: max(2rem, env(safe-area-inset-bottom, 0px));
+}
+
 /* Scrollbar styling */
 ::-webkit-scrollbar {
   width: 6px;

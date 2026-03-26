@@ -9,6 +9,7 @@ import {
   X,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import MobileFormOverlay from '@/components/MobileFormOverlay'
 import type {
   Project,
   Feature,
@@ -289,77 +290,85 @@ export default function ProjectDetailPage() {
         <div className="p-5">
           {/* Add feature form */}
           {showAddForm && (
-            <div className="mb-4 p-4 bg-black/20 rounded-lg border border-border/50">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-medium text-text-primary">New Feature</h3>
-                <button
-                  onClick={() => setShowAddForm(false)}
-                  className="text-text-secondary hover:text-text-primary transition-colors"
-                >
-                  <X size={16} />
-                </button>
-              </div>
-              <div className="space-y-3">
-                <input
-                  type="text"
-                  placeholder="Feature name"
-                  value={newFeature.name}
-                  onChange={(e) => setNewFeature((prev) => ({ ...prev, name: e.target.value }))}
-                  className="w-full bg-black/30 border border-border rounded-md px-3 py-2 text-sm text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:border-purple/50"
-                />
-                <textarea
-                  placeholder="Description (optional)"
-                  value={newFeature.description}
-                  onChange={(e) => setNewFeature((prev) => ({ ...prev, description: e.target.value }))}
-                  rows={2}
-                  className="w-full bg-black/30 border border-border rounded-md px-3 py-2 text-sm text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:border-purple/50 resize-none"
-                />
-                <div className="grid grid-cols-3 gap-3">
-                  <div>
-                    <label className="text-[11px] text-text-secondary mb-1 block">Start Date</label>
-                    <input
-                      type="date"
-                      value={newFeature.start_date}
-                      onChange={(e) => setNewFeature((prev) => ({ ...prev, start_date: e.target.value }))}
-                      className="w-full bg-black/30 border border-border rounded-md px-3 py-1.5 text-sm text-text-primary focus:outline-none focus:border-purple/50"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[11px] text-text-secondary mb-1 block">End Date</label>
-                    <input
-                      type="date"
-                      value={newFeature.end_date}
-                      onChange={(e) => setNewFeature((prev) => ({ ...prev, end_date: e.target.value }))}
-                      className="w-full bg-black/30 border border-border rounded-md px-3 py-1.5 text-sm text-text-primary focus:outline-none focus:border-purple/50"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[11px] text-text-secondary mb-1 block">Status</label>
-                    <select
-                      value={newFeature.status_id}
-                      onChange={(e) => setNewFeature((prev) => ({ ...prev, status_id: Number(e.target.value) }))}
-                      className="w-full bg-black/30 border border-border rounded-md px-3 py-1.5 text-sm text-text-primary focus:outline-none focus:border-purple/50"
-                    >
-                      <option value={0}>Select status</option>
-                      {featureStatuses.map((s) => (
-                        <option key={s.id} value={s.id}>
-                          {s.option_label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-                <div className="flex justify-end">
+            <MobileFormOverlay title="New Feature" onClose={() => setShowAddForm(false)}>
+              <div className="mb-4 p-4 md:bg-black/20 rounded-lg md:border md:border-border/50">
+                <div className="hidden md:flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-medium text-text-primary">New Feature</h3>
                   <button
-                    onClick={handleAddFeature}
-                    disabled={!newFeature.name.trim() || saving}
-                    className="px-4 py-1.5 text-sm font-medium bg-purple hover:bg-purple-hover text-white rounded-md transition-colors disabled:opacity-50"
+                    onClick={() => setShowAddForm(false)}
+                    className="text-text-secondary hover:text-text-primary transition-colors"
                   >
-                    {saving ? 'Saving...' : 'Add Feature'}
+                    <X size={16} />
                   </button>
                 </div>
+                <div className="space-y-3">
+                  <input
+                    type="text"
+                    placeholder="Feature name"
+                    value={newFeature.name}
+                    onChange={(e) => setNewFeature((prev) => ({ ...prev, name: e.target.value }))}
+                    className="w-full bg-black/30 border border-border rounded-md px-3 py-2 text-sm text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:border-purple/50"
+                  />
+                  <textarea
+                    placeholder="Description (optional)"
+                    value={newFeature.description}
+                    onChange={(e) => setNewFeature((prev) => ({ ...prev, description: e.target.value }))}
+                    rows={2}
+                    className="w-full bg-black/30 border border-border rounded-md px-3 py-2 text-sm text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:border-purple/50 resize-none"
+                  />
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label className="text-[11px] text-text-secondary mb-1 block">Start Date</label>
+                      <input
+                        type="date"
+                        value={newFeature.start_date}
+                        onChange={(e) => setNewFeature((prev) => ({ ...prev, start_date: e.target.value }))}
+                        className="w-full bg-black/30 border border-border rounded-md px-3 py-1.5 text-sm text-text-primary focus:outline-none focus:border-purple/50"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] text-text-secondary mb-1 block">End Date</label>
+                      <input
+                        type="date"
+                        value={newFeature.end_date}
+                        onChange={(e) => setNewFeature((prev) => ({ ...prev, end_date: e.target.value }))}
+                        className="w-full bg-black/30 border border-border rounded-md px-3 py-1.5 text-sm text-text-primary focus:outline-none focus:border-purple/50"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] text-text-secondary mb-1 block">Status</label>
+                      <select
+                        value={newFeature.status_id}
+                        onChange={(e) => setNewFeature((prev) => ({ ...prev, status_id: Number(e.target.value) }))}
+                        className="w-full bg-black/30 border border-border rounded-md px-3 py-1.5 text-sm text-text-primary focus:outline-none focus:border-purple/50"
+                      >
+                        <option value={0}>Select status</option>
+                        {featureStatuses.map((s) => (
+                          <option key={s.id} value={s.id}>
+                            {s.option_label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <div className="flex justify-end gap-2">
+                    <button
+                      onClick={() => setShowAddForm(false)}
+                      className="px-4 py-1.5 text-sm font-medium border border-border text-text-secondary hover:text-text-primary rounded-md transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleAddFeature}
+                      disabled={!newFeature.name.trim() || saving}
+                      className="px-4 py-1.5 text-sm font-medium bg-purple hover:bg-purple-hover text-white rounded-md transition-colors disabled:opacity-50"
+                    >
+                      {saving ? 'Saving...' : 'Add Feature'}
+                    </button>
+                  </div>
+                </div>
               </div>
-            </div>
+            </MobileFormOverlay>
           )}
 
           {/* Features list */}

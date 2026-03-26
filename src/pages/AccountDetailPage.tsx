@@ -28,6 +28,7 @@ import type {
   TeamMember,
 } from '@/types/database'
 import GanttChart from '@/components/GanttChart'
+import MobileFormOverlay from '@/components/MobileFormOverlay'
 
 const statusColors: Record<string, string> = {
   active: 'bg-emerald-500/15 text-emerald-400',
@@ -287,7 +288,7 @@ export default function AccountDetailPage() {
   ]
 
   return (
-    <div className="p-4 md:p-8 max-w-4xl mx-auto">
+    <div className="p-4 md:p-8 max-w-4xl mx-auto overflow-x-hidden">
       {/* Back link */}
       <Link
         to="/accounts"
@@ -432,12 +433,12 @@ export default function AccountDetailPage() {
       {/* Tabbed Container */}
       <div className="bg-surface rounded-xl border border-border overflow-hidden">
         {/* Tab headers */}
-        <div className="flex border-b border-border">
+        <div className="flex border-b border-border overflow-x-auto scrollbar-hide">
           {tabs.map((tab) => (
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
-              className={`flex items-center gap-2 px-5 py-3 text-sm font-medium transition-colors relative ${
+              className={`flex items-center gap-2 px-5 py-3 text-sm font-medium transition-colors relative whitespace-nowrap flex-shrink-0 ${
                 activeTab === tab.key
                   ? 'text-purple'
                   : 'text-text-secondary hover:text-text-primary'
@@ -579,56 +580,58 @@ function ProjectsTab({
       </div>
 
       {showForm && (
-        <div className="p-4 bg-black/20 rounded-lg border border-border/50 space-y-3">
-          <div className="flex items-center justify-between mb-1">
-            <h3 className="text-sm font-medium text-text-primary">New Project</h3>
-            <button onClick={() => setShowForm(false)} className="text-text-secondary hover:text-text-primary transition-colors">
-              <X size={16} />
-            </button>
-          </div>
-          <input
-            type="text"
-            placeholder="Project name"
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-            className="w-full text-sm bg-surface border border-border rounded-lg px-3 py-2 text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:border-purple/50"
-          />
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-[10px] text-text-secondary uppercase tracking-wider mb-1 block">Start Date</label>
-              <input
-                type="date"
-                value={newStart}
-                onChange={(e) => setNewStart(e.target.value)}
-                className="w-full text-sm bg-surface border border-border rounded-lg px-3 py-2 text-text-primary focus:outline-none focus:border-purple/50"
-              />
+        <MobileFormOverlay title="New Project" onClose={() => setShowForm(false)}>
+          <div className="p-4 md:bg-black/20 rounded-lg md:border md:border-border/50 space-y-3">
+            <div className="hidden md:flex items-center justify-between mb-1">
+              <h3 className="text-sm font-medium text-text-primary">New Project</h3>
+              <button onClick={() => setShowForm(false)} className="text-text-secondary hover:text-text-primary transition-colors">
+                <X size={16} />
+              </button>
             </div>
-            <div>
-              <label className="text-[10px] text-text-secondary uppercase tracking-wider mb-1 block">End Date</label>
-              <input
-                type="date"
-                value={newEnd}
-                onChange={(e) => setNewEnd(e.target.value)}
-                className="w-full text-sm bg-surface border border-border rounded-lg px-3 py-2 text-text-primary focus:outline-none focus:border-purple/50"
-              />
+            <input
+              type="text"
+              placeholder="Project name"
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              className="w-full text-sm bg-surface border border-border rounded-lg px-3 py-2 text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:border-purple/50"
+            />
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-[10px] text-text-secondary uppercase tracking-wider mb-1 block">Start Date</label>
+                <input
+                  type="date"
+                  value={newStart}
+                  onChange={(e) => setNewStart(e.target.value)}
+                  className="w-full text-sm bg-surface border border-border rounded-lg px-3 py-2 text-text-primary focus:outline-none focus:border-purple/50"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] text-text-secondary uppercase tracking-wider mb-1 block">End Date</label>
+                <input
+                  type="date"
+                  value={newEnd}
+                  onChange={(e) => setNewEnd(e.target.value)}
+                  className="w-full text-sm bg-surface border border-border rounded-lg px-3 py-2 text-text-primary focus:outline-none focus:border-purple/50"
+                />
+              </div>
+            </div>
+            <div className="flex items-center gap-2 pt-1">
+              <button
+                onClick={handleCreateProject}
+                disabled={!newName.trim() || saving}
+                className="text-xs font-medium px-4 py-1.5 rounded-lg bg-purple text-white hover:bg-purple-hover transition-colors disabled:opacity-50"
+              >
+                {saving ? 'Creating...' : 'Create'}
+              </button>
+              <button
+                onClick={() => setShowForm(false)}
+                className="text-xs font-medium px-4 py-1.5 rounded-lg border border-border text-text-secondary hover:text-text-primary transition-colors"
+              >
+                Cancel
+              </button>
             </div>
           </div>
-          <div className="flex items-center gap-2 pt-1">
-            <button
-              onClick={handleCreateProject}
-              disabled={!newName.trim() || saving}
-              className="text-xs font-medium px-4 py-1.5 rounded-lg bg-purple text-white hover:bg-purple-hover transition-colors disabled:opacity-50"
-            >
-              {saving ? 'Creating...' : 'Create'}
-            </button>
-            <button
-              onClick={() => setShowForm(false)}
-              className="text-xs font-medium px-4 py-1.5 rounded-lg border border-border text-text-secondary hover:text-text-primary transition-colors"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
+        </MobileFormOverlay>
       )}
 
       {projects.length === 0 && !showForm ? (
@@ -983,77 +986,79 @@ function TimeLogsTab({
 
       {/* New time log form */}
       {showForm && currentTeamMember && (
-        <form
-          onSubmit={handleCreateLog}
-          className="mb-6 p-4 bg-black/20 rounded-lg border border-border/50 space-y-3"
-        >
-          <div>
-            <input
-              type="text"
-              placeholder="What did you work on?"
-              value={formName}
-              onChange={(e) => setFormName(e.target.value)}
-              required
-              className="w-full text-sm bg-surface border border-border rounded-lg px-3 py-2 text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:border-purple/50"
-            />
-          </div>
-          <div className="grid grid-cols-3 gap-3">
+        <MobileFormOverlay title="Log Time" onClose={() => setShowForm(false)}>
+          <form
+            onSubmit={handleCreateLog}
+            className="md:mb-6 p-4 md:bg-black/20 rounded-lg md:border md:border-border/50 space-y-3"
+          >
             <div>
-              <label className="text-[10px] text-text-secondary uppercase tracking-wider mb-1 block">Hours</label>
               <input
-                type="number"
-                step="0.25"
-                min="0.25"
-                placeholder="0.0"
-                value={formHours}
-                onChange={(e) => setFormHours(e.target.value)}
+                type="text"
+                placeholder="What did you work on?"
+                value={formName}
+                onChange={(e) => setFormName(e.target.value)}
                 required
                 className="w-full text-sm bg-surface border border-border rounded-lg px-3 py-2 text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:border-purple/50"
               />
             </div>
-            <div>
-              <label className="text-[10px] text-text-secondary uppercase tracking-wider mb-1 block">Date</label>
-              <input
-                type="date"
-                value={formDate}
-                onChange={(e) => setFormDate(e.target.value)}
-                required
-                className="w-full text-sm bg-surface border border-border rounded-lg px-3 py-2 text-text-primary focus:outline-none focus:border-purple/50"
-              />
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label className="text-[10px] text-text-secondary uppercase tracking-wider mb-1 block">Hours</label>
+                <input
+                  type="number"
+                  step="0.25"
+                  min="0.25"
+                  placeholder="0.0"
+                  value={formHours}
+                  onChange={(e) => setFormHours(e.target.value)}
+                  required
+                  className="w-full text-sm bg-surface border border-border rounded-lg px-3 py-2 text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:border-purple/50"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] text-text-secondary uppercase tracking-wider mb-1 block">Date</label>
+                <input
+                  type="date"
+                  value={formDate}
+                  onChange={(e) => setFormDate(e.target.value)}
+                  required
+                  className="w-full text-sm bg-surface border border-border rounded-lg px-3 py-2 text-text-primary focus:outline-none focus:border-purple/50"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] text-text-secondary uppercase tracking-wider mb-1 block">Project</label>
+                <select
+                  value={formProjectId}
+                  onChange={(e) => setFormProjectId(e.target.value)}
+                  className="w-full text-sm bg-surface border border-border rounded-lg px-3 py-2 text-text-primary focus:outline-none focus:border-purple/50"
+                >
+                  <option value="">No project</option>
+                  {projects.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name ?? 'Unnamed Project'}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
-            <div>
-              <label className="text-[10px] text-text-secondary uppercase tracking-wider mb-1 block">Project</label>
-              <select
-                value={formProjectId}
-                onChange={(e) => setFormProjectId(e.target.value)}
-                className="w-full text-sm bg-surface border border-border rounded-lg px-3 py-2 text-text-primary focus:outline-none focus:border-purple/50"
+            <div className="flex items-center gap-2 pt-1">
+              <button
+                type="submit"
+                disabled={saving}
+                className="text-xs font-medium px-4 py-1.5 rounded-lg bg-purple text-white hover:bg-purple-hover transition-colors disabled:opacity-50"
               >
-                <option value="">No project</option>
-                {projects.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name ?? 'Unnamed Project'}
-                  </option>
-                ))}
-              </select>
+                {saving ? 'Saving...' : 'Save'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowForm(false)}
+                className="text-xs font-medium px-4 py-1.5 rounded-lg border border-border text-text-secondary hover:text-text-primary transition-colors"
+              >
+                Cancel
+              </button>
             </div>
-          </div>
-          <div className="flex items-center gap-2 pt-1">
-            <button
-              type="submit"
-              disabled={saving}
-              className="text-xs font-medium px-4 py-1.5 rounded-lg bg-purple text-white hover:bg-purple-hover transition-colors disabled:opacity-50"
-            >
-              {saving ? 'Saving...' : 'Save'}
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowForm(false)}
-              className="text-xs font-medium px-4 py-1.5 rounded-lg border border-border text-text-secondary hover:text-text-primary transition-colors"
-            >
-              Cancel
-            </button>
-          </div>
-        </form>
+          </form>
+        </MobileFormOverlay>
       )}
 
       {timeLogs.length === 0 && !showForm ? (

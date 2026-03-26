@@ -30,7 +30,7 @@ export default function AppLayout() {
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0">
         <MobileHeader />
-        <main className="flex-1 overflow-y-auto bg-black">
+        <main className="flex-1 overflow-y-auto overflow-x-hidden bg-black">
           <Outlet />
         </main>
         <BottomNav />

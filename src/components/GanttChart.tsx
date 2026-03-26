@@ -34,7 +34,8 @@ interface GanttRow {
 /* ------------------------------------------------------------------ */
 
 const ROW_HEIGHT = 36
-const LABEL_WIDTH = 220
+const LABEL_WIDTH_DESKTOP = 220
+const LABEL_WIDTH_MOBILE = 100
 const BAR_V_PAD = 6
 const MIN_BAR_WIDTH = 12
 
@@ -160,6 +161,8 @@ export default function GanttChart({
   const navigate = useNavigate()
   const containerRef = useRef<HTMLDivElement>(null)
   const [chartWidth, setChartWidth] = useState(600)
+  const [isMobile, setIsMobile] = useState(false)
+  const labelWidth = isMobile ? LABEL_WIDTH_MOBILE : LABEL_WIDTH_DESKTOP
 
   const [timeframe, setTimeframe] = useState<Timeframe>('month')
   const [offset, setOffset] = useState(0)
@@ -231,8 +234,11 @@ export default function GanttChart({
   /* Measure container */
   useEffect(() => {
     function measure() {
+      const mobile = window.innerWidth < 768
+      setIsMobile(mobile)
       if (containerRef.current) {
-        setChartWidth(Math.max(containerRef.current.offsetWidth - LABEL_WIDTH - 32, 200))
+        const lw = mobile ? LABEL_WIDTH_MOBILE : LABEL_WIDTH_DESKTOP
+        setChartWidth(Math.max(containerRef.current.offsetWidth - lw - 32, 200))
       }
     }
     measure()
@@ -554,13 +560,13 @@ export default function GanttChart({
   }
 
   return (
-    <div className="bg-surface rounded-xl border border-border p-5 mb-8" ref={containerRef}>
+    <div className="bg-surface rounded-xl border border-border p-3 sm:p-5 mb-8 overflow-hidden" ref={containerRef}>
       {/* Header */}
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-4">
         <h3 className="text-sm font-semibold text-text-secondary uppercase tracking-wider">
           Project Timeline
         </h3>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <button
             onClick={() => setOffset((o) => o - 1)}
             className="text-xs px-2 py-1 rounded border border-border text-text-secondary hover:text-text-primary hover:border-purple/30 transition-colors"
@@ -606,9 +612,9 @@ export default function GanttChart({
       </div>
 
       {/* Chart */}
-      <div ref={wheelRef} className="flex overflow-hidden relative select-none">
+      <div ref={wheelRef} className="flex overflow-hidden relative select-none max-w-full">
         {/* Labels column */}
-        <div className="flex-shrink-0" style={{ width: LABEL_WIDTH }}>
+        <div className="flex-shrink-0 overflow-hidden" style={{ width: labelWidth }}>
           {rows.map((row) => (
             <div
               key={row.id}
