@@ -112,10 +112,10 @@ export interface TimeLog {
   id: string
   account_id: string | null
   project_id: string | null
-  team_member_id: string | null
+  assigned_to_id: string | null
   date: string | null
   hours: number | null
-  description: string | null
+  name: string | null
   created_at: string | null
   status_id: number | null
 }
