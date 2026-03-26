@@ -12,14 +12,25 @@
 }
 
 @layer base {
-  html, body, #root {
+  html {
     height: 100%;
+    overflow: hidden;
+  }
+
+  body {
+    height: 100%;
+    overflow: hidden;
     background-color: var(--color-surface);
     color: var(--color-text-primary);
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     color-scheme: dark;
+  }
+
+  #root {
+    height: 100%;
+    overflow: hidden;
   }
 
   a, button, [role="button"], [tabindex="0"] {
@@ -32,8 +43,17 @@
   padding-top: env(safe-area-inset-top, 0px);
 }
 
-.safe-bottom {
+/* Bottom nav: fixed to screen bottom, extends through safe area */
+.bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  background-color: var(--color-surface);
+  border-top: 1px solid var(--color-border);
   padding-bottom: env(safe-area-inset-bottom, 0px);
+  box-sizing: content-box;
 }
 
 /* Scrollbar styling */
