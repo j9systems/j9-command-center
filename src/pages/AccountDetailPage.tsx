@@ -15,6 +15,7 @@ import { supabase } from '@/lib/supabase'
 import type {
   AccountWithStatus,
   Contact,
+  Option,
   Project,
   Task,
   TimeLog,
@@ -78,7 +79,8 @@ export default function AccountDetailPage() {
   const [primaryContact, setPrimaryContact] = useState<Contact | null>(null)
   const [tasks, setTasks] = useState<(Task & { assigned_to?: TeamMember | null })[]>([])
   const [projects, setProjects] = useState<(Project & { project_manager?: TeamMember | null; logged_hours: number })[]>([])
-  const [timeLogs, setTimeLogs] = useState<(TimeLog & { team_member?: TeamMember | null; project?: { name: string | null } | null })[]>([])
+  const [timeLogs, setTimeLogs] = useState<(TimeLog & { team_member?: TeamMember | null; project?: { name: string | null } | null; status_option?: Option | null })[]>([])
+  const [timeLogStatuses, setTimeLogStatuses] = useState<Option[]>([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<'projects' | 'time_logs'>('projects')
 
@@ -174,10 +176,20 @@ export default function AccountDetailPage() {
         )
       }
 
-      // Fetch time logs
+      // Fetch timelog status options
+      const { data: statusOptions } = await supabase
+        .from('options')
+        .select('*')
+        .eq('category', 'timelog_status')
+
+      if (statusOptions) {
+        setTimeLogStatuses(statusOptions as Option[])
+      }
+
+      // Fetch time logs with status option
       const { data: timeLogsData } = await supabase
         .from('time_logs')
-        .select('*, team(first_name, last_name), projects(name)')
+        .select('*, team(first_name, last_name), projects(name), options(id, option_key, option_label)')
         .eq('account_id', id!)
         .order('date', { ascending: false })
         .limit(50)
@@ -188,9 +200,11 @@ export default function AccountDetailPage() {
             ...tl,
             team_member: tl.team as TeamMember | null,
             project: tl.projects as { name: string | null } | null,
+            status_option: tl.options as Option | null,
             team: undefined,
             projects: undefined,
-          })) as (TimeLog & { team_member?: TeamMember | null; project?: { name: string | null } | null })[]
+            options: undefined,
+          })) as (TimeLog & { team_member?: TeamMember | null; project?: { name: string | null } | null; status_option?: Option | null })[]
         )
       }
 
@@ -411,7 +425,19 @@ export default function AccountDetailPage() {
             <ProjectsTab projects={projects} />
           )}
           {activeTab === 'time_logs' && (
-            <TimeLogsTab timeLogs={timeLogs} />
+            <TimeLogsTab
+              timeLogs={timeLogs}
+              statuses={timeLogStatuses}
+              onStatusUpdate={(logId, statusId) => {
+                setTimeLogs((prev) =>
+                  prev.map((tl) =>
+                    tl.id === logId
+                      ? { ...tl, status_id: statusId, status_option: timeLogStatuses.find((s) => s.id === statusId) ?? null }
+                      : tl
+                  )
+                )
+              }}
+            />
           )}
         </div>
       </div>
@@ -559,11 +585,39 @@ function ProjectsTab({
   )
 }
 
+const timeLogStatusColors: Record<string, string> = {
+  approved: 'bg-emerald-500/15 text-emerald-400',
+  will_not_bill: 'bg-red-500/15 text-red-400',
+  backlog: 'bg-amber-500/15 text-amber-400',
+  retainer: 'bg-blue-500/15 text-blue-400',
+}
+
 function TimeLogsTab({
   timeLogs,
+  statuses,
+  onStatusUpdate,
 }: {
-  timeLogs: (TimeLog & { team_member?: TeamMember | null; project?: { name: string | null } | null })[]
+  timeLogs: (TimeLog & { team_member?: TeamMember | null; project?: { name: string | null } | null; status_option?: Option | null })[]
+  statuses: Option[]
+  onStatusUpdate: (logId: string, statusId: number) => void
 }) {
+  const [updatingId, setUpdatingId] = useState<string | null>(null)
+
+  const approvedStatus = statuses.find((s) => s.option_key === 'approved')
+  const willNotBillStatus = statuses.find((s) => s.option_key === 'will_not_bill')
+
+  async function handleStatusUpdate(logId: string, statusId: number) {
+    setUpdatingId(logId)
+    const { error } = await supabase
+      .from('time_logs')
+      .update({ status_id: statusId })
+      .eq('id', logId)
+    if (!error) {
+      onStatusUpdate(logId, statusId)
+    }
+    setUpdatingId(null)
+  }
+
   if (timeLogs.length === 0) {
     return (
       <p className="text-sm text-text-secondary text-center py-8">
@@ -583,42 +637,86 @@ function TimeLogsTab({
         </span>
       </div>
       <div className="space-y-2">
-        {timeLogs.map((log) => (
-          <div
-            key={log.id}
-            className="flex items-center gap-4 p-3 bg-black/20 rounded-lg border border-border/50"
-          >
-            <div className="text-right flex-shrink-0 w-14">
-              <span className="text-sm font-semibold text-purple">
-                {log.hours?.toFixed(1) ?? '0.0'}h
-              </span>
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm text-text-primary truncate">
-                {log.description ?? 'No description'}
-              </p>
-              <div className="flex items-center gap-3 mt-0.5">
-                {log.team_member && (
-                  <span className="text-xs text-text-secondary">
-                    {[log.team_member.first_name, log.team_member.last_name]
-                      .filter(Boolean)
-                      .join(' ')}
-                  </span>
+        {timeLogs.map((log) => {
+          const statusKey = log.status_option?.option_key ?? null
+          const isUpdating = updatingId === log.id
+          const isApproved = statusKey === 'approved'
+          const isWillNotBill = statusKey === 'will_not_bill'
+
+          return (
+            <div
+              key={log.id}
+              className="flex items-start gap-4 p-3 bg-black/20 rounded-lg border border-border/50"
+            >
+              <div className="text-right flex-shrink-0 w-14 pt-0.5">
+                <span className="text-sm font-semibold text-purple">
+                  {log.hours?.toFixed(1) ?? '0.0'}h
+                </span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm text-text-primary truncate">
+                  {log.description ?? 'No description'}
+                </p>
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-0.5">
+                  {log.team_member && (
+                    <span className="text-xs text-text-secondary">
+                      {[log.team_member.first_name, log.team_member.last_name]
+                        .filter(Boolean)
+                        .join(' ')}
+                    </span>
+                  )}
+                  {log.project?.name && (
+                    <span className="text-xs text-text-secondary">
+                      {log.project.name}
+                    </span>
+                  )}
+                  {log.date && (
+                    <span className="text-xs text-text-secondary">
+                      {new Date(log.date).toLocaleDateString()}
+                    </span>
+                  )}
+                  {log.status_option && (
+                    <span
+                      className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${
+                        timeLogStatusColors[statusKey ?? ''] ?? 'bg-zinc-500/15 text-zinc-400'
+                      }`}
+                    >
+                      {log.status_option.option_label}
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center gap-1.5 flex-shrink-0">
+                {approvedStatus && (
+                  <button
+                    onClick={() => handleStatusUpdate(log.id, approvedStatus.id)}
+                    disabled={isUpdating || isApproved}
+                    className={`text-[11px] font-medium px-2.5 py-1 rounded-full transition-colors ${
+                      isApproved
+                        ? 'bg-emerald-500/15 text-emerald-400 cursor-default'
+                        : 'bg-emerald-500/10 text-emerald-400/60 hover:bg-emerald-500/20 hover:text-emerald-400'
+                    } disabled:opacity-50`}
+                  >
+                    {isUpdating ? '...' : 'Approve'}
+                  </button>
                 )}
-                {log.project?.name && (
-                  <span className="text-xs text-text-secondary">
-                    {log.project.name}
-                  </span>
+                {willNotBillStatus && (
+                  <button
+                    onClick={() => handleStatusUpdate(log.id, willNotBillStatus.id)}
+                    disabled={isUpdating || isWillNotBill}
+                    className={`text-[11px] font-medium px-2.5 py-1 rounded-full transition-colors ${
+                      isWillNotBill
+                        ? 'bg-red-500/15 text-red-400 cursor-default'
+                        : 'bg-red-500/10 text-red-400/60 hover:bg-red-500/20 hover:text-red-400'
+                    } disabled:opacity-50`}
+                  >
+                    {isUpdating ? '...' : 'Will Not Bill'}
+                  </button>
                 )}
               </div>
             </div>
-            {log.date && (
-              <span className="text-xs text-text-secondary flex-shrink-0">
-                {new Date(log.date).toLocaleDateString()}
-              </span>
-            )}
-          </div>
-        ))}
+          )
+        })}
       </div>
     </div>
   )
