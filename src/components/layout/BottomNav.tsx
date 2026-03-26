@@ -11,10 +11,10 @@ const navItems = [
 export default function BottomNav() {
   return (
     <nav
-      className="md:hidden fixed bottom-0 left-0 right-0 bg-surface border-t border-border z-50"
-      style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+      className="md:hidden fixed left-0 right-0 bg-surface border-t border-border z-50"
+      style={{ bottom: 0, paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
     >
-      <div className="flex justify-around items-center h-16">
+      <div className="flex justify-around items-center h-14">
         {navItems.map(({ to, icon: Icon, label }) => (
           <NavLink
             key={to}
@@ -28,7 +28,7 @@ export default function BottomNav() {
               }`
             }
           >
-            <Icon size={22} />
+            <Icon size={20} />
             {label}
           </NavLink>
         ))}
