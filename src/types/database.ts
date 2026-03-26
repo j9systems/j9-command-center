@@ -82,3 +82,25 @@ export interface AccountTeam {
   expected_weekly_hrs: string | null
   role: string | null
 }
+
+export interface Task {
+  id: string
+  account_id: string | null
+  title: string | null
+  description: string | null
+  status: string | null
+  due_date: string | null
+  assigned_to_id: string | null
+  created_at: string | null
+}
+
+export interface TimeLog {
+  id: string
+  account_id: string | null
+  project_id: string | null
+  team_member_id: string | null
+  date: string | null
+  hours: number | null
+  description: string | null
+  created_at: string | null
+}
