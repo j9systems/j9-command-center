@@ -43,6 +43,7 @@ export interface TeamMember {
   personal_email: string | null
   photo: string | null
   role: string | null
+  role_id: number | null
   desired_hr_capacity: number | null
   active: string | null
   phone: number | null
