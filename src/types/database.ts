@@ -112,3 +112,16 @@ export interface TimeLog {
   created_at: string | null
   status_id: number | null
 }
+
+export interface Feature {
+  id: string
+  project_id: string | null
+  name: string | null
+  description: string | null
+  start_date: string | null
+  end_date: string | null
+  status_id: number | null
+  precedes_id: string | null
+  follows_id: string | null
+  created_at: string | null
+}
