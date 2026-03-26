@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import type { AccountWithStatus } from '@/types/database'
 
 const statusColors: Record<string, string> = {
@@ -33,7 +34,7 @@ interface AccountCardProps {
 
 export default function AccountCard({ account }: AccountCardProps) {
   return (
-    <div className="flex items-center gap-4 p-4 bg-surface rounded-xl border border-border hover:border-purple/30 hover:bg-surface-hover transition-all duration-200 cursor-pointer">
+    <Link to={`/accounts/${account.id}`} className="flex items-center gap-4 p-4 bg-surface rounded-xl border border-border hover:border-purple/30 hover:bg-surface-hover transition-all duration-200 cursor-pointer">
       {account.logo_path ? (
         <img
           src={account.logo_path}
@@ -63,6 +64,6 @@ export default function AccountCard({ account }: AccountCardProps) {
           {account.status_label}
         </span>
       )}
-    </div>
+    </Link>
   )
 }
