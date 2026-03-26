@@ -12,6 +12,9 @@ import {
   FolderKanban,
   Timer,
   Plus,
+  X,
+  ClipboardList,
+  FileText,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import type {
@@ -87,7 +90,7 @@ export default function AccountDetailPage() {
   const [timeLogStatuses, setTimeLogStatuses] = useState<Option[]>([])
   const [accountTeamMembers, setAccountTeamMembers] = useState<{ id: string; team_member: TeamMember | null; role: AccountRole | null; expected_weekly_hrs: string | null }[]>([])
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<'projects' | 'time_logs' | 'team'>('projects')
+  const [activeTab, setActiveTab] = useState<'projects' | 'tasks' | 'time_logs' | 'invoices' | 'team'>('projects')
 
   useEffect(() => {
     if (!id) return
@@ -277,7 +280,9 @@ export default function AccountDetailPage() {
 
   const tabs = [
     { key: 'projects' as const, label: 'Projects', icon: FolderKanban },
+    { key: 'tasks' as const, label: 'Tasks', icon: ClipboardList },
     { key: 'time_logs' as const, label: 'Time Logs', icon: Timer },
+    { key: 'invoices' as const, label: 'Invoices', icon: FileText },
     { key: 'team' as const, label: 'Team', icon: Users },
   ]
 
@@ -450,7 +455,10 @@ export default function AccountDetailPage() {
         {/* Tab content */}
         <div className="p-5">
           {activeTab === 'projects' && (
-            <ProjectsTab projects={projects} accountId={id!} />
+            <ProjectsTab projects={projects} accountId={id!} onProjectCreated={(p) => setProjects((prev) => [...prev, p])} />
+          )}
+          {activeTab === 'tasks' && (
+            <TasksTab tasks={tasks} />
           )}
           {activeTab === 'time_logs' && (
             <TimeLogsTab
@@ -471,6 +479,9 @@ export default function AccountDetailPage() {
                 setTimeLogs((prev) => [log, ...prev])
               }}
             />
+          )}
+          {activeTab === 'invoices' && (
+            <InvoicesTab />
           )}
           {activeTab === 'team' && (
             <AccountTeamTab members={accountTeamMembers} />
@@ -498,17 +509,44 @@ const statusGroupLabels: Record<string, string> = {
 function ProjectsTab({
   projects,
   accountId,
+  onProjectCreated,
 }: {
   projects: (Project & { project_manager?: TeamMember | null; logged_hours: number })[]
   accountId: string
+  onProjectCreated: (p: Project & { project_manager?: TeamMember | null; logged_hours: number }) => void
 }) {
   const navigate = useNavigate()
-  if (projects.length === 0) {
-    return (
-      <p className="text-sm text-text-secondary text-center py-8">
-        No projects found for this account.
-      </p>
-    )
+  const [showForm, setShowForm] = useState(false)
+  const [newName, setNewName] = useState('')
+  const [newStart, setNewStart] = useState('')
+  const [newEnd, setNewEnd] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  async function handleCreateProject() {
+    if (!newName.trim()) return
+    setSaving(true)
+    const id = crypto.randomUUID()
+    const { data, error } = await supabase
+      .from('projects')
+      .insert({
+        id,
+        name: newName.trim(),
+        account_id: accountId,
+        status: 'active',
+        project_start: newStart || null,
+        project_end: newEnd || null,
+      })
+      .select('*')
+      .single()
+
+    if (data && !error) {
+      onProjectCreated({ ...data, project_manager: null, logged_hours: 0 } as Project & { project_manager?: TeamMember | null; logged_hours: number })
+      setNewName('')
+      setNewStart('')
+      setNewEnd('')
+      setShowForm(false)
+    }
+    setSaving(false)
   }
 
   // Group projects by status
@@ -528,6 +566,77 @@ function ProjectsTab({
 
   return (
     <div className="space-y-6">
+      <div className="flex justify-end">
+        {!showForm && (
+          <button
+            onClick={() => setShowForm(true)}
+            className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-purple text-white hover:bg-purple-hover transition-colors"
+          >
+            <Plus size={14} />
+            New Project
+          </button>
+        )}
+      </div>
+
+      {showForm && (
+        <div className="p-4 bg-black/20 rounded-lg border border-border/50 space-y-3">
+          <div className="flex items-center justify-between mb-1">
+            <h3 className="text-sm font-medium text-text-primary">New Project</h3>
+            <button onClick={() => setShowForm(false)} className="text-text-secondary hover:text-text-primary transition-colors">
+              <X size={16} />
+            </button>
+          </div>
+          <input
+            type="text"
+            placeholder="Project name"
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            className="w-full text-sm bg-surface border border-border rounded-lg px-3 py-2 text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:border-purple/50"
+          />
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-[10px] text-text-secondary uppercase tracking-wider mb-1 block">Start Date</label>
+              <input
+                type="date"
+                value={newStart}
+                onChange={(e) => setNewStart(e.target.value)}
+                className="w-full text-sm bg-surface border border-border rounded-lg px-3 py-2 text-text-primary focus:outline-none focus:border-purple/50"
+              />
+            </div>
+            <div>
+              <label className="text-[10px] text-text-secondary uppercase tracking-wider mb-1 block">End Date</label>
+              <input
+                type="date"
+                value={newEnd}
+                onChange={(e) => setNewEnd(e.target.value)}
+                className="w-full text-sm bg-surface border border-border rounded-lg px-3 py-2 text-text-primary focus:outline-none focus:border-purple/50"
+              />
+            </div>
+          </div>
+          <div className="flex items-center gap-2 pt-1">
+            <button
+              onClick={handleCreateProject}
+              disabled={!newName.trim() || saving}
+              className="text-xs font-medium px-4 py-1.5 rounded-lg bg-purple text-white hover:bg-purple-hover transition-colors disabled:opacity-50"
+            >
+              {saving ? 'Creating...' : 'Create'}
+            </button>
+            <button
+              onClick={() => setShowForm(false)}
+              className="text-xs font-medium px-4 py-1.5 rounded-lg border border-border text-text-secondary hover:text-text-primary transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {projects.length === 0 && !showForm ? (
+        <p className="text-sm text-text-secondary text-center py-8">
+          No projects found for this account.
+        </p>
+      ) : null}
+
       {sortedGroups.map(([status, groupProjects]) => (
         <div key={status}>
           <div className="flex items-center gap-2 mb-3">
@@ -973,6 +1082,74 @@ function TimeLogsTab({
         </div>
       )}
     </div>
+  )
+}
+
+function TasksTab({
+  tasks,
+}: {
+  tasks: (Task & { assigned_to?: TeamMember | null })[]
+}) {
+  if (tasks.length === 0) {
+    return (
+      <p className="text-sm text-text-secondary text-center py-8">
+        No open tasks for this account.
+      </p>
+    )
+  }
+
+  return (
+    <div className="space-y-2">
+      {tasks.map((task) => (
+        <div
+          key={task.id}
+          className="flex items-start gap-3 p-3 bg-black/20 rounded-lg border border-border/50"
+        >
+          <CheckCircle2
+            size={16}
+            className="text-text-secondary mt-0.5 flex-shrink-0"
+          />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm text-text-primary">
+              {task.title ?? 'Untitled Task'}
+            </p>
+            {task.description && (
+              <p className="text-xs text-text-secondary mt-0.5 line-clamp-2">
+                {task.description}
+              </p>
+            )}
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5">
+              {task.status && (
+                <span
+                  className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${getTaskStatusColor(task.status)}`}
+                >
+                  {task.status.replace(/_/g, ' ')}
+                </span>
+              )}
+              {task.due_date && (
+                <span className="text-[10px] text-text-secondary flex items-center gap-1">
+                  <CalendarDays size={10} />
+                  {new Date(task.due_date).toLocaleDateString()}
+                </span>
+              )}
+              {task.assigned_to && (
+                <span className="text-[10px] text-text-secondary">
+                  {[task.assigned_to.first_name, task.assigned_to.last_name].filter(Boolean).join(' ')}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function InvoicesTab() {
+  return (
+    <p className="text-sm text-text-secondary text-center py-8">
+      Invoicing coming soon.
+    </p>
   )
 }
 

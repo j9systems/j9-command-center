@@ -184,6 +184,7 @@ export default function GanttChart({
     lastDStart: number
     lastDEnd: number
   } | null>(null)
+  const didDragRef = useRef(false)
   const [dragDelta, setDragDelta] = useState<{ id: string; dStart: number; dEnd: number } | null>(null)
 
   /* Fetch features for all projects */
@@ -333,6 +334,7 @@ export default function GanttChart({
       e.preventDefault()
       e.stopPropagation()
       dragRef.current = { rowId, mode, startX: e.clientX, origStart: start, origEnd: end, lastDStart: 0, lastDEnd: 0 }
+      didDragRef.current = false
       setDragDelta({ id: rowId, dStart: 0, dEnd: 0 })
     },
     []
@@ -353,6 +355,7 @@ export default function GanttChart({
         dStart = dDays
         dEnd = dDays
       }
+      if (dStart !== 0 || dEnd !== 0) didDragRef.current = true
       dragRef.current.lastDStart = dStart
       dragRef.current.lastDEnd = dEnd
       setDragDelta({ id: rowId, dStart, dEnd })
@@ -692,7 +695,6 @@ export default function GanttChart({
               const y = i * ROW_HEIGHT + BAR_V_PAD
               const h = ROW_HEIGHT - BAR_V_PAD * 2
               const color = barColor(row.status)
-              const isDragging = dragDelta?.id === row.id
               const isProject = row.type === 'project'
 
               return (
@@ -707,7 +709,7 @@ export default function GanttChart({
                     fill={color}
                     opacity={isProject ? 0.6 : 0.85}
                     className="cursor-pointer"
-                    onClick={() => !isDragging && handleBarClick(row)}
+                    onClick={() => !didDragRef.current && handleBarClick(row)}
                     onMouseEnter={(e) => handleBarMouseEnter(e, row)}
                     onMouseLeave={handleBarMouseLeave}
                   />
@@ -773,7 +775,7 @@ export default function GanttChart({
                       onMouseDown={(e) =>
                         handleMouseDown(e, row.id, 'move', row.start!, row.end!)
                       }
-                      onClick={() => !isDragging && handleBarClick(row)}
+                      onClick={() => !didDragRef.current && handleBarClick(row)}
                       onMouseEnter={(e) => handleBarMouseEnter(e, row)}
                       onMouseLeave={handleBarMouseLeave}
                     />

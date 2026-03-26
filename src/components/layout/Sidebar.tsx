@@ -1,5 +1,6 @@
-import { NavLink } from 'react-router-dom'
-import { Home, Building2, Users, UserCog } from 'lucide-react'
+import { NavLink, useNavigate } from 'react-router-dom'
+import { Home, Building2, Users, UserCog, LogOut } from 'lucide-react'
+import { supabase } from '@/lib/supabase'
 
 const navItems = [
   { to: '/', icon: Home, label: 'Home' },
@@ -9,6 +10,14 @@ const navItems = [
 ]
 
 export default function Sidebar() {
+  const navigate = useNavigate()
+
+  async function handleLogout() {
+    await supabase.auth.signOut()
+    navigate('/')
+    window.location.reload()
+  }
+
   return (
     <aside className="hidden md:flex flex-col w-56 bg-surface border-r border-border h-full">
       <div className="p-5 border-b border-border flex flex-col items-center gap-2">
@@ -40,6 +49,15 @@ export default function Sidebar() {
           </NavLink>
         ))}
       </nav>
+      <div className="p-3 border-t border-border">
+        <button
+          onClick={handleLogout}
+          className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-text-secondary hover:text-red-400 hover:bg-red-500/10 transition-all duration-200 w-full"
+        >
+          <LogOut size={20} />
+          Log Out
+        </button>
+      </div>
     </aside>
   )
 }
