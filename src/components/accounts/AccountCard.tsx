@@ -34,36 +34,38 @@ interface AccountCardProps {
 
 export default function AccountCard({ account }: AccountCardProps) {
   return (
-    <Link to={`/accounts/${account.id}`} className="flex items-center gap-4 p-4 bg-surface rounded-xl border border-border hover:border-purple/30 hover:bg-surface-hover transition-all duration-200 cursor-pointer">
-      {account.logo_path ? (
-        <img
-          src={account.logo_path}
-          alt={account.company_name ?? 'Account logo'}
-          className="w-11 h-11 rounded-lg object-cover bg-black flex-shrink-0"
-          onError={(e) => {
-            const target = e.currentTarget
-            target.style.display = 'none'
-            target.nextElementSibling?.classList.remove('hidden')
-          }}
-        />
-      ) : null}
-      <div
-        className={`w-11 h-11 rounded-lg bg-purple-muted flex items-center justify-center text-purple text-sm font-semibold flex-shrink-0 ${account.logo_path ? 'hidden' : ''}`}
-      >
-        {getInitials(account.company_name)}
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-text-primary truncate">
-          {account.company_name ?? 'Unnamed Account'}
-        </p>
-      </div>
-      {account.status_label && (
-        <span
-          className={`text-xs font-medium px-2.5 py-1 rounded-full flex-shrink-0 ${getStatusColor(account.status_key)}`}
+    <Link to={`/accounts/${account.id}`} className="no-underline">
+      <div className="flex items-center gap-4 p-4 bg-surface rounded-xl border border-border hover:border-purple/30 hover:bg-surface-hover transition-all duration-200 cursor-pointer">
+        {account.logo_path ? (
+          <img
+            src={account.logo_path}
+            alt={account.company_name ?? 'Account logo'}
+            className="w-11 h-11 rounded-lg object-cover bg-black flex-shrink-0"
+            onError={(e) => {
+              const target = e.currentTarget
+              target.style.display = 'none'
+              target.nextElementSibling?.classList.remove('hidden')
+            }}
+          />
+        ) : null}
+        <div
+          className={`w-11 h-11 rounded-lg bg-purple-muted flex items-center justify-center text-purple text-sm font-semibold flex-shrink-0 ${account.logo_path ? 'hidden' : ''}`}
         >
-          {account.status_label}
-        </span>
-      )}
+          {getInitials(account.company_name)}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium text-text-primary truncate">
+            {account.company_name ?? 'Unnamed Account'}
+          </p>
+        </div>
+        {account.status_label && (
+          <span
+            className={`text-xs font-medium px-2.5 py-1 rounded-full flex-shrink-0 ${getStatusColor(account.status_key)}`}
+          >
+            {account.status_label}
+          </span>
+        )}
+      </div>
     </Link>
   )
 }
