@@ -145,7 +145,7 @@ export default function AccountDetailPage() {
       // Fetch projects
       const { data: projectsData } = await supabase
         .from('projects')
-        .select(`*, team!projects_Project Manager ID_fkey(first_name, last_name)`)
+        .select('*, team(first_name, last_name)')
         .eq('account_id', id!)
 
       // Fetch time log hours grouped by project
@@ -177,7 +177,7 @@ export default function AccountDetailPage() {
       // Fetch time logs
       const { data: timeLogsData } = await supabase
         .from('time_logs')
-        .select(`*, team!time_logs_Assigned To ID_fkey(first_name, last_name), projects!time_logs_Project ID_fkey(name)`)
+        .select('*, team(first_name, last_name), projects(name)')
         .eq('account_id', id!)
         .order('date', { ascending: false })
         .limit(50)
