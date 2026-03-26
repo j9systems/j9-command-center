@@ -1,5 +1,9 @@
-import { Routes, Route } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Routes, Route, Navigate } from 'react-router-dom'
+import { supabase } from '@/lib/supabase'
+import type { Session } from '@supabase/supabase-js'
 import AppLayout from './components/layout/AppLayout'
+import LoginPage from './pages/LoginPage'
 import HomePage from './pages/HomePage'
 import AccountsPage from './pages/AccountsPage'
 import AccountDetailPage from './pages/AccountDetailPage'
@@ -9,8 +13,36 @@ import FeatureDetailPage from './pages/FeatureDetailPage'
 import TeamPage from './pages/TeamPage'
 
 export default function App() {
+  const [session, setSession] = useState<Session | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session)
+      setLoading(false)
+    })
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session)
+    })
+
+    return () => subscription.unsubscribe()
+  }, [])
+
+  if (loading) return null
+
+  if (!session) {
+    return (
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="*" element={<Navigate to="/login" replace />} />
+      </Routes>
+    )
+  }
+
   return (
     <Routes>
+      <Route path="/login" element={<Navigate to="/" replace />} />
       <Route element={<AppLayout />}>
         <Route path="/" element={<HomePage />} />
         <Route path="/accounts" element={<AccountsPage />} />
