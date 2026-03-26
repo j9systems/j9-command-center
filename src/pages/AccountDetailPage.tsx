@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, Link, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft,
   Mail,
@@ -443,7 +443,7 @@ export default function AccountDetailPage() {
         {/* Tab content */}
         <div className="p-5">
           {activeTab === 'projects' && (
-            <ProjectsTab projects={projects} />
+            <ProjectsTab projects={projects} accountId={id!} />
           )}
           {activeTab === 'time_logs' && (
             <TimeLogsTab
@@ -485,9 +485,12 @@ const statusGroupLabels: Record<string, string> = {
 
 function ProjectsTab({
   projects,
+  accountId,
 }: {
   projects: (Project & { project_manager?: TeamMember | null; logged_hours: number })[]
+  accountId: string
 }) {
+  const navigate = useNavigate()
   if (projects.length === 0) {
     return (
       <p className="text-sm text-text-secondary text-center py-8">
@@ -538,7 +541,8 @@ function ProjectsTab({
               return (
                 <div
                   key={project.id}
-                  className="flex items-start gap-4 p-4 bg-black/20 rounded-lg border border-border/50 hover:border-purple/20 transition-colors"
+                  onClick={() => navigate(`/accounts/${accountId}/projects/${project.id}`)}
+                  className="flex items-start gap-4 p-4 bg-black/20 rounded-lg border border-border/50 hover:border-purple/20 transition-colors cursor-pointer"
                 >
                   <FolderKanban size={18} className="text-text-secondary flex-shrink-0 mt-0.5" />
                   <div className="flex-1 min-w-0">
@@ -782,9 +786,14 @@ function AccountTeamTab({
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-text-primary truncate">{name}</p>
-              {member.team_member?.email && (
-                <p className="text-xs text-text-secondary truncate">{member.team_member.email}</p>
-              )}
+              <div className="flex items-center gap-2 mt-0.5">
+                {member.team_member?.role && (
+                  <span className="text-xs text-text-secondary">{member.team_member.role}</span>
+                )}
+                {member.team_member?.email && (
+                  <span className="text-xs text-text-secondary truncate">{member.team_member.email}</span>
+                )}
+              </div>
             </div>
             <div className="flex items-center gap-3 flex-shrink-0">
               {member.expected_weekly_hrs && (
