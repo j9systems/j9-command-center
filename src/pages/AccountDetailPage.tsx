@@ -656,6 +656,119 @@ function TimeLogsTab({
 
   const totalHours = timeLogs.reduce((sum, tl) => sum + (tl.hours ?? 0), 0)
 
+  // Group time logs by week
+  const now = new Date()
+  const dayOfWeek = now.getDay()
+  const mondayOffset = dayOfWeek === 0 ? 6 : dayOfWeek - 1
+  const thisWeekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - mondayOffset)
+  const lastWeekStart = new Date(thisWeekStart.getFullYear(), thisWeekStart.getMonth(), thisWeekStart.getDate() - 7)
+
+  type LogEntry = typeof timeLogs[number]
+  const groups: { label: string; logs: LogEntry[] }[] = [
+    { label: 'This Week', logs: [] },
+    { label: 'Last Week', logs: [] },
+    { label: 'Other', logs: [] },
+  ]
+
+  for (const log of timeLogs) {
+    if (!log.date) {
+      groups[2].logs.push(log)
+      continue
+    }
+    const logDate = new Date(log.date + 'T00:00:00')
+    if (logDate >= thisWeekStart) {
+      groups[0].logs.push(log)
+    } else if (logDate >= lastWeekStart) {
+      groups[1].logs.push(log)
+    } else {
+      groups[2].logs.push(log)
+    }
+  }
+
+  function renderLogEntry(log: LogEntry) {
+    const statusKey = log.status_option?.option_key ?? null
+    const isUpdating = updatingId === log.id
+    const isApproved = statusKey === 'approved'
+    const isWillNotBill = statusKey === 'will_not_bill'
+
+    return (
+      <div
+        key={log.id}
+        className="flex items-center gap-4 p-3 bg-black/20 rounded-lg border border-border/50"
+      >
+        <div className="w-7 h-7 rounded-full bg-purple-muted flex items-center justify-center flex-shrink-0">
+          {log.team_member?.photo ? (
+            <img
+              src={log.team_member.photo}
+              alt=""
+              className="w-7 h-7 rounded-full object-cover"
+            />
+          ) : (
+            <User size={14} className="text-purple" />
+          )}
+        </div>
+        <div className="text-right flex-shrink-0 w-14">
+          <span className="text-sm font-semibold text-purple">
+            {log.hours?.toFixed(1) ?? '0.0'}h
+          </span>
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm text-text-primary truncate">
+            {log.description ?? 'No description'}
+          </p>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-0.5">
+            {log.team_member && (
+              <span className="text-xs text-text-secondary">
+                {[log.team_member.first_name, log.team_member.last_name]
+                  .filter(Boolean)
+                  .join(' ')}
+              </span>
+            )}
+            {log.project?.name && (
+              <span className="text-xs text-text-secondary">
+                {log.project.name}
+              </span>
+            )}
+            {log.date && (
+              <span className="text-xs text-text-secondary">
+                {new Date(log.date).toLocaleDateString()}
+              </span>
+            )}
+            {log.status_option && (
+              <span
+                className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${
+                  timeLogStatusColors[statusKey ?? ''] ?? 'bg-zinc-500/15 text-zinc-400'
+                }`}
+              >
+                {log.status_option.option_label}
+              </span>
+            )}
+          </div>
+        </div>
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          {approvedStatus && !isApproved && (
+            <button
+              onClick={() => handleStatusUpdate(log.id, approvedStatus.id)}
+              disabled={isUpdating}
+              className="text-[11px] font-medium px-2.5 py-1 rounded-md border border-emerald-500/30 text-emerald-400/70 hover:bg-emerald-500/15 hover:text-emerald-400 hover:border-emerald-500/50 transition-colors disabled:opacity-50"
+            >
+              {isUpdating ? '...' : 'Approve'}
+            </button>
+          )}
+          {willNotBillStatus && !isWillNotBill && (
+            <button
+              onClick={() => handleStatusUpdate(log.id, willNotBillStatus.id)}
+              disabled={isUpdating}
+              className="text-[11px] font-medium px-2.5 py-1 rounded-md border border-red-500/30 text-red-400/70 hover:bg-red-500/15 hover:text-red-400 hover:border-red-500/50 transition-colors disabled:opacity-50"
+            >
+              {isUpdating ? '...' : 'Will Not Bill'}
+            </button>
+          )}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div>
       <div className="flex items-center gap-2 mb-4 text-sm text-text-secondary">
@@ -664,90 +777,24 @@ function TimeLogsTab({
           Total: <span className="text-text-primary font-medium">{totalHours.toFixed(1)}h</span> logged
         </span>
       </div>
-      <div className="space-y-2">
-        {timeLogs.map((log) => {
-          const statusKey = log.status_option?.option_key ?? null
-          const isUpdating = updatingId === log.id
-          const isApproved = statusKey === 'approved'
-          const isWillNotBill = statusKey === 'will_not_bill'
-
-          return (
-            <div
-              key={log.id}
-              className="flex items-center gap-4 p-3 bg-black/20 rounded-lg border border-border/50"
-            >
-              <div className="w-7 h-7 rounded-full bg-purple-muted flex items-center justify-center flex-shrink-0">
-                {log.team_member?.photo ? (
-                  <img
-                    src={log.team_member.photo}
-                    alt=""
-                    className="w-7 h-7 rounded-full object-cover"
-                  />
-                ) : (
-                  <User size={14} className="text-purple" />
-                )}
-              </div>
-              <div className="text-right flex-shrink-0 w-14">
-                <span className="text-sm font-semibold text-purple">
-                  {log.hours?.toFixed(1) ?? '0.0'}h
+      <div className="space-y-6">
+        {groups.map((group) =>
+          group.logs.length > 0 ? (
+            <div key={group.label}>
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-xs font-semibold text-text-secondary uppercase tracking-wider">
+                  {group.label}
+                </span>
+                <span className="text-xs text-text-secondary">
+                  ({group.logs.reduce((sum, tl) => sum + (tl.hours ?? 0), 0).toFixed(1)}h)
                 </span>
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm text-text-primary truncate">
-                  {log.description ?? 'No description'}
-                </p>
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-0.5">
-                  {log.team_member && (
-                    <span className="text-xs text-text-secondary">
-                      {[log.team_member.first_name, log.team_member.last_name]
-                        .filter(Boolean)
-                        .join(' ')}
-                    </span>
-                  )}
-                  {log.project?.name && (
-                    <span className="text-xs text-text-secondary">
-                      {log.project.name}
-                    </span>
-                  )}
-                  {log.date && (
-                    <span className="text-xs text-text-secondary">
-                      {new Date(log.date).toLocaleDateString()}
-                    </span>
-                  )}
-                  {log.status_option && (
-                    <span
-                      className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${
-                        timeLogStatusColors[statusKey ?? ''] ?? 'bg-zinc-500/15 text-zinc-400'
-                      }`}
-                    >
-                      {log.status_option.option_label}
-                    </span>
-                  )}
-                </div>
-              </div>
-              <div className="flex items-center gap-1.5 flex-shrink-0">
-                {approvedStatus && !isApproved && (
-                  <button
-                    onClick={() => handleStatusUpdate(log.id, approvedStatus.id)}
-                    disabled={isUpdating}
-                    className="text-[11px] font-medium px-2.5 py-1 rounded-md border border-emerald-500/30 text-emerald-400/70 hover:bg-emerald-500/15 hover:text-emerald-400 hover:border-emerald-500/50 transition-colors disabled:opacity-50"
-                  >
-                    {isUpdating ? '...' : 'Approve'}
-                  </button>
-                )}
-                {willNotBillStatus && !isWillNotBill && (
-                  <button
-                    onClick={() => handleStatusUpdate(log.id, willNotBillStatus.id)}
-                    disabled={isUpdating}
-                    className="text-[11px] font-medium px-2.5 py-1 rounded-md border border-red-500/30 text-red-400/70 hover:bg-red-500/15 hover:text-red-400 hover:border-red-500/50 transition-colors disabled:opacity-50"
-                  >
-                    {isUpdating ? '...' : 'Will Not Bill'}
-                  </button>
-                )}
+              <div className="space-y-2">
+                {group.logs.map(renderLogEntry)}
               </div>
             </div>
-          )
-        })}
+          ) : null
+        )}
       </div>
     </div>
   )
@@ -797,24 +844,26 @@ function AccountTeamTab({
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-text-primary truncate">{name}</p>
-              {member.team_member?.email && (
-                <p className="text-xs text-text-secondary truncate mt-0.5">{member.team_member.email}</p>
-              )}
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-0.5">
+                {member.role && (
+                  <span
+                    className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${
+                      roleColors[member.role.name] ?? 'bg-zinc-500/15 text-zinc-400'
+                    }`}
+                  >
+                    {member.role.name}
+                  </span>
+                )}
+                {member.team_member?.email && (
+                  <span className="text-xs text-text-secondary truncate">{member.team_member.email}</span>
+                )}
+              </div>
             </div>
             <div className="flex items-center gap-3 flex-shrink-0">
               {member.expected_weekly_hrs && (
                 <span className="text-xs text-text-secondary flex items-center gap-1">
                   <Clock size={12} />
                   {member.expected_weekly_hrs}h/wk
-                </span>
-              )}
-              {member.role && (
-                <span
-                  className={`text-xs font-medium px-2.5 py-1 rounded-full ${
-                    roleColors[member.role.name] ?? 'bg-zinc-500/15 text-zinc-400'
-                  }`}
-                >
-                  {member.role.name}
                 </span>
               )}
             </div>

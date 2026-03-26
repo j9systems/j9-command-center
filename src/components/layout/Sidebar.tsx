@@ -11,7 +11,7 @@ const navItems = [
 export default function Sidebar() {
   return (
     <aside className="hidden md:flex flex-col w-56 bg-surface border-r border-border h-full">
-      <div className="p-5 border-b border-border flex items-center gap-3">
+      <div className="p-5 border-b border-border flex flex-col items-center gap-2">
         <img
           src="https://res.cloudinary.com/duy32f0q4/image/upload/v1773874676/20A38445-8946-49E1-8330-AA60BFA12F74_1_1_fuobbj.png"
           alt="J9 Logo"

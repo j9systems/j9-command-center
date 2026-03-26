@@ -14,22 +14,11 @@ const roleColors: Record<string, string> = {
 
 export default function TeamPage() {
   const [members, setMembers] = useState<(TeamMember & { role_option?: Role | null })[]>([])
-  const [roles, setRoles] = useState<Role[]>([])
   const [loading, setLoading] = useState(true)
-  const [updatingId, setUpdatingId] = useState<string | null>(null)
 
   useEffect(() => {
     async function fetchData() {
       setLoading(true)
-
-      const { data: rolesData } = await supabase
-        .from('roles')
-        .select('*')
-        .order('name')
-
-      if (rolesData) {
-        setRoles(rolesData as Role[])
-      }
 
       const { data: teamData } = await supabase
         .from('team')
@@ -52,24 +41,6 @@ export default function TeamPage() {
     fetchData()
   }, [])
 
-  async function handleRoleChange(memberId: string, roleId: number | null) {
-    setUpdatingId(memberId)
-    const { error } = await supabase
-      .from('team')
-      .update({ role_id: roleId || null })
-      .eq('id', memberId)
-
-    if (!error) {
-      const newRole = roleId ? (roles.find((r) => r.id === roleId) ?? null) : null
-      setMembers((prev) =>
-        prev.map((m) =>
-          m.id === memberId ? { ...m, role_id: roleId, role_option: newRole } : m
-        )
-      )
-    }
-    setUpdatingId(null)
-  }
-
   if (loading) {
     return (
       <div className="p-4 md:p-8 max-w-4xl mx-auto">
@@ -90,7 +61,6 @@ export default function TeamPage() {
         {members.map((member) => {
           const name = [member.first_name, member.last_name].filter(Boolean).join(' ') || 'Unknown'
           const isActive = member.active === 'true' || member.active === '3'
-          const isUpdating = updatingId === member.id
 
           return (
             <div
@@ -122,7 +92,7 @@ export default function TeamPage() {
                 )}
               </div>
               <div className="flex items-center gap-3 flex-shrink-0">
-                {member.role_option && !isUpdating && (
+                {member.role_option && (
                   <span
                     className={`text-xs font-medium px-2.5 py-1 rounded-full ${
                       roleColors[member.role_option.name] ?? 'bg-zinc-500/15 text-zinc-400'
@@ -131,22 +101,6 @@ export default function TeamPage() {
                     {member.role_option.name}
                   </span>
                 )}
-                <select
-                  value={member.role_id ?? ''}
-                  onChange={(e) => {
-                    const val = e.target.value
-                    handleRoleChange(member.id, val ? Number(val) : null)
-                  }}
-                  disabled={isUpdating}
-                  className="bg-black/30 border border-border rounded-md px-2 py-1 text-xs text-text-primary focus:outline-none focus:border-purple/50 disabled:opacity-50"
-                >
-                  <option value="">No role</option>
-                  {roles.map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {r.name}
-                    </option>
-                  ))}
-                </select>
               </div>
             </div>
           )
