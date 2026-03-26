@@ -10,6 +10,10 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
+      workbox: {
+        skipWaiting: true,
+        clientsClaim: true,
+      },
       includeAssets: ['icon-192.png', 'icon-512.png'],
       manifest: {
         name: 'J9 Command Center',
