@@ -25,8 +25,7 @@ export default function MobileHeader() {
 
   return (
     <header
-      className="md:hidden sticky top-0 z-50 bg-surface border-b border-border"
-      style={{ paddingTop: 'env(safe-area-inset-top)' }}
+      className="md:hidden sticky top-0 z-50 bg-surface border-b border-border safe-top"
     >
       <div className="flex items-center justify-between px-4 h-14">
         <div className="flex items-center gap-2">
