@@ -103,4 +103,5 @@ export interface TimeLog {
   hours: number | null
   description: string | null
   created_at: string | null
+  status_id: number | null
 }
