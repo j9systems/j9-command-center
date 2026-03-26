@@ -230,19 +230,38 @@ export default function GanttChart({
     return () => window.removeEventListener('resize', measure)
   }, [])
 
-  /* Build rows */
+  /* Date range */
+  const [rangeStart, rangeEnd] = getRange(timeframe, offset)
+
+  /* Check if a date range overlaps the visible range */
+  function overlapsRange(start: Date | null, end: Date | null): boolean {
+    if (!start || !end) return false
+    return start <= rangeEnd && end >= rangeStart
+  }
+
+  /* Build rows — only include projects that have dates in range or features in range */
   const rows: GanttRow[] = []
   for (const proj of projectsWithFeatures) {
+    const projStart = parseDate(proj.project_start)
+    const projEnd = parseDate(proj.project_end)
+    const projectInRange = overlapsRange(projStart, projEnd)
+
+    const visibleFeatures = proj.features.filter((feat) =>
+      overlapsRange(parseDate(feat.start_date), parseDate(feat.end_date))
+    )
+
+    if (!projectInRange && visibleFeatures.length === 0) continue
+
     rows.push({
       type: 'project',
       id: proj.id,
       name: proj.name ?? 'Unnamed Project',
-      start: parseDate(proj.project_start),
-      end: parseDate(proj.project_end),
+      start: projStart,
+      end: projEnd,
       status: proj.status,
       projectId: proj.id,
     })
-    for (const feat of proj.features) {
+    for (const feat of visibleFeatures) {
       rows.push({
         type: 'feature',
         id: feat.id,
@@ -256,9 +275,6 @@ export default function GanttChart({
       })
     }
   }
-
-  /* Date range */
-  const [rangeStart, rangeEnd] = getRange(timeframe, offset)
   const totalDays = diffDays(rangeStart, rangeEnd) + 1
   const pxPerDay = chartWidth / totalDays
 

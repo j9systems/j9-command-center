@@ -11,6 +11,7 @@ import {
   CalendarDays,
   FolderKanban,
   Timer,
+  Plus,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import type {
@@ -455,6 +456,8 @@ export default function AccountDetailPage() {
             <TimeLogsTab
               timeLogs={timeLogs}
               statuses={timeLogStatuses}
+              projects={projects}
+              accountId={id!}
               onStatusUpdate={(logId, statusId) => {
                 setTimeLogs((prev) =>
                   prev.map((tl) =>
@@ -463,6 +466,9 @@ export default function AccountDetailPage() {
                       : tl
                   )
                 )
+              }}
+              onLogCreated={(log) => {
+                setTimeLogs((prev) => [log, ...prev])
               }}
             />
           )}
@@ -626,16 +632,46 @@ const timeLogStatusColors: Record<string, string> = {
   retainer: 'bg-blue-500/15 text-blue-400',
 }
 
+type LogEntry = TimeLog & { team_member?: TeamMember | null; project?: { name: string | null } | null; status_option?: Option | null }
+
 function TimeLogsTab({
   timeLogs,
   statuses,
+  projects,
+  accountId,
   onStatusUpdate,
+  onLogCreated,
 }: {
-  timeLogs: (TimeLog & { team_member?: TeamMember | null; project?: { name: string | null } | null; status_option?: Option | null })[]
+  timeLogs: LogEntry[]
   statuses: Option[]
+  projects: (Project & { project_manager?: TeamMember | null; logged_hours: number })[]
+  accountId: string
   onStatusUpdate: (logId: string, statusId: number) => void
+  onLogCreated: (log: LogEntry) => void
 }) {
   const [updatingId, setUpdatingId] = useState<string | null>(null)
+  const [showForm, setShowForm] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [currentTeamMember, setCurrentTeamMember] = useState<TeamMember | null>(null)
+  const [formName, setFormName] = useState('')
+  const [formHours, setFormHours] = useState('')
+  const [formDate, setFormDate] = useState(() => new Date().toISOString().slice(0, 10))
+  const [formProjectId, setFormProjectId] = useState('')
+
+  // Resolve the logged-in user's team member record
+  useEffect(() => {
+    async function resolveTeamMember() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user?.email) return
+      const { data } = await supabase
+        .from('team')
+        .select('*')
+        .eq('email', user.email)
+        .single()
+      if (data) setCurrentTeamMember(data as TeamMember)
+    }
+    resolveTeamMember()
+  }, [])
 
   const approvedStatus = statuses.find((s) => s.option_key === 'approved')
   const willNotBillStatus = statuses.find((s) => s.option_key === 'will_not_bill')
@@ -652,12 +688,54 @@ function TimeLogsTab({
     setUpdatingId(null)
   }
 
-  if (timeLogs.length === 0) {
-    return (
-      <p className="text-sm text-text-secondary text-center py-8">
-        No time logs found for this account.
-      </p>
-    )
+  async function handleCreateLog(e: React.FormEvent) {
+    e.preventDefault()
+    if (!currentTeamMember || !formName.trim() || !formHours) return
+
+    setSaving(true)
+    const hours = parseFloat(formHours)
+    if (isNaN(hours) || hours <= 0) {
+      setSaving(false)
+      return
+    }
+
+    // Format date to match existing DB format: "M/D/YYYY, 12:00:00 AM"
+    const d = new Date(formDate + 'T00:00:00')
+    const dateStr = `${d.getMonth() + 1}/${d.getDate()}/${d.getFullYear()}, 12:00:00 AM`
+
+    const newLog = {
+      name: formName.trim(),
+      hours,
+      date: dateStr,
+      account_id: accountId,
+      project_id: formProjectId || null,
+      assigned_to_id: currentTeamMember.id,
+    }
+
+    const { data, error } = await supabase
+      .from('time_logs')
+      .insert(newLog)
+      .select('*, team(first_name, last_name, photo), projects(name), options(id, option_key, option_label)')
+      .single()
+
+    if (data && !error) {
+      const entry: LogEntry = {
+        ...data,
+        team_member: data.team as TeamMember | null,
+        project: data.projects as { name: string | null } | null,
+        status_option: data.options as Option | null,
+        team: undefined,
+        projects: undefined,
+        options: undefined,
+      } as LogEntry
+      onLogCreated(entry)
+      setFormName('')
+      setFormHours('')
+      setFormDate(new Date().toISOString().slice(0, 10))
+      setFormProjectId('')
+      setShowForm(false)
+    }
+    setSaving(false)
   }
 
   const totalHours = timeLogs.reduce((sum, tl) => sum + (tl.hours ?? 0), 0)
@@ -669,7 +747,6 @@ function TimeLogsTab({
   const thisWeekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - mondayOffset)
   const lastWeekStart = new Date(thisWeekStart.getFullYear(), thisWeekStart.getMonth(), thisWeekStart.getDate() - 7)
 
-  type LogEntry = typeof timeLogs[number]
   const groups: { label: string; logs: LogEntry[] }[] = [
     { label: 'This Week', logs: [] },
     { label: 'Last Week', logs: [] },
@@ -681,7 +758,7 @@ function TimeLogsTab({
       groups[2].logs.push(log)
       continue
     }
-    const logDate = new Date(log.date + 'T00:00:00')
+    const logDate = new Date(log.date)
     if (logDate >= thisWeekStart) {
       groups[0].logs.push(log)
     } else if (logDate >= lastWeekStart) {
@@ -720,7 +797,7 @@ function TimeLogsTab({
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-sm text-text-primary truncate">
-            {log.description ?? 'No description'}
+            {log.name ?? 'No description'}
           </p>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-0.5">
             {log.team_member && (
@@ -777,31 +854,136 @@ function TimeLogsTab({
 
   return (
     <div>
-      <div className="flex items-center gap-2 mb-4 text-sm text-text-secondary">
-        <Clock size={14} />
-        <span>
-          Total: <span className="text-text-primary font-medium">{totalHours.toFixed(1)}h</span> logged
-        </span>
-      </div>
-      <div className="space-y-6">
-        {groups.map((group) =>
-          group.logs.length > 0 ? (
-            <div key={group.label}>
-              <div className="flex items-center gap-2 mb-3">
-                <span className="text-xs font-semibold text-text-secondary uppercase tracking-wider">
-                  {group.label}
-                </span>
-                <span className="text-xs text-text-secondary">
-                  ({group.logs.reduce((sum, tl) => sum + (tl.hours ?? 0), 0).toFixed(1)}h)
-                </span>
-              </div>
-              <div className="space-y-2">
-                {group.logs.map(renderLogEntry)}
-              </div>
-            </div>
-          ) : null
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2 text-sm text-text-secondary">
+          <Clock size={14} />
+          <span>
+            Total: <span className="text-text-primary font-medium">{totalHours.toFixed(1)}h</span> logged
+          </span>
+        </div>
+        {currentTeamMember && !showForm && (
+          <button
+            onClick={() => setShowForm(true)}
+            className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-purple text-white hover:bg-purple-hover transition-colors"
+          >
+            <Plus size={14} />
+            Log Time
+          </button>
         )}
       </div>
+
+      {/* New time log form */}
+      {showForm && currentTeamMember && (
+        <form
+          onSubmit={handleCreateLog}
+          className="mb-6 p-4 bg-black/20 rounded-lg border border-border/50 space-y-3"
+        >
+          <div className="flex items-center gap-2 mb-1">
+            <div className="w-6 h-6 rounded-full bg-purple-muted flex items-center justify-center flex-shrink-0">
+              {currentTeamMember.photo ? (
+                <img src={currentTeamMember.photo} alt="" className="w-6 h-6 rounded-full object-cover" />
+              ) : (
+                <User size={12} className="text-purple" />
+              )}
+            </div>
+            <span className="text-xs text-text-secondary">
+              Logging as {[currentTeamMember.first_name, currentTeamMember.last_name].filter(Boolean).join(' ')}
+            </span>
+          </div>
+          <div>
+            <input
+              type="text"
+              placeholder="What did you work on?"
+              value={formName}
+              onChange={(e) => setFormName(e.target.value)}
+              required
+              className="w-full text-sm bg-surface border border-border rounded-lg px-3 py-2 text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:border-purple/50"
+            />
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="text-[10px] text-text-secondary uppercase tracking-wider mb-1 block">Hours</label>
+              <input
+                type="number"
+                step="0.25"
+                min="0.25"
+                placeholder="0.0"
+                value={formHours}
+                onChange={(e) => setFormHours(e.target.value)}
+                required
+                className="w-full text-sm bg-surface border border-border rounded-lg px-3 py-2 text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:border-purple/50"
+              />
+            </div>
+            <div>
+              <label className="text-[10px] text-text-secondary uppercase tracking-wider mb-1 block">Date</label>
+              <input
+                type="date"
+                value={formDate}
+                onChange={(e) => setFormDate(e.target.value)}
+                required
+                className="w-full text-sm bg-surface border border-border rounded-lg px-3 py-2 text-text-primary focus:outline-none focus:border-purple/50"
+              />
+            </div>
+            <div>
+              <label className="text-[10px] text-text-secondary uppercase tracking-wider mb-1 block">Project</label>
+              <select
+                value={formProjectId}
+                onChange={(e) => setFormProjectId(e.target.value)}
+                className="w-full text-sm bg-surface border border-border rounded-lg px-3 py-2 text-text-primary focus:outline-none focus:border-purple/50"
+              >
+                <option value="">No project</option>
+                {projects.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name ?? 'Unnamed Project'}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 pt-1">
+            <button
+              type="submit"
+              disabled={saving}
+              className="text-xs font-medium px-4 py-1.5 rounded-lg bg-purple text-white hover:bg-purple-hover transition-colors disabled:opacity-50"
+            >
+              {saving ? 'Saving...' : 'Save'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowForm(false)}
+              className="text-xs font-medium px-4 py-1.5 rounded-lg border border-border text-text-secondary hover:text-text-primary transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      )}
+
+      {timeLogs.length === 0 && !showForm ? (
+        <p className="text-sm text-text-secondary text-center py-8">
+          No time logs found for this account.
+        </p>
+      ) : (
+        <div className="space-y-6">
+          {groups.map((group) =>
+            group.logs.length > 0 ? (
+              <div key={group.label}>
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="text-xs font-semibold text-text-secondary uppercase tracking-wider">
+                    {group.label}
+                  </span>
+                  <span className="text-xs text-text-secondary">
+                    ({group.logs.reduce((sum, tl) => sum + (tl.hours ?? 0), 0).toFixed(1)}h)
+                  </span>
+                </div>
+                <div className="space-y-2">
+                  {group.logs.map(renderLogEntry)}
+                </div>
+              </div>
+            ) : null
+          )}
+        </div>
+      )}
     </div>
   )
 }
