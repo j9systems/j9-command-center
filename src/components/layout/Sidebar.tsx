@@ -14,8 +14,7 @@ export default function Sidebar() {
 
   async function handleLogout() {
     await supabase.auth.signOut()
-    navigate('/')
-    window.location.reload()
+    navigate('/login')
   }
 
   return (
