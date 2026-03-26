@@ -23,6 +23,7 @@ import type {
   TimeLog,
   TeamMember,
 } from '@/types/database'
+import GanttChart from '@/components/GanttChart'
 
 const statusColors: Record<string, string> = {
   active: 'bg-emerald-500/15 text-emerald-400',
@@ -416,6 +417,11 @@ export default function AccountDetailPage() {
           )}
         </div>
       </div>
+
+      {/* Gantt Chart */}
+      {projects.length > 0 && (
+        <GanttChart projects={projects} accountId={id!} />
+      )}
 
       {/* Tabbed Container */}
       <div className="bg-surface rounded-xl border border-border overflow-hidden">
