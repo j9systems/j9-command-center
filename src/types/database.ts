@@ -81,6 +81,13 @@ export interface AccountTeam {
   account_id: string | null
   expected_weekly_hrs: string | null
   role: string | null
+  role_id: number | null
+}
+
+export interface AccountRole {
+  id: number
+  created_at: string
+  name: string
 }
 
 export interface Task {

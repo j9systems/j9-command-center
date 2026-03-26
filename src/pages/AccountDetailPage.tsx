@@ -5,6 +5,7 @@ import {
   Mail,
   Phone,
   User,
+  Users,
   CheckCircle2,
   Clock,
   CalendarDays,
@@ -14,6 +15,7 @@ import {
 import { supabase } from '@/lib/supabase'
 import type {
   AccountWithStatus,
+  AccountRole,
   Contact,
   Option,
   Project,
@@ -81,8 +83,9 @@ export default function AccountDetailPage() {
   const [projects, setProjects] = useState<(Project & { project_manager?: TeamMember | null; logged_hours: number })[]>([])
   const [timeLogs, setTimeLogs] = useState<(TimeLog & { team_member?: TeamMember | null; project?: { name: string | null } | null; status_option?: Option | null })[]>([])
   const [timeLogStatuses, setTimeLogStatuses] = useState<Option[]>([])
+  const [accountTeamMembers, setAccountTeamMembers] = useState<{ id: string; team_member: TeamMember | null; role: AccountRole | null; expected_weekly_hrs: string | null }[]>([])
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<'projects' | 'time_logs'>('projects')
+  const [activeTab, setActiveTab] = useState<'projects' | 'time_logs' | 'team'>('projects')
 
   useEffect(() => {
     if (!id) return
@@ -208,6 +211,23 @@ export default function AccountDetailPage() {
         )
       }
 
+      // Fetch account team members with roles
+      const { data: accountTeamData } = await supabase
+        .from('account_team')
+        .select('id, expected_weekly_hrs, team(id, first_name, last_name, email, photo, role), account_roles(id, name)')
+        .eq('account_id', id!)
+
+      if (accountTeamData) {
+        setAccountTeamMembers(
+          accountTeamData.map((at) => ({
+            id: at.id,
+            team_member: at.team as TeamMember | null,
+            role: at.account_roles as AccountRole | null,
+            expected_weekly_hrs: at.expected_weekly_hrs,
+          }))
+        )
+      }
+
       setLoading(false)
     }
 
@@ -256,6 +276,7 @@ export default function AccountDetailPage() {
   const tabs = [
     { key: 'projects' as const, label: 'Projects', icon: FolderKanban },
     { key: 'time_logs' as const, label: 'Time Logs', icon: Timer },
+    { key: 'team' as const, label: 'Team', icon: Users },
   ]
 
   return (
@@ -438,6 +459,9 @@ export default function AccountDetailPage() {
                 )
               }}
             />
+          )}
+          {activeTab === 'team' && (
+            <AccountTeamTab members={accountTeamMembers} />
           )}
         </div>
       </div>
@@ -646,9 +670,9 @@ function TimeLogsTab({
           return (
             <div
               key={log.id}
-              className="flex items-start gap-4 p-3 bg-black/20 rounded-lg border border-border/50"
+              className="flex items-center gap-4 p-3 bg-black/20 rounded-lg border border-border/50"
             >
-              <div className="text-right flex-shrink-0 w-14 pt-0.5">
+              <div className="text-right flex-shrink-0 w-14">
                 <span className="text-sm font-semibold text-purple">
                   {log.hours?.toFixed(1) ?? '0.0'}h
                 </span>
@@ -687,28 +711,20 @@ function TimeLogsTab({
                 </div>
               </div>
               <div className="flex items-center gap-1.5 flex-shrink-0">
-                {approvedStatus && (
+                {approvedStatus && !isApproved && (
                   <button
                     onClick={() => handleStatusUpdate(log.id, approvedStatus.id)}
-                    disabled={isUpdating || isApproved}
-                    className={`text-[11px] font-medium px-2.5 py-1 rounded-full transition-colors ${
-                      isApproved
-                        ? 'bg-emerald-500/15 text-emerald-400 cursor-default'
-                        : 'bg-emerald-500/10 text-emerald-400/60 hover:bg-emerald-500/20 hover:text-emerald-400'
-                    } disabled:opacity-50`}
+                    disabled={isUpdating}
+                    className="text-[11px] font-medium px-2.5 py-1 rounded-md border border-emerald-500/30 text-emerald-400/70 hover:bg-emerald-500/15 hover:text-emerald-400 hover:border-emerald-500/50 transition-colors disabled:opacity-50"
                   >
                     {isUpdating ? '...' : 'Approve'}
                   </button>
                 )}
-                {willNotBillStatus && (
+                {willNotBillStatus && !isWillNotBill && (
                   <button
                     onClick={() => handleStatusUpdate(log.id, willNotBillStatus.id)}
-                    disabled={isUpdating || isWillNotBill}
-                    className={`text-[11px] font-medium px-2.5 py-1 rounded-full transition-colors ${
-                      isWillNotBill
-                        ? 'bg-red-500/15 text-red-400 cursor-default'
-                        : 'bg-red-500/10 text-red-400/60 hover:bg-red-500/20 hover:text-red-400'
-                    } disabled:opacity-50`}
+                    disabled={isUpdating}
+                    className="text-[11px] font-medium px-2.5 py-1 rounded-md border border-red-500/30 text-red-400/70 hover:bg-red-500/15 hover:text-red-400 hover:border-red-500/50 transition-colors disabled:opacity-50"
                   >
                     {isUpdating ? '...' : 'Will Not Bill'}
                   </button>
@@ -718,6 +734,78 @@ function TimeLogsTab({
           )
         })}
       </div>
+    </div>
+  )
+}
+
+const roleColors: Record<string, string> = {
+  'Account Manager': 'bg-purple-500/15 text-purple-400',
+  'Developer': 'bg-blue-500/15 text-blue-400',
+  'Executive Sponsor': 'bg-amber-500/15 text-amber-400',
+}
+
+function AccountTeamTab({
+  members,
+}: {
+  members: { id: string; team_member: TeamMember | null; role: AccountRole | null; expected_weekly_hrs: string | null }[]
+}) {
+  if (members.length === 0) {
+    return (
+      <p className="text-sm text-text-secondary text-center py-8">
+        No team members assigned to this account.
+      </p>
+    )
+  }
+
+  return (
+    <div className="space-y-2">
+      {members.map((member) => {
+        const name = member.team_member
+          ? [member.team_member.first_name, member.team_member.last_name].filter(Boolean).join(' ')
+          : 'Unknown Member'
+
+        return (
+          <div
+            key={member.id}
+            className="flex items-center gap-4 p-3 bg-black/20 rounded-lg border border-border/50"
+          >
+            <div className="w-9 h-9 rounded-full bg-purple-muted flex items-center justify-center flex-shrink-0">
+              {member.team_member?.photo ? (
+                <img
+                  src={member.team_member.photo}
+                  alt={name}
+                  className="w-9 h-9 rounded-full object-cover"
+                />
+              ) : (
+                <User size={16} className="text-purple" />
+              )}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-text-primary truncate">{name}</p>
+              {member.team_member?.email && (
+                <p className="text-xs text-text-secondary truncate">{member.team_member.email}</p>
+              )}
+            </div>
+            <div className="flex items-center gap-3 flex-shrink-0">
+              {member.expected_weekly_hrs && (
+                <span className="text-xs text-text-secondary flex items-center gap-1">
+                  <Clock size={12} />
+                  {member.expected_weekly_hrs}h/wk
+                </span>
+              )}
+              {member.role && (
+                <span
+                  className={`text-xs font-medium px-2.5 py-1 rounded-full ${
+                    roleColors[member.role.name] ?? 'bg-zinc-500/15 text-zinc-400'
+                  }`}
+                >
+                  {member.role.name}
+                </span>
+              )}
+            </div>
+          </div>
+        )
+      })}
     </div>
   )
 }
