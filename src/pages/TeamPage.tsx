@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { User } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
-import type { TeamMember, AccountRole } from '@/types/database'
+import type { TeamMember, Role } from '@/types/database'
 
 const roleColors: Record<string, string> = {
   'Account Manager': 'bg-purple-500/15 text-purple-400',
@@ -13,8 +13,8 @@ const roleColors: Record<string, string> = {
 }
 
 export default function TeamPage() {
-  const [members, setMembers] = useState<(TeamMember & { role_option?: AccountRole | null })[]>([])
-  const [roles, setRoles] = useState<AccountRole[]>([])
+  const [members, setMembers] = useState<(TeamMember & { role_option?: Role | null })[]>([])
+  const [roles, setRoles] = useState<Role[]>([])
   const [loading, setLoading] = useState(true)
   const [updatingId, setUpdatingId] = useState<string | null>(null)
 
@@ -23,26 +23,26 @@ export default function TeamPage() {
       setLoading(true)
 
       const { data: rolesData } = await supabase
-        .from('account_roles')
+        .from('roles')
         .select('*')
         .order('name')
 
       if (rolesData) {
-        setRoles(rolesData as AccountRole[])
+        setRoles(rolesData as Role[])
       }
 
       const { data: teamData } = await supabase
         .from('team')
-        .select('*, account_roles(id, name)')
+        .select('*, roles(id, name)')
         .order('first_name')
 
       if (teamData) {
         setMembers(
           teamData.map((m) => ({
             ...m,
-            role_option: m.account_roles as unknown as AccountRole | null,
-            account_roles: undefined,
-          })) as (TeamMember & { role_option?: AccountRole | null })[]
+            role_option: m.roles as unknown as Role | null,
+            roles: undefined,
+          })) as (TeamMember & { role_option?: Role | null })[]
         )
       }
 
@@ -56,11 +56,11 @@ export default function TeamPage() {
     setUpdatingId(memberId)
     const { error } = await supabase
       .from('team')
-      .update({ role_id: roleId })
+      .update({ role_id: roleId || null })
       .eq('id', memberId)
 
     if (!error) {
-      const newRole = roles.find((r) => r.id === roleId) ?? null
+      const newRole = roleId ? (roles.find((r) => r.id === roleId) ?? null) : null
       setMembers((prev) =>
         prev.map((m) =>
           m.id === memberId ? { ...m, role_id: roleId, role_option: newRole } : m

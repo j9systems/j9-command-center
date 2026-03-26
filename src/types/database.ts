@@ -91,6 +91,12 @@ export interface AccountRole {
   name: string
 }
 
+export interface Role {
+  id: number
+  created_at: string
+  name: string
+}
+
 export interface Task {
   id: string
   account_id: string | null
