@@ -10,24 +10,29 @@ const navItems = [
 
 export default function BottomNav() {
   return (
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-surface border-t border-border z-50 flex justify-around items-start pt-2 h-[calc(4rem+env(safe-area-inset-bottom))] pb-[env(safe-area-inset-bottom)]">
-      {navItems.map(({ to, icon: Icon, label }) => (
-        <NavLink
-          key={to}
-          to={to}
-          end={to === '/'}
-          className={({ isActive }) =>
-            `flex flex-col items-center gap-1 py-1 px-3 text-xs font-medium transition-colors duration-200 ${
-              isActive
-                ? 'text-purple'
-                : 'text-text-secondary'
-            }`
-          }
-        >
-          <Icon size={22} />
-          {label}
-        </NavLink>
-      ))}
+    <nav
+      className="md:hidden fixed bottom-0 left-0 right-0 bg-surface border-t border-border z-50"
+      style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+    >
+      <div className="flex justify-around items-center h-16">
+        {navItems.map(({ to, icon: Icon, label }) => (
+          <NavLink
+            key={to}
+            to={to}
+            end={to === '/'}
+            className={({ isActive }) =>
+              `flex flex-col items-center gap-1 py-1 px-3 text-xs font-medium transition-colors duration-200 ${
+                isActive
+                  ? 'text-purple'
+                  : 'text-text-secondary'
+              }`
+            }
+          >
+            <Icon size={22} />
+            {label}
+          </NavLink>
+        ))}
+      </div>
     </nav>
   )
 }
