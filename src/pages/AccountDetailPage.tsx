@@ -35,6 +35,7 @@ import type {
 } from '@/types/database'
 import GanttChart from '@/components/GanttChart'
 import MobileFormOverlay from '@/components/MobileFormOverlay'
+import NewMeetingModal from '@/components/NewMeetingModal'
 
 const statusColors: Record<string, string> = {
   active: 'bg-emerald-500/15 text-emerald-400',
@@ -100,6 +101,7 @@ export default function AccountDetailPage() {
   const [meetings, setMeetings] = useState<(Meeting & { attendees: { contact: Contact | null; team_member: TeamMember | null }[] })[]>([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<'projects' | 'tasks' | 'time_logs' | 'invoices' | 'contacts' | 'team' | 'meetings'>('projects')
+  const [refreshKey, setRefreshKey] = useState(0)
 
   useEffect(() => {
     if (!id) return
@@ -363,7 +365,7 @@ export default function AccountDetailPage() {
     }
 
     fetchData()
-  }, [id])
+  }, [id, refreshKey])
 
   if (loading) {
     return (
@@ -615,7 +617,12 @@ export default function AccountDetailPage() {
             <AccountTeamTab members={accountTeamMembers} />
           )}
           {activeTab === 'meetings' && (
-            <MeetingsTab meetings={meetings} />
+            <MeetingsTab
+              meetings={meetings}
+              accountId={id!}
+              accountContacts={accountContacts}
+              onRefresh={() => setRefreshKey((k) => k + 1)}
+            />
           )}
         </div>
       </div>
@@ -1959,16 +1966,16 @@ const meetingStatusColors: Record<string, string> = {
 
 function MeetingsTab({
   meetings,
+  accountId,
+  accountContacts,
+  onRefresh,
 }: {
   meetings: (Meeting & { attendees: { contact: Contact | null; team_member: TeamMember | null }[] })[]
+  accountId: string
+  accountContacts: (AccountContact & { contact: Contact })[]
+  onRefresh: () => void
 }) {
-  if (meetings.length === 0) {
-    return (
-      <p className="text-sm text-text-secondary text-center py-8">
-        No meetings found for this account&apos;s contacts.
-      </p>
-    )
-  }
+  const [showForm, setShowForm] = useState(false)
 
   function formatDateTime(dateStr: string | null): string {
     if (!dateStr) return ''
@@ -1994,6 +2001,33 @@ function MeetingsTab({
 
   return (
     <div className="space-y-6">
+      <div className="flex justify-end">
+        {!showForm && (
+          <button
+            onClick={() => setShowForm(true)}
+            className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-purple text-white hover:bg-purple-hover transition-colors"
+          >
+            <Plus size={14} />
+            New Meeting
+          </button>
+        )}
+      </div>
+
+      {showForm && (
+        <NewMeetingModal
+          accountId={accountId}
+          accountContacts={accountContacts.map((ac) => ({ contact: ac.contact }))}
+          onClose={() => setShowForm(false)}
+          onCreated={onRefresh}
+        />
+      )}
+
+      {groups.length === 0 && !showForm && (
+        <p className="text-sm text-text-secondary text-center py-8">
+          No meetings found for this account&apos;s contacts.
+        </p>
+      )}
+
       {groups.map((group) => (
         <div key={group.label}>
           <h4 className="text-xs font-semibold text-text-secondary uppercase tracking-wider mb-3">
