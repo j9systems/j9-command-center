@@ -128,6 +128,21 @@ export interface TimeLog {
   status_id: number | null
 }
 
+export interface Invoice {
+  row_id: string
+  created_date: string | null
+  sent_date: string | null
+  account_id: string | null
+  amount: number | null
+  rate: number | null
+  qb_id: number | null
+  quickbooks_id: number | null
+  payment_link: string | null
+  project_id: string | null
+  send_pressed: string | null
+  status_id: number | null
+}
+
 export interface Feature {
   id: string
   project_id: string | null
