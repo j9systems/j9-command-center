@@ -372,27 +372,29 @@ export default function GanttChart({
       const { rowId, origStart, origEnd, lastDStart, lastDEnd } = dragRef.current
 
       dragRef.current = null
-      setDragDelta(null)
 
-      if (lastDStart === 0 && lastDEnd === 0) return
+      if (lastDStart === 0 && lastDEnd === 0) {
+        setDragDelta(null)
+        return
+      }
 
       const newStart = addDays(origStart, lastDStart)
       const newEnd = addDays(origEnd, lastDEnd)
 
       // Don't allow start > end
-      if (newStart > newEnd) return
+      if (newStart > newEnd) {
+        setDragDelta(null)
+        return
+      }
 
       const row = rows.find((r) => r.id === rowId)
-      if (!row) return
+      if (!row) {
+        setDragDelta(null)
+        return
+      }
 
       if (row.type === 'project') {
-        // Update project dates
-        await supabase
-          .from('projects')
-          .update({ project_start: fmtDate(newStart), project_end: fmtDate(newEnd) })
-          .eq('id', rowId)
-
-        // Update local state
+        // Optimistically update local state BEFORE clearing drag delta
         setProjectsWithFeatures((prev) =>
           prev.map((p) =>
             p.id === rowId
@@ -400,15 +402,41 @@ export default function GanttChart({
               : p
           )
         )
+        setDragDelta(null)
+
+        // Persist to database
+        await supabase
+          .from('projects')
+          .update({ project_start: fmtDate(newStart), project_end: fmtDate(newEnd) })
+          .eq('id', rowId)
       } else {
-        // Feature update
+        // Optimistically update local state BEFORE clearing drag delta
+        const parentProject = projectsWithFeatures.find((p) => p.id === row.projectId)
+        setProjectsWithFeatures((prev) =>
+          prev.map((p) => {
+            if (p.id !== row.projectId) return p
+            const updatedFeatures = p.features.map((f) =>
+              f.id === rowId
+                ? { ...f, start_date: fmtDate(newStart), end_date: fmtDate(newEnd) }
+                : f
+            )
+            // Also expand parent project dates if feature extends beyond them
+            const projStart = parseDate(p.project_start)
+            const projEnd = parseDate(p.project_end)
+            const newProjStart = projStart && newStart < projStart ? fmtDate(newStart) : p.project_start
+            const newProjEnd = projEnd && newEnd > projEnd ? fmtDate(newEnd) : p.project_end
+            return { ...p, project_start: newProjStart, project_end: newProjEnd, features: updatedFeatures }
+          })
+        )
+        setDragDelta(null)
+
+        // Persist feature update to database
         await supabase
           .from('features')
           .update({ start_date: fmtDate(newStart), end_date: fmtDate(newEnd) })
           .eq('id', rowId)
 
         // Check if feature extends beyond parent project dates
-        const parentProject = projectsWithFeatures.find((p) => p.id === row.projectId)
         if (parentProject) {
           const projStart = parseDate(parentProject.project_start)
           const projEnd = parseDate(parentProject.project_end)
@@ -423,7 +451,7 @@ export default function GanttChart({
           // Handle dependency cascading: push features that follow this one
           await cascadeDependencies(rowId, newEnd, row.projectId)
 
-          // Refresh features
+          // Refresh features to pick up cascaded dependency changes
           const { data: freshFeatures } = await supabase
             .from('features')
             .select('*, options(id, option_key, option_label)')
