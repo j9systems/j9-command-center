@@ -19,6 +19,7 @@
 
   body {
     height: 100%;
+    margin: 0;
     overflow: hidden;
     background-color: var(--color-surface);
     color: var(--color-text-primary);
@@ -29,7 +30,7 @@
   }
 
   #root {
-    height: 100%;
+    height: 100dvh;
     overflow: hidden;
   }
 
