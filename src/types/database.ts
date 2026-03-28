@@ -100,6 +100,8 @@ export interface Role {
 export interface Task {
   id: string
   account_id: string | null
+  project_id: string | null
+  feature_id: string | null
   title: string | null
   description: string | null
   status: string | null
