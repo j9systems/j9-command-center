@@ -541,7 +541,7 @@ export default function AccountDetailPage() {
             />
           )}
           {activeTab === 'invoices' && (
-            <InvoicesTab invoices={invoices} />
+            <InvoicesTab invoices={invoices} accountId={id!} />
           )}
           {activeTab === 'contacts' && (
             <ContactsTab
@@ -833,6 +833,7 @@ function TimeLogsTab({
   onStatusUpdate: (logId: string, statusId: number) => void
   onLogCreated: (log: LogEntry) => void
 }) {
+  const navigate = useNavigate()
   const [updatingId, setUpdatingId] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -961,7 +962,8 @@ function TimeLogsTab({
     return (
       <div
         key={log.id}
-        className="flex items-center gap-4 p-3 bg-black/20 rounded-lg border border-border/50"
+        onClick={() => navigate(`/accounts/${accountId}/time-logs/${log.id}`)}
+        className="flex items-center gap-4 p-3 bg-black/20 rounded-lg border border-border/50 cursor-pointer hover:border-purple/30 transition-colors"
       >
         <div className="w-7 h-7 rounded-full bg-purple-muted flex items-center justify-center flex-shrink-0">
           {log.team_member?.photo ? (
@@ -1015,7 +1017,7 @@ function TimeLogsTab({
         <div className="flex items-center gap-1.5 flex-shrink-0">
           {approvedStatus && !isApproved && (
             <button
-              onClick={() => handleStatusUpdate(log.id, approvedStatus.id)}
+              onClick={(e) => { e.stopPropagation(); handleStatusUpdate(log.id, approvedStatus.id) }}
               disabled={isUpdating}
               className="text-[11px] font-medium px-2.5 py-1 rounded-md border border-emerald-500/30 text-emerald-400/70 hover:bg-emerald-500/15 hover:text-emerald-400 hover:border-emerald-500/50 transition-colors disabled:opacity-50"
             >
@@ -1024,7 +1026,7 @@ function TimeLogsTab({
           )}
           {willNotBillStatus && !isWillNotBill && (
             <button
-              onClick={() => handleStatusUpdate(log.id, willNotBillStatus.id)}
+              onClick={(e) => { e.stopPropagation(); handleStatusUpdate(log.id, willNotBillStatus.id) }}
               disabled={isUpdating}
               className="text-[11px] font-medium px-2.5 py-1 rounded-md border border-red-500/30 text-red-400/70 hover:bg-red-500/15 hover:text-red-400 hover:border-red-500/50 transition-colors disabled:opacity-50"
             >
@@ -1414,9 +1416,13 @@ function getInvoiceStatusColor(key: string | null | undefined): string {
 
 function InvoicesTab({
   invoices,
+  accountId,
 }: {
   invoices: (Invoice & { project?: { name: string | null } | null; status_option?: Option | null })[]
+  accountId: string
 }) {
+  const navigate = useNavigate()
+
   if (invoices.length === 0) {
     return (
       <p className="text-sm text-text-secondary text-center py-8">
@@ -1430,7 +1436,8 @@ function InvoicesTab({
       {invoices.map((invoice) => (
         <div
           key={invoice.row_id}
-          className="flex items-center gap-4 p-3 bg-black/20 rounded-lg border border-border/50"
+          onClick={() => navigate(`/accounts/${accountId}/invoices/${invoice.row_id}`)}
+          className="flex items-center gap-4 p-3 bg-black/20 rounded-lg border border-border/50 cursor-pointer hover:border-purple/30 transition-colors"
         >
           <div className="w-7 h-7 rounded-full bg-purple-muted flex items-center justify-center flex-shrink-0">
             <FileText size={14} className="text-purple" />
