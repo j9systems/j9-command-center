@@ -21,6 +21,7 @@ import type {
   AccountWithStatus,
   AccountRole,
   Contact,
+  Invoice,
   Option,
   Project,
   Task,
@@ -90,6 +91,7 @@ export default function AccountDetailPage() {
   const [timeLogs, setTimeLogs] = useState<(TimeLog & { team_member?: TeamMember | null; project?: { name: string | null } | null; status_option?: Option | null })[]>([])
   const [timeLogStatuses, setTimeLogStatuses] = useState<Option[]>([])
   const [accountTeamMembers, setAccountTeamMembers] = useState<{ id: string; team_member: TeamMember | null; role: AccountRole | null; expected_weekly_hrs: string | null }[]>([])
+  const [invoices, setInvoices] = useState<(Invoice & { project?: { name: string | null } | null; status_option?: Option | null })[]>([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<'projects' | 'tasks' | 'time_logs' | 'invoices' | 'team'>('projects')
 
@@ -282,6 +284,25 @@ export default function AccountDetailPage() {
             role: at.account_roles as unknown as AccountRole | null,
             expected_weekly_hrs: at.expected_weekly_hrs,
           }))
+        )
+      }
+
+      // Fetch invoices
+      const { data: invoicesData } = await supabase
+        .from('invoices')
+        .select('*, projects(name), options(id, option_key, option_label)')
+        .eq('account_id', id!)
+        .order('created_date', { ascending: false })
+
+      if (invoicesData) {
+        setInvoices(
+          invoicesData.map((inv) => ({
+            ...inv,
+            project: inv.projects as { name: string | null } | null,
+            status_option: inv.options as Option | null,
+            projects: undefined,
+            options: undefined,
+          })) as (Invoice & { project?: { name: string | null } | null; status_option?: Option | null })[]
         )
       }
 
@@ -519,6 +540,8 @@ export default function AccountDetailPage() {
             <TasksTab
               tasks={tasks}
               accountId={id!}
+              taskStatuses={taskStatuses}
+              projects={projects}
               onMarkComplete={async (taskId) => {
                 const completeOption = taskStatuses.find((s) => s.option_key === 'complete')
                 if (!completeOption) return
@@ -536,6 +559,7 @@ export default function AccountDetailPage() {
                   )
                 }
               }}
+              onTaskCreated={(task) => setTasks((prev) => [...prev, task])}
             />
           )}
           {activeTab === 'time_logs' && (
@@ -559,7 +583,7 @@ export default function AccountDetailPage() {
             />
           )}
           {activeTab === 'invoices' && (
-            <InvoicesTab />
+            <InvoicesTab invoices={invoices} />
           )}
           {activeTab === 'team' && (
             <AccountTeamTab members={accountTeamMembers} />
@@ -1170,21 +1194,58 @@ function TimeLogsTab({
 function TasksTab({
   tasks,
   accountId,
+  taskStatuses,
+  projects,
   onMarkComplete,
+  onTaskCreated,
 }: {
   tasks: (Task & { assigned_to?: TeamMember | null; status_option?: Option | null })[]
   accountId: string
+  taskStatuses: Option[]
+  projects: (Project & { project_manager?: TeamMember | null; logged_hours: number })[]
   onMarkComplete: (taskId: string) => Promise<void>
+  onTaskCreated: (task: Task & { assigned_to?: TeamMember | null; status_option?: Option | null }) => void
 }) {
   const navigate = useNavigate()
   const [completingId, setCompletingId] = useState<string | null>(null)
+  const [showForm, setShowForm] = useState(false)
+  const [newName, setNewName] = useState('')
+  const [newDue, setNewDue] = useState('')
+  const [newProjectId, setNewProjectId] = useState('')
+  const [saving, setSaving] = useState(false)
 
-  if (tasks.length === 0) {
-    return (
-      <p className="text-sm text-text-secondary text-center py-8">
-        No tasks for this account.
-      </p>
-    )
+  async function handleCreateTask() {
+    if (!newName.trim()) return
+    setSaving(true)
+    const rowId = crypto.randomUUID()
+    const backlogStatus = taskStatuses.find((s) => s.option_key === 'backlog')
+    const { data, error } = await supabase
+      .from('tasks')
+      .insert({
+        row_id: rowId,
+        name: newName.trim(),
+        account_id: accountId,
+        project_id: newProjectId || null,
+        due: newDue || null,
+        status_id: backlogStatus?.id ?? null,
+      })
+      .select('*, team!fk_tasks_assigned_to_id_internal(id, first_name, last_name, photo), options!fk_tasks_status_id(id, option_key, option_label)')
+      .single()
+
+    if (data && !error) {
+      onTaskCreated({
+        ...data,
+        assigned_to: data.team as TeamMember | null,
+        status_option: data.options as Option | null,
+        team: undefined,
+        options: undefined,
+      } as Task & { assigned_to?: TeamMember | null; status_option?: Option | null })
+      setNewName('')
+      setNewDue('')
+      setNewProjectId('')
+      setShowForm(false)
+    }
+    setSaving(false)
   }
 
   // Group tasks by status category
@@ -1269,32 +1330,187 @@ function TasksTab({
 
   return (
     <div className="space-y-6">
-      {groups.map((group) =>
-        group.tasks.length > 0 ? (
-          <div key={group.key}>
-            <div className="flex items-center gap-2 mb-3">
-              <span className="text-xs font-semibold text-text-secondary uppercase tracking-wider">
-                {group.label}
-              </span>
-              <span className="text-xs text-text-secondary">
-                ({group.tasks.length})
-              </span>
+      <div className="flex justify-end">
+        {!showForm && (
+          <button
+            onClick={() => setShowForm(true)}
+            className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-purple text-white hover:bg-purple-hover transition-colors"
+          >
+            <Plus size={14} />
+            New Task
+          </button>
+        )}
+      </div>
+
+      {showForm && (
+        <MobileFormOverlay title="New Task" onClose={() => setShowForm(false)}>
+          <div className="p-4 md:bg-black/20 rounded-lg md:border md:border-border/50 space-y-3">
+            <div className="hidden md:flex items-center justify-between mb-1">
+              <h3 className="text-sm font-medium text-text-primary">New Task</h3>
+              <button onClick={() => setShowForm(false)} className="text-text-secondary hover:text-text-primary transition-colors">
+                <X size={16} />
+              </button>
             </div>
-            <div className="space-y-2">
-              {group.tasks.map(renderTaskEntry)}
+            <input
+              type="text"
+              placeholder="Task name"
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              className="w-full text-sm bg-surface border border-border rounded-lg px-3 py-2 text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:border-purple/50"
+            />
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-[10px] text-text-secondary uppercase tracking-wider mb-1 block">Due Date</label>
+                <input
+                  type="date"
+                  value={newDue}
+                  onChange={(e) => setNewDue(e.target.value)}
+                  className="w-full text-sm bg-surface border border-border rounded-lg px-3 py-2 text-text-primary focus:outline-none focus:border-purple/50"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] text-text-secondary uppercase tracking-wider mb-1 block">Project</label>
+                <select
+                  value={newProjectId}
+                  onChange={(e) => setNewProjectId(e.target.value)}
+                  className="w-full text-sm bg-surface border border-border rounded-lg px-3 py-2 text-text-primary focus:outline-none focus:border-purple/50"
+                >
+                  <option value="">None</option>
+                  {projects.map((p) => (
+                    <option key={p.id} value={p.id}>{p.name ?? 'Untitled'}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 pt-1">
+              <button
+                onClick={handleCreateTask}
+                disabled={!newName.trim() || saving}
+                className="text-xs font-medium px-4 py-1.5 rounded-lg bg-purple text-white hover:bg-purple-hover transition-colors disabled:opacity-50"
+              >
+                {saving ? 'Creating...' : 'Create'}
+              </button>
+              <button
+                onClick={() => setShowForm(false)}
+                className="text-xs font-medium px-4 py-1.5 rounded-lg border border-border text-text-secondary hover:text-text-primary transition-colors"
+              >
+                Cancel
+              </button>
             </div>
           </div>
-        ) : null
+        </MobileFormOverlay>
+      )}
+
+      {tasks.length === 0 && !showForm ? (
+        <p className="text-sm text-text-secondary text-center py-8">
+          No tasks for this account.
+        </p>
+      ) : (
+        groups.map((group) =>
+          group.tasks.length > 0 ? (
+            <div key={group.key}>
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-xs font-semibold text-text-secondary uppercase tracking-wider">
+                  {group.label}
+                </span>
+                <span className="text-xs text-text-secondary">
+                  ({group.tasks.length})
+                </span>
+              </div>
+              <div className="space-y-2">
+                {group.tasks.map(renderTaskEntry)}
+              </div>
+            </div>
+          ) : null
+        )
       )}
     </div>
   )
 }
 
-function InvoicesTab() {
+const invoiceStatusColors: Record<string, string> = {
+  paid: 'bg-emerald-500/15 text-emerald-400',
+  sent: 'bg-blue-500/15 text-blue-400',
+  draft: 'bg-zinc-500/15 text-zinc-400',
+  overdue: 'bg-red-500/15 text-red-400',
+  pending: 'bg-amber-500/15 text-amber-400',
+}
+
+function getInvoiceStatusColor(key: string | null | undefined): string {
+  if (!key) return 'bg-zinc-500/15 text-zinc-400'
+  return invoiceStatusColors[key.toLowerCase()] ?? 'bg-purple-muted text-purple'
+}
+
+function InvoicesTab({
+  invoices,
+}: {
+  invoices: (Invoice & { project?: { name: string | null } | null; status_option?: Option | null })[]
+}) {
+  if (invoices.length === 0) {
+    return (
+      <p className="text-sm text-text-secondary text-center py-8">
+        No invoices for this account.
+      </p>
+    )
+  }
+
   return (
-    <p className="text-sm text-text-secondary text-center py-8">
-      Invoicing coming soon.
-    </p>
+    <div className="space-y-2">
+      {invoices.map((invoice) => (
+        <div
+          key={invoice.row_id}
+          className="flex items-center gap-4 p-3 bg-black/20 rounded-lg border border-border/50"
+        >
+          <div className="w-7 h-7 rounded-full bg-purple-muted flex items-center justify-center flex-shrink-0">
+            <FileText size={14} className="text-purple" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <p className="text-sm text-text-primary font-medium">
+                ${invoice.amount != null ? invoice.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00'}
+              </p>
+              {invoice.status_option && (
+                <span
+                  className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${getInvoiceStatusColor(invoice.status_option.option_key)}`}
+                >
+                  {invoice.status_option.option_label}
+                </span>
+              )}
+            </div>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-0.5">
+              {invoice.project?.name && (
+                <span className="text-xs text-text-secondary flex items-center gap-1">
+                  <FolderKanban size={10} />
+                  {invoice.project.name}
+                </span>
+              )}
+              {invoice.created_date && (
+                <span className="text-xs text-text-secondary flex items-center gap-1">
+                  <CalendarDays size={10} />
+                  {invoice.created_date}
+                </span>
+              )}
+              {invoice.sent_date && (
+                <span className="text-xs text-text-secondary">
+                  Sent: {invoice.sent_date}
+                </span>
+              )}
+            </div>
+          </div>
+          {invoice.payment_link && (
+            <a
+              href={invoice.payment_link}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="text-[10px] font-medium px-2 py-1 rounded-lg bg-purple-muted text-purple hover:bg-purple/25 transition-colors flex-shrink-0"
+            >
+              Payment Link
+            </a>
+          )}
+        </div>
+      ))}
+    </div>
   )
 }
 
