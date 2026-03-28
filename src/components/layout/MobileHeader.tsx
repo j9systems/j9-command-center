@@ -3,9 +3,17 @@ import { useNavigate } from 'react-router-dom'
 import { Menu, LogOut, X, Calendar } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 
+interface UserProfile {
+  first_name: string | null
+  last_name: string | null
+  email: string | null
+  photo: string | null
+}
+
 export default function MobileHeader() {
   const [open, setOpen] = useState(false)
   const [calendarConnected, setCalendarConnected] = useState<boolean | null>(null)
+  const [profile, setProfile] = useState<UserProfile | null>(null)
   const navigate = useNavigate()
   const menuRef = useRef<HTMLDivElement>(null)
 
@@ -20,18 +28,33 @@ export default function MobileHeader() {
   }, [open])
 
   useEffect(() => {
-    async function checkCalendar() {
+    async function loadProfile() {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session?.user) return
-      const { data } = await supabase
-        .from('user_integrations')
-        .select('id')
-        .eq('user_id', session.user.id)
-        .eq('provider', 'google_calendar')
-        .maybeSingle()
-      setCalendarConnected(!!data)
+
+      const [integrationResult, teamResult] = await Promise.all([
+        supabase
+          .from('user_integrations')
+          .select('id')
+          .eq('user_id', session.user.id)
+          .eq('provider', 'google_calendar')
+          .maybeSingle(),
+        supabase
+          .from('team')
+          .select('first_name, last_name, email, photo')
+          .eq('email', session.user.email!)
+          .maybeSingle(),
+      ])
+
+      setCalendarConnected(!!integrationResult.data)
+      setProfile(teamResult.data ?? {
+        first_name: null,
+        last_name: null,
+        email: session.user.email ?? null,
+        photo: null,
+      })
     }
-    checkCalendar()
+    loadProfile()
   }, [])
 
   async function connectGoogleCalendar() {
@@ -53,6 +76,14 @@ export default function MobileHeader() {
     await supabase.auth.signOut()
     navigate('/login')
   }
+
+  const displayName = profile
+    ? [profile.first_name, profile.last_name].filter(Boolean).join(' ') || profile.email || 'User'
+    : ''
+
+  const initials = profile
+    ? (profile.first_name?.[0] ?? '') + (profile.last_name?.[0] ?? '') || (profile.email?.[0]?.toUpperCase() ?? 'U')
+    : ''
 
   return (
     <header
@@ -81,10 +112,30 @@ export default function MobileHeader() {
 
           {open && (
             <div className="absolute right-0 top-12 w-56 bg-surface border border-border rounded-lg shadow-lg overflow-hidden">
+              {/* Profile info */}
+              <div className="px-4 py-3 border-b border-border">
+                <div className="flex items-center gap-3">
+                  {profile?.photo ? (
+                    <img src={profile.photo} alt="" className="w-9 h-9 rounded-full object-cover" />
+                  ) : (
+                    <div className="w-9 h-9 rounded-full bg-purple-muted text-purple flex items-center justify-center text-xs font-semibold">
+                      {initials}
+                    </div>
+                  )}
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-text-primary truncate">{displayName}</p>
+                    {profile?.email && (
+                      <p className="text-xs text-text-secondary truncate">{profile.email}</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Google Calendar */}
               {calendarConnected !== null && (
                 calendarConnected ? (
                   <div className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-text-secondary">
-                    <span className="relative flex h-[18px] w-[18px] items-center justify-center">
+                    <span className="flex h-[18px] w-[18px] items-center justify-center">
                       <span className="h-2.5 w-2.5 rounded-full bg-green-400" />
                     </span>
                     Calendar Connected
@@ -99,6 +150,8 @@ export default function MobileHeader() {
                   </button>
                 )
               )}
+
+              {/* Logout */}
               <button
                 onClick={handleLogout}
                 className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-text-secondary hover:text-red-400 hover:bg-red-500/10 transition-colors w-full"
