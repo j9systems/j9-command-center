@@ -127,12 +127,11 @@ export default function AccountDetailPage() {
 
       if (contactLinks) {
         const mapped = contactLinks
-          .filter((cl: Record<string, unknown>) => cl.contacts)
-          .map((cl: Record<string, unknown>) => ({
-            ...cl,
-            contact: cl.contacts as Contact,
-            contacts: undefined,
-          })) as (AccountContact & { contact: Contact })[]
+          .filter((cl) => cl.contacts)
+          .map((cl) => {
+            const { contacts, ...rest } = cl as AccountContact & { contacts: Contact }
+            return { ...rest, contact: contacts }
+          })
         setAccountContacts(mapped)
       }
 
