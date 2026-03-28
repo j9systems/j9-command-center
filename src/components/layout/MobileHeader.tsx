@@ -1,10 +1,11 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Menu, LogOut, X } from 'lucide-react'
+import { Menu, LogOut, X, Calendar } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 
 export default function MobileHeader() {
   const [open, setOpen] = useState(false)
+  const [calendarConnected, setCalendarConnected] = useState<boolean | null>(null)
   const navigate = useNavigate()
   const menuRef = useRef<HTMLDivElement>(null)
 
@@ -17,6 +18,36 @@ export default function MobileHeader() {
     if (open) document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [open])
+
+  useEffect(() => {
+    async function checkCalendar() {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.user) return
+      const { data } = await supabase
+        .from('user_integrations')
+        .select('id')
+        .eq('user_id', session.user.id)
+        .eq('provider', 'google_calendar')
+        .maybeSingle()
+      setCalendarConnected(!!data)
+    }
+    checkCalendar()
+  }, [])
+
+  async function connectGoogleCalendar() {
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) return
+    const params = new URLSearchParams({
+      client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
+      redirect_uri: `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/google-calendar-connect`,
+      response_type: 'code',
+      scope: 'https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.freebusy',
+      access_type: 'offline',
+      prompt: 'consent',
+      state: session.access_token,
+    })
+    window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?${params}`
+  }
 
   async function handleLogout() {
     await supabase.auth.signOut()
@@ -49,7 +80,25 @@ export default function MobileHeader() {
           </button>
 
           {open && (
-            <div className="absolute right-0 top-12 w-48 bg-surface border border-border rounded-lg shadow-lg overflow-hidden">
+            <div className="absolute right-0 top-12 w-56 bg-surface border border-border rounded-lg shadow-lg overflow-hidden">
+              {calendarConnected !== null && (
+                calendarConnected ? (
+                  <div className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-text-secondary">
+                    <span className="relative flex h-[18px] w-[18px] items-center justify-center">
+                      <span className="h-2.5 w-2.5 rounded-full bg-green-400" />
+                    </span>
+                    Calendar Connected
+                  </div>
+                ) : (
+                  <button
+                    onClick={connectGoogleCalendar}
+                    className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-text-secondary hover:text-text-primary hover:bg-surface-hover transition-colors w-full"
+                  >
+                    <Calendar size={18} />
+                    Connect Google Calendar
+                  </button>
+                )
+              )}
               <button
                 onClick={handleLogout}
                 className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-text-secondary hover:text-red-400 hover:bg-red-500/10 transition-colors w-full"
