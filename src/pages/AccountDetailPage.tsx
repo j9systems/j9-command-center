@@ -145,26 +145,34 @@ export default function AccountDetailPage() {
       // Fetch all tasks related to this account (directly or via project)
       const taskSelect = '*, team!fk_tasks_assigned_to_id_internal(id, first_name, last_name, photo)'
 
-      const taskQueries = [
-        supabase
-          .from('tasks')
-          .select(taskSelect)
-          .eq('account_id', id!)
-          .order('due', { ascending: true }),
-      ]
+      // First try: tasks linked directly to this account
+      const { data: directTasks, error: directErr } = await supabase
+        .from('tasks')
+        .select(taskSelect)
+        .eq('account_id', id!)
+        .order('due', { ascending: true })
 
-      if (projectIds.length > 0) {
-        taskQueries.push(
-          supabase
-            .from('tasks')
-            .select(taskSelect)
-            .in('project_id', projectIds)
-            .order('due', { ascending: true })
-        )
+      if (directErr) {
+        console.error('Error fetching direct tasks:', directErr)
       }
 
-      const taskResults = await Promise.all(taskQueries)
-      const allTasksRaw = taskResults.flatMap((r) => r.data ?? [])
+      // Second try: tasks linked via projects
+      let projectTasks: typeof directTasks = []
+      if (projectIds.length > 0) {
+        const { data: ptData, error: ptErr } = await supabase
+          .from('tasks')
+          .select(taskSelect)
+          .in('project_id', projectIds)
+          .order('due', { ascending: true })
+
+        if (ptErr) {
+          console.error('Error fetching project tasks:', ptErr)
+        }
+        projectTasks = ptData ?? []
+      }
+
+      const allTasksRaw = [...(directTasks ?? []), ...projectTasks]
+      console.log('Tasks fetched:', { directCount: directTasks?.length ?? 0, projectCount: projectTasks.length, accountId: id })
 
       // Deduplicate by row_id
       const seenTaskIds = new Set<string>()
