@@ -70,22 +70,22 @@ function getProjectStatusColor(status: string | null): string {
 }
 
 const taskStatusColors: Record<string, string> = {
-  open: 'bg-blue-500/15 text-blue-400',
+  backlog: 'bg-blue-500/15 text-blue-400',
   in_progress: 'bg-amber-500/15 text-amber-400',
-  completed: 'bg-emerald-500/15 text-emerald-400',
-  closed: 'bg-zinc-500/15 text-zinc-400',
+  complete: 'bg-emerald-500/15 text-emerald-400',
 }
 
-function getTaskStatusColor(status: string | null): string {
-  if (!status) return 'bg-zinc-500/15 text-zinc-400'
-  return taskStatusColors[status.toLowerCase()] ?? 'bg-purple-muted text-purple'
+function getTaskStatusColor(key: string | null | undefined): string {
+  if (!key) return 'bg-zinc-500/15 text-zinc-400'
+  return taskStatusColors[key.toLowerCase()] ?? 'bg-purple-muted text-purple'
 }
 
 export default function AccountDetailPage() {
   const { id } = useParams<{ id: string }>()
   const [account, setAccount] = useState<AccountWithStatus | null>(null)
   const [primaryContact, setPrimaryContact] = useState<Contact | null>(null)
-  const [tasks, setTasks] = useState<(Task & { assigned_to?: TeamMember | null })[]>([])
+  const [tasks, setTasks] = useState<(Task & { assigned_to?: TeamMember | null; status_option?: Option | null })[]>([])
+  const [taskStatuses, setTaskStatuses] = useState<Option[]>([])
   const [projects, setProjects] = useState<(Project & { project_manager?: TeamMember | null; logged_hours: number })[]>([])
   const [timeLogs, setTimeLogs] = useState<(TimeLog & { team_member?: TeamMember | null; project?: { name: string | null } | null; status_option?: Option | null })[]>([])
   const [timeLogStatuses, setTimeLogStatuses] = useState<Option[]>([])
@@ -143,7 +143,7 @@ export default function AccountDetailPage() {
       const projectIds = (projectsData ?? []).map((p) => p.id)
 
       // Fetch all tasks related to this account (directly or via project)
-      const taskSelect = '*, team!fk_tasks_assigned_to_id_internal(id, first_name, last_name, photo)'
+      const taskSelect = '*, team!fk_tasks_assigned_to_id_internal(id, first_name, last_name, photo), options!fk_tasks_status_id(id, option_key, option_label)'
 
       // First try: tasks linked directly to this account
       const { data: directTasks, error: directErr } = await supabase
@@ -194,8 +194,10 @@ export default function AccountDetailPage() {
         uniqueTasks.map((t) => ({
           ...t,
           assigned_to: t.team as TeamMember | null,
+          status_option: t.options as Option | null,
           team: undefined,
-        })) as (Task & { assigned_to?: TeamMember | null })[]
+          options: undefined,
+        })) as (Task & { assigned_to?: TeamMember | null; status_option?: Option | null })[]
       )
 
       // Fetch time log hours grouped by project
@@ -232,6 +234,16 @@ export default function AccountDetailPage() {
 
       if (statusOptions) {
         setTimeLogStatuses(statusOptions as Option[])
+      }
+
+      // Fetch task status options
+      const { data: taskStatusOptions } = await supabase
+        .from('options')
+        .select('*')
+        .eq('category', 'task_status')
+
+      if (taskStatusOptions) {
+        setTaskStatuses(taskStatusOptions as Option[])
       }
 
       // Fetch time logs with status option
@@ -429,8 +441,8 @@ export default function AccountDetailPage() {
           </h3>
           {(() => {
             const openTasks = tasks.filter((t) => {
-              const s = t.status?.toLowerCase()
-              return s !== 'completed' && s !== 'closed'
+              const key = t.status_option?.option_key?.toLowerCase()
+              return key !== 'complete'
             })
             return openTasks.length > 0 ? (
               <div className="space-y-3 max-h-48 overflow-y-auto">
@@ -445,11 +457,11 @@ export default function AccountDetailPage() {
                         {task.name ?? 'Untitled Task'}
                       </p>
                       <div className="flex items-center gap-2 mt-0.5">
-                        {task.status && (
+                        {task.status_option && (
                           <span
-                            className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${getTaskStatusColor(task.status)}`}
+                            className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${getTaskStatusColor(task.status_option.option_key)}`}
                           >
-                            {task.status.replace(/_/g, ' ')}
+                            {task.status_option.option_label}
                           </span>
                         )}
                         {task.due && (
@@ -504,7 +516,27 @@ export default function AccountDetailPage() {
             <ProjectsTab projects={projects} accountId={id!} onProjectCreated={(p) => setProjects((prev) => [...prev, p])} />
           )}
           {activeTab === 'tasks' && (
-            <TasksTab tasks={tasks} accountId={id!} />
+            <TasksTab
+              tasks={tasks}
+              accountId={id!}
+              onMarkComplete={async (taskId) => {
+                const completeOption = taskStatuses.find((s) => s.option_key === 'complete')
+                if (!completeOption) return
+                const { error } = await supabase
+                  .from('tasks')
+                  .update({ status_id: completeOption.id })
+                  .eq('row_id', taskId)
+                if (!error) {
+                  setTasks((prev) =>
+                    prev.map((t) =>
+                      t.row_id === taskId
+                        ? { ...t, status_id: completeOption.id, status_option: completeOption }
+                        : t
+                    )
+                  )
+                }
+              }}
+            />
           )}
           {activeTab === 'time_logs' && (
             <TimeLogsTab
@@ -1138,11 +1170,14 @@ function TimeLogsTab({
 function TasksTab({
   tasks,
   accountId,
+  onMarkComplete,
 }: {
-  tasks: (Task & { assigned_to?: TeamMember | null })[]
+  tasks: (Task & { assigned_to?: TeamMember | null; status_option?: Option | null })[]
   accountId: string
+  onMarkComplete: (taskId: string) => Promise<void>
 }) {
   const navigate = useNavigate()
+  const [completingId, setCompletingId] = useState<string | null>(null)
 
   if (tasks.length === 0) {
     return (
@@ -1153,18 +1188,29 @@ function TasksTab({
   }
 
   // Group tasks by status category
-  const statusGroupOrder: { key: string; label: string; statuses: string[] }[] = [
-    { key: 'open', label: 'Backlog', statuses: ['open'] },
-    { key: 'in_progress', label: 'In Progress', statuses: ['in_progress'] },
-    { key: 'completed', label: 'Completed', statuses: ['completed', 'closed'] },
+  const statusGroupOrder: { key: string; label: string; optionKeys: string[] }[] = [
+    { key: 'backlog', label: 'Backlog', optionKeys: ['backlog'] },
+    { key: 'in_progress', label: 'In Progress', optionKeys: ['in_progress'] },
+    { key: 'complete', label: 'Complete', optionKeys: ['complete'] },
   ]
 
   const groups = statusGroupOrder.map((group) => ({
     ...group,
-    tasks: tasks.filter((t) => group.statuses.includes(t.status?.toLowerCase() ?? 'open')),
+    tasks: tasks.filter((t) => {
+      const key = t.status_option?.option_key?.toLowerCase() ?? 'backlog'
+      return group.optionKeys.includes(key)
+    }),
   }))
 
-  function renderTaskEntry(task: Task & { assigned_to?: TeamMember | null }) {
+  async function handleMarkComplete(e: React.MouseEvent, taskId: string) {
+    e.stopPropagation()
+    setCompletingId(taskId)
+    await onMarkComplete(taskId)
+    setCompletingId(null)
+  }
+
+  function renderTaskEntry(task: Task & { assigned_to?: TeamMember | null; status_option?: Option | null }) {
+    const isComplete = task.status_option?.option_key === 'complete'
     return (
       <div
         key={task.row_id}
@@ -1187,11 +1233,11 @@ function TasksTab({
             {task.name ?? 'Untitled Task'}
           </p>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-0.5">
-            {task.status && (
+            {task.status_option && (
               <span
-                className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${getTaskStatusColor(task.status)}`}
+                className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${getTaskStatusColor(task.status_option.option_key)}`}
               >
-                {task.status.replace(/_/g, ' ')}
+                {task.status_option.option_label}
               </span>
             )}
             {task.due && (
@@ -1207,6 +1253,16 @@ function TasksTab({
             )}
           </div>
         </div>
+        {!isComplete && (
+          <button
+            onClick={(e) => handleMarkComplete(e, task.row_id)}
+            disabled={completingId === task.row_id}
+            className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-1 rounded-lg bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25 transition-colors flex-shrink-0 disabled:opacity-50"
+          >
+            <CheckCircle2 size={12} />
+            {completingId === task.row_id ? '...' : 'Complete'}
+          </button>
+        )}
       </div>
     )
   }

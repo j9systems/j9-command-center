@@ -8,38 +8,33 @@ import {
   User,
   X,
   Save,
+  CheckCircle2,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
-import type { Task, TeamMember } from '@/types/database'
+import type { Task, TeamMember, Option } from '@/types/database'
 
 const taskStatusColors: Record<string, string> = {
-  open: 'bg-blue-500/15 text-blue-400',
+  backlog: 'bg-blue-500/15 text-blue-400',
   in_progress: 'bg-amber-500/15 text-amber-400',
-  completed: 'bg-emerald-500/15 text-emerald-400',
-  closed: 'bg-zinc-500/15 text-zinc-400',
+  complete: 'bg-emerald-500/15 text-emerald-400',
 }
 
-const taskStatuses = [
-  { value: 'open', label: 'Open' },
-  { value: 'in_progress', label: 'In Progress' },
-  { value: 'completed', label: 'Completed' },
-  { value: 'closed', label: 'Closed' },
-]
-
-type TaskWithAssignee = Task & { assigned_to?: TeamMember | null }
+type TaskWithAssignee = Task & { assigned_to?: TeamMember | null; status_option?: Option | null }
 
 export default function TaskDetailPage() {
   const { id: accountId, taskId } = useParams<{ id: string; taskId: string }>()
   const [task, setTask] = useState<TaskWithAssignee | null>(null)
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
+  const [taskStatuses, setTaskStatuses] = useState<Option[]>([])
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [completing, setCompleting] = useState(false)
 
   // Edit form state
   const [editName, setEditName] = useState('')
   const [editNotes, setEditNotes] = useState('')
-  const [editStatus, setEditStatus] = useState('')
+  const [editStatusId, setEditStatusId] = useState<string>('')
   const [editDue, setEditDue] = useState('')
   const [editAssignedTo, setEditAssignedTo] = useState('')
   const [editPriority, setEditPriority] = useState('')
@@ -52,7 +47,7 @@ export default function TaskDetailPage() {
 
       const { data: taskData } = await supabase
         .from('tasks')
-        .select('*, team!fk_tasks_assigned_to_id_internal(id, first_name, last_name, photo)')
+        .select('*, team!fk_tasks_assigned_to_id_internal(id, first_name, last_name, photo), options!fk_tasks_status_id(id, option_key, option_label)')
         .eq('row_id', taskId!)
         .single()
 
@@ -60,7 +55,9 @@ export default function TaskDetailPage() {
         const mapped: TaskWithAssignee = {
           ...taskData,
           assigned_to: taskData.team as TeamMember | null,
+          status_option: taskData.options as Option | null,
           team: undefined,
+          options: undefined,
         } as TaskWithAssignee
         setTask(mapped)
       }
@@ -76,6 +73,16 @@ export default function TaskDetailPage() {
         setTeamMembers(teamData as TeamMember[])
       }
 
+      // Fetch task status options
+      const { data: statusOptions } = await supabase
+        .from('options')
+        .select('*')
+        .eq('category', 'task_status')
+
+      if (statusOptions) {
+        setTaskStatuses(statusOptions as Option[])
+      }
+
       setLoading(false)
     }
 
@@ -86,7 +93,7 @@ export default function TaskDetailPage() {
     if (!task) return
     setEditName(task.name ?? '')
     setEditNotes(task.notes ?? '')
-    setEditStatus(task.status ?? 'open')
+    setEditStatusId(task.status_id?.toString() ?? '')
     setEditDue(task.due ?? '')
     setEditAssignedTo(task.assigned_to_id_internal ?? '')
     setEditPriority(task.priority ?? '')
@@ -100,7 +107,7 @@ export default function TaskDetailPage() {
     const updates = {
       name: editName.trim() || null,
       notes: editNotes.trim() || null,
-      status: editStatus || null,
+      status_id: editStatusId ? Number(editStatusId) : null,
       due: editDue || null,
       assigned_to_id_internal: editAssignedTo || null,
       priority: editPriority || null,
@@ -110,20 +117,48 @@ export default function TaskDetailPage() {
       .from('tasks')
       .update(updates)
       .eq('row_id', taskId)
-      .select('*, team!fk_tasks_assigned_to_id_internal(id, first_name, last_name, photo)')
+      .select('*, team!fk_tasks_assigned_to_id_internal(id, first_name, last_name, photo), options!fk_tasks_status_id(id, option_key, option_label)')
       .single()
 
     if (data && !error) {
       const mapped: TaskWithAssignee = {
         ...data,
         assigned_to: data.team as TeamMember | null,
+        status_option: data.options as Option | null,
         team: undefined,
+        options: undefined,
       } as TaskWithAssignee
       setTask(mapped)
       setEditing(false)
     }
 
     setSaving(false)
+  }
+
+  async function handleMarkComplete() {
+    if (!taskId || !task) return
+    const completeOption = taskStatuses.find((s) => s.option_key === 'complete')
+    if (!completeOption) return
+
+    setCompleting(true)
+    const { data, error } = await supabase
+      .from('tasks')
+      .update({ status_id: completeOption.id })
+      .eq('row_id', taskId)
+      .select('*, team!fk_tasks_assigned_to_id_internal(id, first_name, last_name, photo), options!fk_tasks_status_id(id, option_key, option_label)')
+      .single()
+
+    if (data && !error) {
+      const mapped: TaskWithAssignee = {
+        ...data,
+        assigned_to: data.team as TeamMember | null,
+        status_option: data.options as Option | null,
+        team: undefined,
+        options: undefined,
+      } as TaskWithAssignee
+      setTask(mapped)
+    }
+    setCompleting(false)
   }
 
   if (loading) {
@@ -155,7 +190,8 @@ export default function TaskDetailPage() {
     )
   }
 
-  const statusKey = task.status?.toLowerCase() ?? ''
+  const statusKey = task.status_option?.option_key?.toLowerCase() ?? ''
+  const isComplete = statusKey === 'complete'
   const assigneeName = task.assigned_to
     ? [task.assigned_to.first_name, task.assigned_to.last_name].filter(Boolean).join(' ')
     : null
@@ -180,13 +216,13 @@ export default function TaskDetailPage() {
             <h1 className="text-2xl font-bold text-text-primary truncate">
               {task.name ?? 'Untitled Task'}
             </h1>
-            {task.status && (
+            {task.status_option && (
               <span
                 className={`text-xs font-medium px-2.5 py-1 rounded-full flex-shrink-0 ${
                   taskStatusColors[statusKey] ?? 'bg-zinc-500/15 text-zinc-400'
                 }`}
               >
-                {task.status.replace(/_/g, ' ')}
+                {task.status_option.option_label}
               </span>
             )}
           </div>
@@ -209,15 +245,27 @@ export default function TaskDetailPage() {
             )}
           </div>
         </div>
-        {!editing && (
-          <button
-            onClick={startEditing}
-            className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-border text-text-secondary hover:text-text-primary hover:border-purple/30 transition-colors flex-shrink-0"
-          >
-            <Pencil size={12} />
-            Edit
-          </button>
-        )}
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {!editing && !isComplete && (
+            <button
+              onClick={handleMarkComplete}
+              disabled={completing}
+              className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25 transition-colors disabled:opacity-50"
+            >
+              <CheckCircle2 size={12} />
+              {completing ? 'Completing...' : 'Mark Complete'}
+            </button>
+          )}
+          {!editing && (
+            <button
+              onClick={startEditing}
+              className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-border text-text-secondary hover:text-text-primary hover:border-purple/30 transition-colors"
+            >
+              <Pencil size={12} />
+              Edit
+            </button>
+          )}
+        </div>
       </div>
 
       {editing ? (
@@ -251,13 +299,14 @@ export default function TaskDetailPage() {
                 Status
               </label>
               <select
-                value={editStatus}
-                onChange={(e) => setEditStatus(e.target.value)}
+                value={editStatusId}
+                onChange={(e) => setEditStatusId(e.target.value)}
                 className="w-full text-sm bg-surface border border-border rounded-lg px-3 py-2 text-text-primary focus:outline-none focus:border-purple/50"
               >
+                <option value="">No status</option>
                 {taskStatuses.map((s) => (
-                  <option key={s.value} value={s.value}>
-                    {s.label}
+                  <option key={s.id} value={s.id.toString()}>
+                    {s.option_label}
                   </option>
                 ))}
               </select>
