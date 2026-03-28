@@ -212,21 +212,19 @@ export default function TaskDetailPage() {
           <ClipboardList size={22} className="text-purple" />
         </div>
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold text-text-primary truncate">
-              {task.name ?? 'Untitled Task'}
-            </h1>
+          <h1 className="text-2xl font-bold text-text-primary break-words">
+            {task.name ?? 'Untitled Task'}
+          </h1>
+          <div className="flex flex-wrap items-center gap-2 mt-2">
             {task.status_option && (
               <span
-                className={`text-xs font-medium px-2.5 py-1 rounded-full flex-shrink-0 ${
+                className={`text-xs font-medium px-2.5 py-1 rounded-full ${
                   taskStatusColors[statusKey] ?? 'bg-zinc-500/15 text-zinc-400'
                 }`}
               >
                 {task.status_option.option_label}
               </span>
             )}
-          </div>
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1.5">
             {task.due && (
               <span className="text-sm text-text-secondary flex items-center gap-1.5">
                 <CalendarDays size={13} />
@@ -244,27 +242,27 @@ export default function TaskDetailPage() {
               </span>
             )}
           </div>
-        </div>
-        <div className="flex items-center gap-2 flex-shrink-0">
-          {!editing && !isComplete && (
-            <button
-              onClick={handleMarkComplete}
-              disabled={completing}
-              className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25 transition-colors disabled:opacity-50"
-            >
-              <CheckCircle2 size={12} />
-              {completing ? 'Completing...' : 'Mark Complete'}
-            </button>
-          )}
-          {!editing && (
-            <button
-              onClick={startEditing}
-              className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-border text-text-secondary hover:text-text-primary hover:border-purple/30 transition-colors"
-            >
-              <Pencil size={12} />
-              Edit
-            </button>
-          )}
+          <div className="flex items-center gap-2 mt-3">
+            {!editing && !isComplete && (
+              <button
+                onClick={handleMarkComplete}
+                disabled={completing}
+                className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25 transition-colors disabled:opacity-50"
+              >
+                <CheckCircle2 size={12} />
+                {completing ? 'Completing...' : 'Mark Complete'}
+              </button>
+            )}
+            {!editing && (
+              <button
+                onClick={startEditing}
+                className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-border text-text-secondary hover:text-text-primary hover:border-purple/30 transition-colors"
+              >
+                <Pencil size={12} />
+                Edit
+              </button>
+            )}
+          </div>
         </div>
       </div>
 

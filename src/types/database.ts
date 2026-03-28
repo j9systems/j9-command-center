@@ -143,6 +143,18 @@ export interface Invoice {
   status_id: number | null
 }
 
+export interface InvoiceLineItem {
+  row_id: string
+  name: string | null
+  invoice_id: string | null
+  account_id: string | null
+  amount: number | null
+  rate: string | null
+  time_log_id: string | null
+  date: string | null
+  hours: string | null
+}
+
 export interface Feature {
   id: string
   project_id: string | null

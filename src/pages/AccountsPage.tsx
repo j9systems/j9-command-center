@@ -1,13 +1,21 @@
 import { useEffect, useState } from 'react'
-import { Search } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { Search, Plus, X } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
-import type { AccountWithStatus } from '@/types/database'
+import type { AccountWithStatus, Option } from '@/types/database'
 import AccountCard from '@/components/accounts/AccountCard'
+import MobileFormOverlay from '@/components/MobileFormOverlay'
 
 export default function AccountsPage() {
+  const navigate = useNavigate()
   const [accounts, setAccounts] = useState<AccountWithStatus[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [showForm, setShowForm] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [statusOptions, setStatusOptions] = useState<Option[]>([])
+  const [newName, setNewName] = useState('')
+  const [newStatusId, setNewStatusId] = useState('')
 
   useEffect(() => {
     async function fetchAccounts() {
@@ -36,8 +44,52 @@ export default function AccountsPage() {
       setLoading(false)
     }
 
+    async function fetchStatusOptions() {
+      const { data } = await supabase
+        .from('options')
+        .select('*')
+        .eq('category', 'account_status')
+      if (data) setStatusOptions(data as Option[])
+    }
+
     fetchAccounts()
+    fetchStatusOptions()
   }, [])
+
+  async function handleCreateAccount(e: React.FormEvent) {
+    e.preventDefault()
+    if (!newName.trim()) return
+    setSaving(true)
+
+    const id = crypto.randomUUID()
+    const { data, error } = await supabase
+      .from('accounts')
+      .insert({
+        id,
+        company_name: newName.trim(),
+        status: newStatusId ? Number(newStatusId) : null,
+      })
+      .select('*, options!fk_accounts_status(option_key, option_label)')
+      .single()
+
+    if (data && !error) {
+      const opt = data.options as { option_key: string; option_label: string } | null
+      const newAccount: AccountWithStatus = {
+        ...data,
+        status_label: opt?.option_label ?? null,
+        status_key: opt?.option_key ?? null,
+        options: undefined,
+      } as AccountWithStatus
+      setAccounts((prev) => [newAccount, ...prev].sort((a, b) =>
+        (a.company_name ?? '').localeCompare(b.company_name ?? '')
+      ))
+      setNewName('')
+      setNewStatusId('')
+      setShowForm(false)
+      navigate(`/accounts/${id}`)
+    }
+    setSaving(false)
+  }
 
   const filtered = accounts.filter((a) => {
     if (!search) return true
@@ -50,7 +102,72 @@ export default function AccountsPage() {
 
   return (
     <div className="p-4 md:p-8 max-w-4xl mx-auto">
-      <h2 className="text-2xl font-bold mb-6 text-text-primary">Accounts</h2>
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="text-2xl font-bold text-text-primary">Accounts</h2>
+        {!showForm && (
+          <button
+            onClick={() => setShowForm(true)}
+            className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-purple text-white hover:bg-purple-hover transition-colors"
+          >
+            <Plus size={14} />
+            New Account
+          </button>
+        )}
+      </div>
+
+      {/* New account form */}
+      {showForm && (
+        <MobileFormOverlay title="New Account" onClose={() => setShowForm(false)}>
+          <form
+            onSubmit={handleCreateAccount}
+            className="mb-6 p-4 md:bg-surface rounded-lg md:border md:border-border space-y-3"
+          >
+            <div className="hidden md:flex items-center justify-between mb-1">
+              <h3 className="text-sm font-medium text-text-primary">New Account</h3>
+              <button type="button" onClick={() => setShowForm(false)} className="text-text-secondary hover:text-text-primary transition-colors">
+                <X size={16} />
+              </button>
+            </div>
+            <input
+              type="text"
+              placeholder="Company name"
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              required
+              className="w-full text-sm bg-surface border border-border rounded-lg px-3 py-2 text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:border-purple/50"
+            />
+            <div>
+              <label className="text-[10px] text-text-secondary uppercase tracking-wider mb-1 block">Status</label>
+              <select
+                value={newStatusId}
+                onChange={(e) => setNewStatusId(e.target.value)}
+                className="w-full text-sm bg-surface border border-border rounded-lg px-3 py-2 text-text-primary focus:outline-none focus:border-purple/50"
+              >
+                <option value="">No status</option>
+                {statusOptions.map((s) => (
+                  <option key={s.id} value={s.id.toString()}>{s.option_label}</option>
+                ))}
+              </select>
+            </div>
+            <div className="flex items-center gap-2 pt-1">
+              <button
+                type="submit"
+                disabled={!newName.trim() || saving}
+                className="text-xs font-medium px-4 py-1.5 rounded-lg bg-purple text-white hover:bg-purple-hover transition-colors disabled:opacity-50"
+              >
+                {saving ? 'Creating...' : 'Create'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowForm(false)}
+                className="text-xs font-medium px-4 py-1.5 rounded-lg border border-border text-text-secondary hover:text-text-primary transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        </MobileFormOverlay>
+      )}
 
       {/* Search bar */}
       <div className="relative mb-6">
