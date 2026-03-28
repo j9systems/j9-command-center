@@ -15,6 +15,9 @@ import {
   X,
   ClipboardList,
   FileText,
+  Calendar,
+  Video,
+  MapPin,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import type {
@@ -23,6 +26,7 @@ import type {
   AccountRole,
   Contact,
   Invoice,
+  Meeting,
   Option,
   Project,
   Task,
@@ -93,8 +97,9 @@ export default function AccountDetailPage() {
   const [accountTeamMembers, setAccountTeamMembers] = useState<{ id: string; team_member: TeamMember | null; role: AccountRole | null; expected_weekly_hrs: string | null }[]>([])
   const [invoices, setInvoices] = useState<(Invoice & { project?: { name: string | null } | null; status_option?: Option | null })[]>([])
   const [accountContacts, setAccountContacts] = useState<(AccountContact & { contact: Contact })[]>([])
+  const [meetings, setMeetings] = useState<(Meeting & { attendees: { contact: Contact | null; team_member: TeamMember | null }[] })[]>([])
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<'projects' | 'tasks' | 'time_logs' | 'invoices' | 'contacts' | 'team'>('projects')
+  const [activeTab, setActiveTab] = useState<'projects' | 'tasks' | 'time_logs' | 'invoices' | 'contacts' | 'team' | 'meetings'>('projects')
 
   useEffect(() => {
     if (!id) return
@@ -305,6 +310,55 @@ export default function AccountDetailPage() {
         )
       }
 
+      // Fetch meetings involving account contacts
+      const contactIds = (contactLinks ?? [])
+        .filter((cl) => cl.contacts)
+        .map((cl) => cl.contact_id)
+        .filter(Boolean) as string[]
+
+      if (contactIds.length > 0) {
+        // Find meeting IDs where any account contact is an attendee
+        const { data: attendeeRows } = await supabase
+          .from('meeting_attendees')
+          .select('meeting_id')
+          .in('external_attendee_id', contactIds)
+
+        const meetingIds = [...new Set((attendeeRows ?? []).map((a) => a.meeting_id).filter(Boolean))] as string[]
+
+        if (meetingIds.length > 0) {
+          const { data: meetingsData } = await supabase
+            .from('meetings')
+            .select('row_id, name, meeting_start, meeting_end, duration, description_agenda, meeting_notes, gmeet_link, meeting_link, location, status, meeting_type, account_id')
+            .in('row_id', meetingIds)
+            .order('meeting_start', { ascending: false })
+
+          // Fetch all attendees for these meetings
+          const { data: allAttendees } = await supabase
+            .from('meeting_attendees')
+            .select('row_id, meeting_id, external_attendee_id, internal_attendee_id, attendee_group, contacts(id, first_name, last_name, email), team(id, first_name, last_name, email, photo)')
+            .in('meeting_id', meetingIds)
+
+          const attendeesByMeeting: Record<string, { contact: Contact | null; team_member: TeamMember | null }[]> = {}
+          for (const att of allAttendees ?? []) {
+            const mid = att.meeting_id as string
+            if (!attendeesByMeeting[mid]) attendeesByMeeting[mid] = []
+            attendeesByMeeting[mid].push({
+              contact: att.contacts as unknown as Contact | null,
+              team_member: att.team as unknown as TeamMember | null,
+            })
+          }
+
+          if (meetingsData) {
+            setMeetings(
+              (meetingsData as Meeting[]).map((m) => ({
+                ...m,
+                attendees: attendeesByMeeting[m.row_id] ?? [],
+              }))
+            )
+          }
+        }
+      }
+
       setLoading(false)
     }
 
@@ -357,6 +411,7 @@ export default function AccountDetailPage() {
     { key: 'invoices' as const, label: 'Invoices', icon: FileText },
     { key: 'contacts' as const, label: 'Contacts', icon: User },
     { key: 'team' as const, label: 'Team', icon: Users },
+    { key: 'meetings' as const, label: 'Meetings', icon: Calendar },
   ]
 
   return (
@@ -558,6 +613,9 @@ export default function AccountDetailPage() {
           )}
           {activeTab === 'team' && (
             <AccountTeamTab members={accountTeamMembers} />
+          )}
+          {activeTab === 'meetings' && (
+            <MeetingsTab meetings={meetings} />
           )}
         </div>
       </div>
@@ -1889,6 +1947,147 @@ function AccountTeamTab({
           </div>
         )
       })}
+    </div>
+  )
+}
+
+const meetingStatusColors: Record<string, string> = {
+  confirmed: 'bg-emerald-500/15 text-emerald-400',
+  cancelled: 'bg-red-500/15 text-red-400',
+  tentative: 'bg-amber-500/15 text-amber-400',
+}
+
+function MeetingsTab({
+  meetings,
+}: {
+  meetings: (Meeting & { attendees: { contact: Contact | null; team_member: TeamMember | null }[] })[]
+}) {
+  if (meetings.length === 0) {
+    return (
+      <p className="text-sm text-text-secondary text-center py-8">
+        No meetings found for this account&apos;s contacts.
+      </p>
+    )
+  }
+
+  function formatDateTime(dateStr: string | null): string {
+    if (!dateStr) return ''
+    const d = new Date(dateStr)
+    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) +
+      ' at ' +
+      d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
+  }
+
+  // Group meetings: Upcoming vs Past
+  const now = new Date()
+  const upcoming = meetings.filter((m) => m.meeting_start && new Date(m.meeting_start) >= now)
+  const past = meetings.filter((m) => !m.meeting_start || new Date(m.meeting_start) < now)
+
+  // Sort upcoming ascending, past descending
+  upcoming.sort((a, b) => (a.meeting_start ?? '').localeCompare(b.meeting_start ?? ''))
+  past.sort((a, b) => (b.meeting_start ?? '').localeCompare(a.meeting_start ?? ''))
+
+  const groups = [
+    { label: 'Upcoming', meetings: upcoming },
+    { label: 'Past', meetings: past },
+  ].filter((g) => g.meetings.length > 0)
+
+  return (
+    <div className="space-y-6">
+      {groups.map((group) => (
+        <div key={group.label}>
+          <h4 className="text-xs font-semibold text-text-secondary uppercase tracking-wider mb-3">
+            {group.label} ({group.meetings.length})
+          </h4>
+          <div className="space-y-2">
+            {group.meetings.map((meeting) => {
+              const attendeeNames = meeting.attendees
+                .map((a) => {
+                  if (a.contact) return [a.contact.first_name, a.contact.last_name].filter(Boolean).join(' ')
+                  if (a.team_member) return [a.team_member.first_name, a.team_member.last_name].filter(Boolean).join(' ')
+                  return null
+                })
+                .filter(Boolean)
+
+              const meetLink = meeting.gmeet_link || meeting.meeting_link
+
+              return (
+                <div
+                  key={meeting.row_id}
+                  className="p-3 bg-black/20 rounded-lg border border-border/50"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-text-primary truncate">
+                        {meeting.name ?? 'Untitled Meeting'}
+                      </p>
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1">
+                        {meeting.meeting_start && (
+                          <span className="text-xs text-text-secondary flex items-center gap-1">
+                            <CalendarDays size={12} />
+                            {formatDateTime(meeting.meeting_start)}
+                          </span>
+                        )}
+                        {meeting.duration && (
+                          <span className="text-xs text-text-secondary flex items-center gap-1">
+                            <Clock size={12} />
+                            {meeting.duration}
+                          </span>
+                        )}
+                        {meeting.location && (
+                          <span className="text-xs text-text-secondary flex items-center gap-1">
+                            <MapPin size={12} />
+                            {meeting.location}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      {meeting.status && (
+                        <span
+                          className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${
+                            meetingStatusColors[meeting.status] ?? 'bg-zinc-500/15 text-zinc-400'
+                          }`}
+                        >
+                          {meeting.status}
+                        </span>
+                      )}
+                      {meetLink && (
+                        <a
+                          href={meetLink}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-purple hover:text-purple/80 transition-colors"
+                          title="Join meeting"
+                        >
+                          <Video size={16} />
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                  {attendeeNames.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {attendeeNames.map((name, i) => (
+                        <span
+                          key={i}
+                          className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-purple-muted text-purple"
+                        >
+                          {name}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  {meeting.description_agenda && (
+                    <p className="mt-2 text-xs text-text-secondary line-clamp-2">
+                      {meeting.description_agenda}
+                    </p>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      ))}
     </div>
   )
 }

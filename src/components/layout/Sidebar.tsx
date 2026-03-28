@@ -104,7 +104,7 @@ export default function Sidebar() {
           <span className="text-purple">J9</span> Command Center
         </h1>
       </div>
-      <nav className="flex-1 p-3 flex flex-col gap-1">
+      <nav className="flex-1 p-3 flex flex-col gap-1 overflow-y-auto min-h-0">
         {navItems.map(({ to, icon: Icon, label }) => (
           <NavLink
             key={to}
@@ -125,7 +125,7 @@ export default function Sidebar() {
       </nav>
 
       {/* Profile menu */}
-      <div ref={menuRef} className="relative p-3 border-t border-border">
+      <div ref={menuRef} className="relative p-3 border-t border-border flex-shrink-0">
         {menuOpen && (
           <div className="absolute bottom-full left-3 right-3 mb-1 bg-surface border border-border rounded-lg shadow-lg overflow-hidden">
             {/* Profile info */}
