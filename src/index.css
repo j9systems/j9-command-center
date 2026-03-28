@@ -48,7 +48,7 @@
   bottom: 0;
   z-index: 50;
   background-color: var(--color-surface);
-  border-top: 1px solid var(--color-border);
+  border-top: 2px solid #7C3AED;
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
