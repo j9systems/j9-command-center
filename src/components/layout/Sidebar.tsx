@@ -1,5 +1,6 @@
+import { useState, useEffect } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
-import { Home, Building2, Users, UserCog, LogOut } from 'lucide-react'
+import { Home, Building2, Users, UserCog, LogOut, Calendar } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 
 const navItems = [
@@ -11,6 +12,37 @@ const navItems = [
 
 export default function Sidebar() {
   const navigate = useNavigate()
+  const [calendarConnected, setCalendarConnected] = useState<boolean | null>(null)
+
+  useEffect(() => {
+    async function checkCalendar() {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.user) return
+      const { data } = await supabase
+        .from('user_integrations')
+        .select('id')
+        .eq('user_id', session.user.id)
+        .eq('provider', 'google_calendar')
+        .maybeSingle()
+      setCalendarConnected(!!data)
+    }
+    checkCalendar()
+  }, [])
+
+  async function connectGoogleCalendar() {
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) return
+    const params = new URLSearchParams({
+      client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
+      redirect_uri: `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/google-calendar-connect`,
+      response_type: 'code',
+      scope: 'https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.freebusy',
+      access_type: 'offline',
+      prompt: 'consent',
+      state: session.access_token,
+    })
+    window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?${params}`
+  }
 
   async function handleLogout() {
     await supabase.auth.signOut()
@@ -48,7 +80,25 @@ export default function Sidebar() {
           </NavLink>
         ))}
       </nav>
-      <div className="p-3 border-t border-border">
+      <div className="p-3 border-t border-border flex flex-col gap-1">
+        {calendarConnected !== null && (
+          calendarConnected ? (
+            <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-text-secondary">
+              <span className="relative flex h-5 w-5 items-center justify-center">
+                <span className="h-2.5 w-2.5 rounded-full bg-green-400" />
+              </span>
+              Calendar Connected
+            </div>
+          ) : (
+            <button
+              onClick={connectGoogleCalendar}
+              className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-text-secondary hover:text-text-primary hover:bg-surface-hover transition-all duration-200 w-full"
+            >
+              <Calendar size={20} />
+              Connect Google Calendar
+            </button>
+          )
+        )}
         <button
           onClick={handleLogout}
           className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-text-secondary hover:text-red-400 hover:bg-red-500/10 transition-all duration-200 w-full"
