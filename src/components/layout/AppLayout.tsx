@@ -7,14 +7,18 @@ import MobileHeader from './MobileHeader'
 function useViewportHeight() {
   useEffect(() => {
     function setHeight() {
-      // window.innerHeight excludes the home indicator area on iOS.
-      // screen.height gives the full physical screen height in CSS pixels.
-      const h = window.innerHeight
+      // visualViewport shrinks when the on-screen keyboard opens,
+      // letting us keep the layout above the keyboard.
+      const h = window.visualViewport?.height ?? window.innerHeight
       document.documentElement.style.setProperty('--app-height', `${h}px`)
     }
     setHeight()
+    window.visualViewport?.addEventListener('resize', setHeight)
     window.addEventListener('resize', setHeight)
-    return () => window.removeEventListener('resize', setHeight)
+    return () => {
+      window.visualViewport?.removeEventListener('resize', setHeight)
+      window.removeEventListener('resize', setHeight)
+    }
   }, [])
 }
 
@@ -22,10 +26,7 @@ export default function AppLayout() {
   useViewportHeight()
 
   return (
-    <div
-      className="fixed top-0 left-0 right-0 flex overflow-hidden"
-      style={{ height: 'var(--app-height, 100vh)' }}
-    >
+    <div className="fixed inset-0 flex overflow-hidden">
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0">
         <MobileHeader />
