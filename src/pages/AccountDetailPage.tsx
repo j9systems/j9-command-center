@@ -519,7 +519,6 @@ export default function AccountDetailPage() {
             <TasksTab
               tasks={tasks}
               accountId={id!}
-              statuses={taskStatuses}
               onMarkComplete={async (taskId) => {
                 const completeOption = taskStatuses.find((s) => s.option_key === 'complete')
                 if (!completeOption) return
@@ -1171,12 +1170,10 @@ function TimeLogsTab({
 function TasksTab({
   tasks,
   accountId,
-  statuses,
   onMarkComplete,
 }: {
   tasks: (Task & { assigned_to?: TeamMember | null; status_option?: Option | null })[]
   accountId: string
-  statuses: Option[]
   onMarkComplete: (taskId: string) => Promise<void>
 }) {
   const navigate = useNavigate()
