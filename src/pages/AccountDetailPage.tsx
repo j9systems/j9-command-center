@@ -134,13 +134,11 @@ export default function AccountDetailPage() {
         if (contactData) setPrimaryContact(contactData)
       }
 
-      // Fetch open tasks
+      // Fetch all tasks
       const { data: tasksData } = await supabase
         .from('tasks')
-        .select('*, team_members!tasks_assigned_to_id_fkey(first_name, last_name)')
+        .select('*, team_members!tasks_assigned_to_id_fkey(id, first_name, last_name, photo)')
         .eq('account_id', id!)
-        .neq('status', 'completed')
-        .neq('status', 'closed')
         .order('due_date', { ascending: true })
 
       if (tasksData) {
@@ -459,7 +457,7 @@ export default function AccountDetailPage() {
             <ProjectsTab projects={projects} accountId={id!} onProjectCreated={(p) => setProjects((prev) => [...prev, p])} />
           )}
           {activeTab === 'tasks' && (
-            <TasksTab tasks={tasks} />
+            <TasksTab tasks={tasks} accountId={id!} />
           )}
           {activeTab === 'time_logs' && (
             <TimeLogsTab
@@ -1092,60 +1090,99 @@ function TimeLogsTab({
 
 function TasksTab({
   tasks,
+  accountId,
 }: {
   tasks: (Task & { assigned_to?: TeamMember | null })[]
+  accountId: string
 }) {
+  const navigate = useNavigate()
+
   if (tasks.length === 0) {
     return (
       <p className="text-sm text-text-secondary text-center py-8">
-        No open tasks for this account.
+        No tasks for this account.
       </p>
     )
   }
 
-  return (
-    <div className="space-y-2">
-      {tasks.map((task) => (
-        <div
-          key={task.id}
-          className="flex items-start gap-3 p-3 bg-black/20 rounded-lg border border-border/50"
-        >
-          <CheckCircle2
-            size={16}
-            className="text-text-secondary mt-0.5 flex-shrink-0"
-          />
-          <div className="flex-1 min-w-0">
-            <p className="text-sm text-text-primary">
-              {task.title ?? 'Untitled Task'}
-            </p>
-            {task.description && (
-              <p className="text-xs text-text-secondary mt-0.5 line-clamp-2">
-                {task.description}
-              </p>
+  // Group tasks by status category
+  const statusGroupOrder: { key: string; label: string; statuses: string[] }[] = [
+    { key: 'open', label: 'Backlog', statuses: ['open'] },
+    { key: 'in_progress', label: 'In Progress', statuses: ['in_progress'] },
+    { key: 'completed', label: 'Completed', statuses: ['completed', 'closed'] },
+  ]
+
+  const groups = statusGroupOrder.map((group) => ({
+    ...group,
+    tasks: tasks.filter((t) => group.statuses.includes(t.status?.toLowerCase() ?? 'open')),
+  }))
+
+  function renderTaskEntry(task: Task & { assigned_to?: TeamMember | null }) {
+    return (
+      <div
+        key={task.id}
+        onClick={() => navigate(`/accounts/${accountId}/tasks/${task.id}`)}
+        className="flex items-center gap-4 p-3 bg-black/20 rounded-lg border border-border/50 cursor-pointer hover:border-purple/30 transition-colors"
+      >
+        <div className="w-7 h-7 rounded-full bg-purple-muted flex items-center justify-center flex-shrink-0">
+          {task.assigned_to?.photo ? (
+            <img
+              src={task.assigned_to.photo}
+              alt=""
+              className="w-7 h-7 rounded-full object-cover"
+            />
+          ) : (
+            <User size={14} className="text-purple" />
+          )}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm text-text-primary truncate">
+            {task.title ?? 'Untitled Task'}
+          </p>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-0.5">
+            {task.status && (
+              <span
+                className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${getTaskStatusColor(task.status)}`}
+              >
+                {task.status.replace(/_/g, ' ')}
+              </span>
             )}
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5">
-              {task.status && (
-                <span
-                  className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${getTaskStatusColor(task.status)}`}
-                >
-                  {task.status.replace(/_/g, ' ')}
-                </span>
-              )}
-              {task.due_date && (
-                <span className="text-[10px] text-text-secondary flex items-center gap-1">
-                  <CalendarDays size={10} />
-                  {new Date(task.due_date).toLocaleDateString()}
-                </span>
-              )}
-              {task.assigned_to && (
-                <span className="text-[10px] text-text-secondary">
-                  {[task.assigned_to.first_name, task.assigned_to.last_name].filter(Boolean).join(' ')}
-                </span>
-              )}
-            </div>
+            {task.due_date && (
+              <span className="text-xs text-text-secondary flex items-center gap-1">
+                <CalendarDays size={10} />
+                {new Date(task.due_date).toLocaleDateString()}
+              </span>
+            )}
+            {task.assigned_to && (
+              <span className="text-xs text-text-secondary">
+                {[task.assigned_to.first_name, task.assigned_to.last_name].filter(Boolean).join(' ')}
+              </span>
+            )}
           </div>
         </div>
-      ))}
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-6">
+      {groups.map((group) =>
+        group.tasks.length > 0 ? (
+          <div key={group.key}>
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-xs font-semibold text-text-secondary uppercase tracking-wider">
+                {group.label}
+              </span>
+              <span className="text-xs text-text-secondary">
+                ({group.tasks.length})
+              </span>
+            </div>
+            <div className="space-y-2">
+              {group.tasks.map(renderTaskEntry)}
+            </div>
+          </div>
+        ) : null
+      )}
     </div>
   )
 }
