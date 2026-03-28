@@ -100,7 +100,7 @@ export interface Role {
 export interface Task {
   row_id: string
   name: string | null
-  status: string | null
+  status_id: number | null
   due: string | null
   objective_id: string | null
   notes: string | null
