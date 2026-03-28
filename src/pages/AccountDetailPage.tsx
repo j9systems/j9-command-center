@@ -143,36 +143,69 @@ export default function AccountDetailPage() {
       const projectIds = (projectsData ?? []).map((p) => p.id)
 
       // Fetch all tasks related to this account (directly or via project)
-      const taskSelect = '*, team!fk_tasks_assigned_to_id_internal(id, first_name, last_name, photo)'
-
-      // First try: tasks linked directly to this account
-      const { data: directTasks, error: directErr } = await supabase
+      // Step 1: Simple query without joins to verify RLS/table access
+      const { data: testTasks, error: testErr } = await supabase
         .from('tasks')
-        .select(taskSelect)
-        .eq('account_id', id!)
-        .order('due', { ascending: true })
+        .select('row_id')
+        .limit(1)
 
-      if (directErr) {
-        console.error('Error fetching direct tasks:', directErr)
+      if (testErr) {
+        console.error('[TASKS DEBUG] Cannot access tasks table at all:', testErr.message, testErr.code)
+      } else {
+        console.log('[TASKS DEBUG] Tasks table accessible, test row count:', testTasks?.length ?? 0)
       }
 
-      // Second try: tasks linked via projects
+      // Step 2: Fetch tasks by account_id
+      const { data: directTasks, error: directErr } = await supabase
+        .from('tasks')
+        .select('*')
+        .eq('account_id', id!)
+
+      if (directErr) {
+        console.error('[TASKS DEBUG] Error fetching by account_id:', directErr.message)
+      } else {
+        console.log('[TASKS DEBUG] Direct account tasks:', directTasks?.length ?? 0)
+      }
+
+      // Step 3: Fetch tasks by project_id
       let projectTasks: typeof directTasks = []
       if (projectIds.length > 0) {
         const { data: ptData, error: ptErr } = await supabase
           .from('tasks')
-          .select(taskSelect)
+          .select('*')
           .in('project_id', projectIds)
-          .order('due', { ascending: true })
 
         if (ptErr) {
-          console.error('Error fetching project tasks:', ptErr)
+          console.error('[TASKS DEBUG] Error fetching by project_id:', ptErr.message)
+        } else {
+          console.log('[TASKS DEBUG] Project tasks:', ptData?.length ?? 0, 'for projectIds:', projectIds)
         }
         projectTasks = ptData ?? []
+      } else {
+        console.log('[TASKS DEBUG] No projects found for this account, skipping project task lookup')
       }
 
-      const allTasksRaw = [...(directTasks ?? []), ...projectTasks]
-      console.log('Tasks fetched:', { directCount: directTasks?.length ?? 0, projectCount: projectTasks.length, accountId: id })
+      // Step 4: Now fetch with team join for the combined results
+      const allBasicTasks = [...(directTasks ?? []), ...projectTasks]
+      let allTasksRaw = allBasicTasks
+
+      if (allBasicTasks.length > 0) {
+        const taskIds = [...new Set(allBasicTasks.map((t) => t.row_id))]
+        const { data: enrichedTasks, error: enrichErr } = await supabase
+          .from('tasks')
+          .select('*, team!fk_tasks_assigned_to_id_internal(id, first_name, last_name, photo)')
+          .in('row_id', taskIds)
+          .order('due', { ascending: true })
+
+        if (enrichErr) {
+          console.error('[TASKS DEBUG] Error enriching tasks with team join:', enrichErr.message)
+          // Fall back to basic tasks without team info
+        } else {
+          allTasksRaw = enrichedTasks ?? allBasicTasks
+        }
+      }
+
+      console.log('[TASKS DEBUG] Total tasks to display:', allTasksRaw.length)
 
       // Deduplicate by row_id
       const seenTaskIds = new Set<string>()
