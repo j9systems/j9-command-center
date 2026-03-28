@@ -134,28 +134,81 @@ export default function AccountDetailPage() {
         if (contactData) setPrimaryContact(contactData)
       }
 
-      // Fetch all tasks
-      const { data: tasksData } = await supabase
-        .from('tasks')
-        .select('*, team_members!tasks_assigned_to_id_fkey(id, first_name, last_name, photo)')
-        .eq('account_id', id!)
-        .order('due_date', { ascending: true })
-
-      if (tasksData) {
-        setTasks(
-          tasksData.map((t) => ({
-            ...t,
-            assigned_to: t.team_members as TeamMember | null,
-            team_members: undefined,
-          })) as (Task & { assigned_to?: TeamMember | null })[]
-        )
-      }
-
-      // Fetch projects
+      // Fetch projects first (needed for task lookup)
       const { data: projectsData } = await supabase
         .from('projects')
         .select('*, team(first_name, last_name)')
         .eq('account_id', id!)
+
+      const projectIds = (projectsData ?? []).map((p) => p.id)
+
+      // Fetch feature IDs for this account's projects
+      let featureIds: string[] = []
+      if (projectIds.length > 0) {
+        const { data: featuresData } = await supabase
+          .from('features')
+          .select('id')
+          .in('project_id', projectIds)
+        featureIds = (featuresData ?? []).map((f) => f.id)
+      }
+
+      // Fetch all tasks related to this account (directly, via project, or via feature)
+      const taskSelect = '*, team_members!tasks_assigned_to_id_fkey(id, first_name, last_name, photo)'
+
+      const taskQueries = [
+        supabase
+          .from('tasks')
+          .select(taskSelect)
+          .eq('account_id', id!)
+          .order('due_date', { ascending: true }),
+      ]
+
+      if (projectIds.length > 0) {
+        taskQueries.push(
+          supabase
+            .from('tasks')
+            .select(taskSelect)
+            .in('project_id', projectIds)
+            .order('due_date', { ascending: true })
+        )
+      }
+
+      if (featureIds.length > 0) {
+        taskQueries.push(
+          supabase
+            .from('tasks')
+            .select(taskSelect)
+            .in('feature_id', featureIds)
+            .order('due_date', { ascending: true })
+        )
+      }
+
+      const taskResults = await Promise.all(taskQueries)
+      const allTasksRaw = taskResults.flatMap((r) => r.data ?? [])
+
+      // Deduplicate by task ID
+      const seenTaskIds = new Set<string>()
+      const uniqueTasks = allTasksRaw.filter((t) => {
+        if (seenTaskIds.has(t.id)) return false
+        seenTaskIds.add(t.id)
+        return true
+      })
+
+      // Sort by due_date ascending
+      uniqueTasks.sort((a, b) => {
+        if (!a.due_date && !b.due_date) return 0
+        if (!a.due_date) return 1
+        if (!b.due_date) return -1
+        return a.due_date.localeCompare(b.due_date)
+      })
+
+      setTasks(
+        uniqueTasks.map((t) => ({
+          ...t,
+          assigned_to: t.team_members as TeamMember | null,
+          team_members: undefined,
+        })) as (Task & { assigned_to?: TeamMember | null })[]
+      )
 
       // Fetch time log hours grouped by project
       const { data: projectHoursData } = await supabase
@@ -386,40 +439,46 @@ export default function AccountDetailPage() {
           <h3 className="text-sm font-semibold text-text-secondary uppercase tracking-wider mb-4">
             Open Tasks
           </h3>
-          {tasks.length > 0 ? (
-            <div className="space-y-3 max-h-48 overflow-y-auto">
-              {tasks.map((task) => (
-                <div key={task.id} className="flex items-start gap-3">
-                  <CheckCircle2
-                    size={16}
-                    className="text-text-secondary mt-0.5 flex-shrink-0"
-                  />
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm text-text-primary truncate">
-                      {task.title ?? 'Untitled Task'}
-                    </p>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      {task.status && (
-                        <span
-                          className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${getTaskStatusColor(task.status)}`}
-                        >
-                          {task.status.replace(/_/g, ' ')}
-                        </span>
-                      )}
-                      {task.due_date && (
-                        <span className="text-[10px] text-text-secondary flex items-center gap-1">
-                          <CalendarDays size={10} />
-                          {new Date(task.due_date).toLocaleDateString()}
-                        </span>
-                      )}
+          {(() => {
+            const openTasks = tasks.filter((t) => {
+              const s = t.status?.toLowerCase()
+              return s !== 'completed' && s !== 'closed'
+            })
+            return openTasks.length > 0 ? (
+              <div className="space-y-3 max-h-48 overflow-y-auto">
+                {openTasks.map((task) => (
+                  <div key={task.id} className="flex items-start gap-3">
+                    <CheckCircle2
+                      size={16}
+                      className="text-text-secondary mt-0.5 flex-shrink-0"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm text-text-primary truncate">
+                        {task.title ?? 'Untitled Task'}
+                      </p>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        {task.status && (
+                          <span
+                            className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${getTaskStatusColor(task.status)}`}
+                          >
+                            {task.status.replace(/_/g, ' ')}
+                          </span>
+                        )}
+                        {task.due_date && (
+                          <span className="text-[10px] text-text-secondary flex items-center gap-1">
+                            <CalendarDays size={10} />
+                            {new Date(task.due_date).toLocaleDateString()}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-sm text-text-secondary">No open tasks.</p>
-          )}
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-text-secondary">No open tasks.</p>
+            )
+          })()}
         </div>
       </div>
 
