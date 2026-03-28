@@ -98,16 +98,22 @@ export interface Role {
 }
 
 export interface Task {
-  id: string
-  account_id: string | null
-  project_id: string | null
-  feature_id: string | null
-  title: string | null
-  description: string | null
+  row_id: string
+  name: string | null
   status: string | null
-  due_date: string | null
-  assigned_to_id: string | null
-  created_at: string | null
+  due: string | null
+  objective_id: string | null
+  notes: string | null
+  assigned_to_id_internal: string | null
+  done: unknown | null
+  priority: string | null
+  snooze_date: string | null
+  project_id: string | null
+  from_meeting_id: string | null
+  assigned_to_id_external: string | null
+  assignee_group: string | null
+  created: string | null
+  account_id: string | null
 }
 
 export interface TimeLog {

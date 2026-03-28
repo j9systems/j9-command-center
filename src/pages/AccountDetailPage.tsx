@@ -142,25 +142,15 @@ export default function AccountDetailPage() {
 
       const projectIds = (projectsData ?? []).map((p) => p.id)
 
-      // Fetch feature IDs for this account's projects
-      let featureIds: string[] = []
-      if (projectIds.length > 0) {
-        const { data: featuresData } = await supabase
-          .from('features')
-          .select('id')
-          .in('project_id', projectIds)
-        featureIds = (featuresData ?? []).map((f) => f.id)
-      }
-
-      // Fetch all tasks related to this account (directly, via project, or via feature)
-      const taskSelect = '*, team_members!tasks_assigned_to_id_fkey(id, first_name, last_name, photo)'
+      // Fetch all tasks related to this account (directly or via project)
+      const taskSelect = '*, team!fk_tasks_assigned_to_id_internal(id, first_name, last_name, photo)'
 
       const taskQueries = [
         supabase
           .from('tasks')
           .select(taskSelect)
           .eq('account_id', id!)
-          .order('due_date', { ascending: true }),
+          .order('due', { ascending: true }),
       ]
 
       if (projectIds.length > 0) {
@@ -169,44 +159,34 @@ export default function AccountDetailPage() {
             .from('tasks')
             .select(taskSelect)
             .in('project_id', projectIds)
-            .order('due_date', { ascending: true })
-        )
-      }
-
-      if (featureIds.length > 0) {
-        taskQueries.push(
-          supabase
-            .from('tasks')
-            .select(taskSelect)
-            .in('feature_id', featureIds)
-            .order('due_date', { ascending: true })
+            .order('due', { ascending: true })
         )
       }
 
       const taskResults = await Promise.all(taskQueries)
       const allTasksRaw = taskResults.flatMap((r) => r.data ?? [])
 
-      // Deduplicate by task ID
+      // Deduplicate by row_id
       const seenTaskIds = new Set<string>()
       const uniqueTasks = allTasksRaw.filter((t) => {
-        if (seenTaskIds.has(t.id)) return false
-        seenTaskIds.add(t.id)
+        if (seenTaskIds.has(t.row_id)) return false
+        seenTaskIds.add(t.row_id)
         return true
       })
 
-      // Sort by due_date ascending
+      // Sort by due date ascending
       uniqueTasks.sort((a, b) => {
-        if (!a.due_date && !b.due_date) return 0
-        if (!a.due_date) return 1
-        if (!b.due_date) return -1
-        return a.due_date.localeCompare(b.due_date)
+        if (!a.due && !b.due) return 0
+        if (!a.due) return 1
+        if (!b.due) return -1
+        return a.due.localeCompare(b.due)
       })
 
       setTasks(
         uniqueTasks.map((t) => ({
           ...t,
-          assigned_to: t.team_members as TeamMember | null,
-          team_members: undefined,
+          assigned_to: t.team as TeamMember | null,
+          team: undefined,
         })) as (Task & { assigned_to?: TeamMember | null })[]
       )
 
@@ -447,14 +427,14 @@ export default function AccountDetailPage() {
             return openTasks.length > 0 ? (
               <div className="space-y-3 max-h-48 overflow-y-auto">
                 {openTasks.map((task) => (
-                  <div key={task.id} className="flex items-start gap-3">
+                  <div key={task.row_id} className="flex items-start gap-3">
                     <CheckCircle2
                       size={16}
                       className="text-text-secondary mt-0.5 flex-shrink-0"
                     />
                     <div className="min-w-0 flex-1">
                       <p className="text-sm text-text-primary truncate">
-                        {task.title ?? 'Untitled Task'}
+                        {task.name ?? 'Untitled Task'}
                       </p>
                       <div className="flex items-center gap-2 mt-0.5">
                         {task.status && (
@@ -464,10 +444,10 @@ export default function AccountDetailPage() {
                             {task.status.replace(/_/g, ' ')}
                           </span>
                         )}
-                        {task.due_date && (
+                        {task.due && (
                           <span className="text-[10px] text-text-secondary flex items-center gap-1">
                             <CalendarDays size={10} />
-                            {new Date(task.due_date).toLocaleDateString()}
+                            {new Date(task.due).toLocaleDateString()}
                           </span>
                         )}
                       </div>
@@ -1179,8 +1159,8 @@ function TasksTab({
   function renderTaskEntry(task: Task & { assigned_to?: TeamMember | null }) {
     return (
       <div
-        key={task.id}
-        onClick={() => navigate(`/accounts/${accountId}/tasks/${task.id}`)}
+        key={task.row_id}
+        onClick={() => navigate(`/accounts/${accountId}/tasks/${task.row_id}`)}
         className="flex items-center gap-4 p-3 bg-black/20 rounded-lg border border-border/50 cursor-pointer hover:border-purple/30 transition-colors"
       >
         <div className="w-7 h-7 rounded-full bg-purple-muted flex items-center justify-center flex-shrink-0">
@@ -1196,7 +1176,7 @@ function TasksTab({
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-sm text-text-primary truncate">
-            {task.title ?? 'Untitled Task'}
+            {task.name ?? 'Untitled Task'}
           </p>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-0.5">
             {task.status && (
@@ -1206,10 +1186,10 @@ function TasksTab({
                 {task.status.replace(/_/g, ' ')}
               </span>
             )}
-            {task.due_date && (
+            {task.due && (
               <span className="text-xs text-text-secondary flex items-center gap-1">
                 <CalendarDays size={10} />
-                {new Date(task.due_date).toLocaleDateString()}
+                {new Date(task.due).toLocaleDateString()}
               </span>
             )}
             {task.assigned_to && (

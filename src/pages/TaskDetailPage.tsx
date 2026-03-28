@@ -37,11 +37,12 @@ export default function TaskDetailPage() {
   const [saving, setSaving] = useState(false)
 
   // Edit form state
-  const [editTitle, setEditTitle] = useState('')
-  const [editDescription, setEditDescription] = useState('')
+  const [editName, setEditName] = useState('')
+  const [editNotes, setEditNotes] = useState('')
   const [editStatus, setEditStatus] = useState('')
-  const [editDueDate, setEditDueDate] = useState('')
+  const [editDue, setEditDue] = useState('')
   const [editAssignedTo, setEditAssignedTo] = useState('')
+  const [editPriority, setEditPriority] = useState('')
 
   useEffect(() => {
     if (!taskId) return
@@ -51,15 +52,15 @@ export default function TaskDetailPage() {
 
       const { data: taskData } = await supabase
         .from('tasks')
-        .select('*, team_members!tasks_assigned_to_id_fkey(id, first_name, last_name, photo)')
-        .eq('id', taskId!)
+        .select('*, team!fk_tasks_assigned_to_id_internal(id, first_name, last_name, photo)')
+        .eq('row_id', taskId!)
         .single()
 
       if (taskData) {
         const mapped: TaskWithAssignee = {
           ...taskData,
-          assigned_to: taskData.team_members as TeamMember | null,
-          team_members: undefined,
+          assigned_to: taskData.team as TeamMember | null,
+          team: undefined,
         } as TaskWithAssignee
         setTask(mapped)
       }
@@ -83,11 +84,12 @@ export default function TaskDetailPage() {
 
   function startEditing() {
     if (!task) return
-    setEditTitle(task.title ?? '')
-    setEditDescription(task.description ?? '')
+    setEditName(task.name ?? '')
+    setEditNotes(task.notes ?? '')
     setEditStatus(task.status ?? 'open')
-    setEditDueDate(task.due_date ?? '')
-    setEditAssignedTo(task.assigned_to_id ?? '')
+    setEditDue(task.due ?? '')
+    setEditAssignedTo(task.assigned_to_id_internal ?? '')
+    setEditPriority(task.priority ?? '')
     setEditing(true)
   }
 
@@ -96,25 +98,26 @@ export default function TaskDetailPage() {
     setSaving(true)
 
     const updates = {
-      title: editTitle.trim() || null,
-      description: editDescription.trim() || null,
+      name: editName.trim() || null,
+      notes: editNotes.trim() || null,
       status: editStatus || null,
-      due_date: editDueDate || null,
-      assigned_to_id: editAssignedTo || null,
+      due: editDue || null,
+      assigned_to_id_internal: editAssignedTo || null,
+      priority: editPriority || null,
     }
 
     const { data, error } = await supabase
       .from('tasks')
       .update(updates)
-      .eq('id', taskId)
-      .select('*, team_members!tasks_assigned_to_id_fkey(id, first_name, last_name, photo)')
+      .eq('row_id', taskId)
+      .select('*, team!fk_tasks_assigned_to_id_internal(id, first_name, last_name, photo)')
       .single()
 
     if (data && !error) {
       const mapped: TaskWithAssignee = {
         ...data,
-        assigned_to: data.team_members as TeamMember | null,
-        team_members: undefined,
+        assigned_to: data.team as TeamMember | null,
+        team: undefined,
       } as TaskWithAssignee
       setTask(mapped)
       setEditing(false)
@@ -175,7 +178,7 @@ export default function TaskDetailPage() {
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-bold text-text-primary truncate">
-              {task.title ?? 'Untitled Task'}
+              {task.name ?? 'Untitled Task'}
             </h1>
             {task.status && (
               <span
@@ -188,15 +191,20 @@ export default function TaskDetailPage() {
             )}
           </div>
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1.5">
-            {task.due_date && (
+            {task.due && (
               <span className="text-sm text-text-secondary flex items-center gap-1.5">
                 <CalendarDays size={13} />
-                Due {new Date(task.due_date).toLocaleDateString()}
+                Due {new Date(task.due).toLocaleDateString()}
               </span>
             )}
-            {task.created_at && (
+            {task.priority && (
               <span className="text-sm text-text-secondary">
-                Created {new Date(task.created_at).toLocaleDateString()}
+                Priority: {task.priority}
+              </span>
+            )}
+            {task.created && (
+              <span className="text-sm text-text-secondary">
+                Created {new Date(task.created).toLocaleDateString()}
               </span>
             )}
           </div>
@@ -217,27 +225,27 @@ export default function TaskDetailPage() {
         <div className="bg-surface rounded-xl border border-border p-5 space-y-4">
           <div>
             <label className="text-[10px] text-text-secondary uppercase tracking-wider mb-1 block">
-              Title
+              Name
             </label>
             <input
               type="text"
-              value={editTitle}
-              onChange={(e) => setEditTitle(e.target.value)}
+              value={editName}
+              onChange={(e) => setEditName(e.target.value)}
               className="w-full text-sm bg-surface border border-border rounded-lg px-3 py-2 text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:border-purple/50"
             />
           </div>
           <div>
             <label className="text-[10px] text-text-secondary uppercase tracking-wider mb-1 block">
-              Description
+              Notes
             </label>
             <textarea
-              value={editDescription}
-              onChange={(e) => setEditDescription(e.target.value)}
+              value={editNotes}
+              onChange={(e) => setEditNotes(e.target.value)}
               rows={4}
               className="w-full text-sm bg-surface border border-border rounded-lg px-3 py-2 text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:border-purple/50 resize-none"
             />
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="text-[10px] text-text-secondary uppercase tracking-wider mb-1 block">
                 Status
@@ -256,12 +264,26 @@ export default function TaskDetailPage() {
             </div>
             <div>
               <label className="text-[10px] text-text-secondary uppercase tracking-wider mb-1 block">
+                Priority
+              </label>
+              <input
+                type="text"
+                value={editPriority}
+                onChange={(e) => setEditPriority(e.target.value)}
+                placeholder="e.g. high, medium, low"
+                className="w-full text-sm bg-surface border border-border rounded-lg px-3 py-2 text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:border-purple/50"
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="text-[10px] text-text-secondary uppercase tracking-wider mb-1 block">
                 Due Date
               </label>
               <input
                 type="date"
-                value={editDueDate}
-                onChange={(e) => setEditDueDate(e.target.value)}
+                value={editDue}
+                onChange={(e) => setEditDue(e.target.value)}
                 className="w-full text-sm bg-surface border border-border rounded-lg px-3 py-2 text-text-primary focus:outline-none focus:border-purple/50"
               />
             </div>
@@ -331,17 +353,17 @@ export default function TaskDetailPage() {
             )}
           </div>
 
-          {/* Description */}
+          {/* Notes */}
           <div className="bg-surface rounded-xl border border-border p-5">
             <h3 className="text-sm font-semibold text-text-secondary uppercase tracking-wider mb-4">
-              Description
+              Notes
             </h3>
-            {task.description ? (
+            {task.notes ? (
               <p className="text-sm text-text-primary whitespace-pre-wrap leading-relaxed">
-                {task.description}
+                {task.notes}
               </p>
             ) : (
-              <p className="text-sm text-text-secondary">No description provided.</p>
+              <p className="text-sm text-text-secondary">No notes provided.</p>
             )}
           </div>
         </div>
