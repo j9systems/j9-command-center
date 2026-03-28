@@ -19,6 +19,7 @@ import {
 import { supabase } from '@/lib/supabase'
 import type {
   AccountWithStatus,
+  AccountContact,
   AccountRole,
   Contact,
   Invoice,
@@ -84,7 +85,6 @@ function getTaskStatusColor(key: string | null | undefined): string {
 export default function AccountDetailPage() {
   const { id } = useParams<{ id: string }>()
   const [account, setAccount] = useState<AccountWithStatus | null>(null)
-  const [primaryContact, setPrimaryContact] = useState<Contact | null>(null)
   const [tasks, setTasks] = useState<(Task & { assigned_to?: TeamMember | null; status_option?: Option | null })[]>([])
   const [taskStatuses, setTaskStatuses] = useState<Option[]>([])
   const [projects, setProjects] = useState<(Project & { project_manager?: TeamMember | null; logged_hours: number })[]>([])
@@ -92,8 +92,9 @@ export default function AccountDetailPage() {
   const [timeLogStatuses, setTimeLogStatuses] = useState<Option[]>([])
   const [accountTeamMembers, setAccountTeamMembers] = useState<{ id: string; team_member: TeamMember | null; role: AccountRole | null; expected_weekly_hrs: string | null }[]>([])
   const [invoices, setInvoices] = useState<(Invoice & { project?: { name: string | null } | null; status_option?: Option | null })[]>([])
+  const [accountContacts, setAccountContacts] = useState<(AccountContact & { contact: Contact })[]>([])
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<'projects' | 'tasks' | 'time_logs' | 'invoices' | 'team'>('projects')
+  const [activeTab, setActiveTab] = useState<'projects' | 'tasks' | 'time_logs' | 'invoices' | 'contacts' | 'team'>('projects')
 
   useEffect(() => {
     if (!id) return
@@ -118,22 +119,21 @@ export default function AccountDetailPage() {
         } as AccountWithStatus)
       }
 
-      // Fetch primary contact
+      // Fetch all account contacts
       const { data: contactLinks } = await supabase
         .from('account_contacts')
-        .select('contact_id, is_primary')
+        .select('*, contacts(*)')
         .eq('account_id', id!)
-        .eq('is_primary', 'true')
-        .limit(1)
 
-      if (contactLinks && contactLinks.length > 0) {
-        const { data: contactData } = await supabase
-          .from('contacts')
-          .select('*')
-          .eq('id', contactLinks[0].contact_id!)
-          .single()
-
-        if (contactData) setPrimaryContact(contactData)
+      if (contactLinks) {
+        const mapped = contactLinks
+          .filter((cl: Record<string, unknown>) => cl.contacts)
+          .map((cl: Record<string, unknown>) => ({
+            ...cl,
+            contact: cl.contacts as Contact,
+            contacts: undefined,
+          })) as (AccountContact & { contact: Contact })[]
+        setAccountContacts(mapped)
       }
 
       // Fetch projects first (needed for task lookup)
@@ -356,6 +356,7 @@ export default function AccountDetailPage() {
     { key: 'tasks' as const, label: 'Tasks', icon: ClipboardList },
     { key: 'time_logs' as const, label: 'Time Logs', icon: Timer },
     { key: 'invoices' as const, label: 'Invoices', icon: FileText },
+    { key: 'contacts' as const, label: 'Contacts', icon: User },
     { key: 'team' as const, label: 'Team', icon: Users },
   ]
 
@@ -411,50 +412,8 @@ export default function AccountDetailPage() {
         </div>
       </div>
 
-      {/* Primary Contact & Open Tasks */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-        {/* Primary Contact Card */}
-        <div className="bg-surface rounded-xl border border-border p-5">
-          <h3 className="text-sm font-semibold text-text-secondary uppercase tracking-wider mb-4">
-            Primary Contact
-          </h3>
-          {primaryContact ? (
-            <div className="space-y-3">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-purple-muted flex items-center justify-center flex-shrink-0">
-                  <User size={18} className="text-purple" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-text-primary truncate">
-                    {[primaryContact.first_name, primaryContact.last_name]
-                      .filter(Boolean)
-                      .join(' ') || 'Unnamed Contact'}
-                  </p>
-                  {primaryContact.company_name && (
-                    <p className="text-xs text-text-secondary truncate">
-                      {primaryContact.company_name}
-                    </p>
-                  )}
-                </div>
-              </div>
-              {primaryContact.email && (
-                <div className="flex items-center gap-2.5 text-sm text-text-secondary">
-                  <Mail size={14} className="flex-shrink-0" />
-                  <span className="truncate">{primaryContact.email}</span>
-                </div>
-              )}
-              {primaryContact.phone && (
-                <div className="flex items-center gap-2.5 text-sm text-text-secondary">
-                  <Phone size={14} className="flex-shrink-0" />
-                  <span>{primaryContact.phone}</span>
-                </div>
-              )}
-            </div>
-          ) : (
-            <p className="text-sm text-text-secondary">No primary contact assigned.</p>
-          )}
-        </div>
-
+      {/* Open Tasks */}
+      <div className="mb-8">
         {/* Open Tasks Card */}
         <div className="bg-surface rounded-xl border border-border p-5">
           <h3 className="text-sm font-semibold text-text-secondary uppercase tracking-wider mb-4">
@@ -584,6 +543,19 @@ export default function AccountDetailPage() {
           )}
           {activeTab === 'invoices' && (
             <InvoicesTab invoices={invoices} />
+          )}
+          {activeTab === 'contacts' && (
+            <ContactsTab
+              accountContacts={accountContacts}
+              accountId={id!}
+              onContactAdded={(ac) => {
+                setAccountContacts((prev) =>
+                  ac.is_primary === 'true'
+                    ? [...prev.map((p) => ({ ...p, is_primary: 'false' as const })), ac]
+                    : [...prev, ac]
+                )
+              }}
+            />
           )}
           {activeTab === 'team' && (
             <AccountTeamTab members={accountTeamMembers} />
@@ -1510,6 +1482,333 @@ function InvoicesTab({
           )}
         </div>
       ))}
+    </div>
+  )
+}
+
+function ContactsTab({
+  accountContacts,
+  accountId,
+  onContactAdded,
+}: {
+  accountContacts: (AccountContact & { contact: Contact })[]
+  accountId: string
+  onContactAdded: (ac: AccountContact & { contact: Contact }) => void
+}) {
+  const [showForm, setShowForm] = useState(false)
+  const [showNewContactFields, setShowNewContactFields] = useState(false)
+  const [saving, setSaving] = useState(false)
+
+  // Existing contact selection
+  const [existingContacts, setExistingContacts] = useState<Contact[]>([])
+  const [selectedContactId, setSelectedContactId] = useState('')
+  const [isPrimary, setIsPrimary] = useState(false)
+
+  // New contact fields
+  const [newFirstName, setNewFirstName] = useState('')
+  const [newLastName, setNewLastName] = useState('')
+  const [newEmail, setNewEmail] = useState('')
+  const [newPhone, setNewPhone] = useState('')
+  const [newCompanyName, setNewCompanyName] = useState('')
+
+  // Load existing contacts for the select dropdown
+  useEffect(() => {
+    async function loadContacts() {
+      const { data } = await supabase
+        .from('contacts')
+        .select('*')
+        .order('first_name', { ascending: true })
+      if (data) setExistingContacts(data as Contact[])
+    }
+    if (showForm) loadContacts()
+  }, [showForm])
+
+  function resetForm() {
+    setSelectedContactId('')
+    setIsPrimary(false)
+    setShowNewContactFields(false)
+    setNewFirstName('')
+    setNewLastName('')
+    setNewEmail('')
+    setNewPhone('')
+    setNewCompanyName('')
+    setShowForm(false)
+  }
+
+  async function handleAdd() {
+    setSaving(true)
+    let contactId = selectedContactId
+    let contact: Contact | null = null
+
+    // If creating a new contact, insert it first
+    if (showNewContactFields) {
+      if (!newFirstName.trim() && !newLastName.trim()) {
+        setSaving(false)
+        return
+      }
+      const id = crypto.randomUUID()
+      const { data: newContact, error: contactErr } = await supabase
+        .from('contacts')
+        .insert({
+          id,
+          first_name: newFirstName.trim() || null,
+          last_name: newLastName.trim() || null,
+          email: newEmail.trim() || null,
+          phone: newPhone.trim() || null,
+          company_name: newCompanyName.trim() || null,
+        })
+        .select('*')
+        .single()
+
+      if (contactErr || !newContact) {
+        console.error('Error creating contact:', contactErr)
+        setSaving(false)
+        return
+      }
+      contactId = newContact.id
+      contact = newContact as Contact
+    } else {
+      if (!contactId) {
+        setSaving(false)
+        return
+      }
+      contact = existingContacts.find((c) => c.id === contactId) ?? null
+    }
+
+    if (!contact) {
+      setSaving(false)
+      return
+    }
+
+    // If marking as primary, unset any existing primary
+    if (isPrimary) {
+      await supabase
+        .from('account_contacts')
+        .update({ is_primary: 'false' })
+        .eq('account_id', accountId)
+        .eq('is_primary', 'true')
+    }
+
+    // Create the account_contact link
+    const acId = crypto.randomUUID()
+    const { data: acData, error: acErr } = await supabase
+      .from('account_contacts')
+      .insert({
+        id: acId,
+        account_id: accountId,
+        contact_id: contactId,
+        is_primary: isPrimary ? 'true' : 'false',
+      })
+      .select('*')
+      .single()
+
+    if (acErr || !acData) {
+      console.error('Error creating account contact:', acErr)
+      setSaving(false)
+      return
+    }
+
+    onContactAdded({ ...acData, contact } as AccountContact & { contact: Contact })
+    resetForm()
+    setSaving(false)
+  }
+
+  // Sort: primary first, then alphabetical
+  const sorted = [...accountContacts].sort((a, b) => {
+    if (a.is_primary === 'true' && b.is_primary !== 'true') return -1
+    if (b.is_primary === 'true' && a.is_primary !== 'true') return 1
+    const nameA = [a.contact.first_name, a.contact.last_name].filter(Boolean).join(' ').toLowerCase()
+    const nameB = [b.contact.first_name, b.contact.last_name].filter(Boolean).join(' ').toLowerCase()
+    return nameA.localeCompare(nameB)
+  })
+
+  // IDs already linked to this account (to filter from dropdown)
+  const linkedContactIds = new Set(accountContacts.map((ac) => ac.contact_id))
+
+  return (
+    <div className="space-y-6">
+      <div className="flex justify-end">
+        {!showForm && (
+          <button
+            onClick={() => setShowForm(true)}
+            className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-purple text-white hover:bg-purple-hover transition-colors"
+          >
+            <Plus size={14} />
+            Add Contact
+          </button>
+        )}
+      </div>
+
+      {showForm && (
+        <MobileFormOverlay title="Add Account Contact" onClose={resetForm}>
+          <div className="p-4 md:bg-black/20 rounded-lg md:border md:border-border/50 space-y-3">
+            <div className="hidden md:flex items-center justify-between mb-1">
+              <h3 className="text-sm font-medium text-text-primary">Add Account Contact</h3>
+              <button onClick={resetForm} className="text-text-secondary hover:text-text-primary transition-colors">
+                <X size={16} />
+              </button>
+            </div>
+
+            {!showNewContactFields ? (
+              <>
+                <div>
+                  <label className="block text-xs text-text-secondary mb-1">Select Contact</label>
+                  <select
+                    value={selectedContactId}
+                    onChange={(e) => setSelectedContactId(e.target.value)}
+                    className="w-full text-sm bg-surface border border-border rounded-lg px-3 py-2 text-text-primary focus:outline-none focus:border-purple/50"
+                  >
+                    <option value="">Choose a contact...</option>
+                    {existingContacts
+                      .filter((c) => !linkedContactIds.has(c.id))
+                      .map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {[c.first_name, c.last_name].filter(Boolean).join(' ') || 'Unnamed'}{c.email ? ` (${c.email})` : ''}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowNewContactFields(true)
+                    setSelectedContactId('')
+                  }}
+                  className="text-xs text-purple hover:text-purple-hover transition-colors"
+                >
+                  + Create new contact instead
+                </button>
+              </>
+            ) : (
+              <>
+                <p className="text-xs text-text-secondary font-medium uppercase tracking-wider">New Contact</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <input
+                    type="text"
+                    placeholder="First name"
+                    value={newFirstName}
+                    onChange={(e) => setNewFirstName(e.target.value)}
+                    className="w-full text-sm bg-surface border border-border rounded-lg px-3 py-2 text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:border-purple/50"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Last name"
+                    value={newLastName}
+                    onChange={(e) => setNewLastName(e.target.value)}
+                    className="w-full text-sm bg-surface border border-border rounded-lg px-3 py-2 text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:border-purple/50"
+                  />
+                </div>
+                <input
+                  type="email"
+                  placeholder="Email"
+                  value={newEmail}
+                  onChange={(e) => setNewEmail(e.target.value)}
+                  className="w-full text-sm bg-surface border border-border rounded-lg px-3 py-2 text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:border-purple/50"
+                />
+                <input
+                  type="tel"
+                  placeholder="Phone"
+                  value={newPhone}
+                  onChange={(e) => setNewPhone(e.target.value)}
+                  className="w-full text-sm bg-surface border border-border rounded-lg px-3 py-2 text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:border-purple/50"
+                />
+                <input
+                  type="text"
+                  placeholder="Company name"
+                  value={newCompanyName}
+                  onChange={(e) => setNewCompanyName(e.target.value)}
+                  className="w-full text-sm bg-surface border border-border rounded-lg px-3 py-2 text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:border-purple/50"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowNewContactFields(false)
+                    setNewFirstName('')
+                    setNewLastName('')
+                    setNewEmail('')
+                    setNewPhone('')
+                    setNewCompanyName('')
+                  }}
+                  className="text-xs text-purple hover:text-purple-hover transition-colors"
+                >
+                  Select existing contact instead
+                </button>
+              </>
+            )}
+
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={isPrimary}
+                onChange={(e) => setIsPrimary(e.target.checked)}
+                className="rounded border-border text-purple focus:ring-purple/50"
+              />
+              <span className="text-sm text-text-primary">Primary contact</span>
+            </label>
+
+            <button
+              onClick={handleAdd}
+              disabled={saving || (!showNewContactFields && !selectedContactId) || (showNewContactFields && !newFirstName.trim() && !newLastName.trim())}
+              className="w-full text-sm font-medium px-4 py-2 rounded-lg bg-purple text-white hover:bg-purple-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {saving ? 'Saving...' : 'Add Contact'}
+            </button>
+          </div>
+        </MobileFormOverlay>
+      )}
+
+      {sorted.length === 0 && !showForm ? (
+        <p className="text-sm text-text-secondary text-center py-8">
+          No contacts linked to this account.
+        </p>
+      ) : (
+        <div className="space-y-2">
+          {sorted.map((ac) => {
+            const name = [ac.contact.first_name, ac.contact.last_name]
+              .filter(Boolean)
+              .join(' ') || 'Unnamed Contact'
+            const isPrimaryContact = ac.is_primary === 'true'
+
+            return (
+              <div
+                key={ac.id}
+                className="flex items-center gap-4 p-3 bg-black/20 rounded-lg border border-border/50"
+              >
+                <div className="w-9 h-9 rounded-full bg-purple-muted flex items-center justify-center flex-shrink-0">
+                  <User size={16} className="text-purple" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-medium text-text-primary truncate">{name}</p>
+                    {isPrimaryContact && (
+                      <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400">
+                        Primary
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-0.5">
+                    {ac.contact.company_name && (
+                      <span className="text-xs text-text-secondary truncate">{ac.contact.company_name}</span>
+                    )}
+                    {ac.contact.email && (
+                      <span className="text-xs text-text-secondary flex items-center gap-1 truncate">
+                        <Mail size={10} />
+                        {ac.contact.email}
+                      </span>
+                    )}
+                    {ac.contact.phone && (
+                      <span className="text-xs text-text-secondary flex items-center gap-1">
+                        <Phone size={10} />
+                        {ac.contact.phone}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }
