@@ -155,6 +155,30 @@ export interface InvoiceLineItem {
   hours: string | null
 }
 
+export interface Meeting {
+  row_id: string
+  name: string | null
+  meeting_start: string | null
+  meeting_end: string | null
+  duration: string | null
+  description_agenda: string | null
+  meeting_notes: string | null
+  gmeet_link: string | null
+  meeting_link: string | null
+  location: string | null
+  status: string | null
+  meeting_type: string | null
+  account_id: string | null
+}
+
+export interface MeetingAttendee {
+  row_id: string
+  external_attendee_id: string | null
+  meeting_id: string | null
+  internal_attendee_id: string | null
+  attendee_group: string | null
+}
+
 export interface Feature {
   id: string
   project_id: string | null

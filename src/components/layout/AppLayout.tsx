@@ -9,7 +9,7 @@ function useViewportHeight() {
     function setHeight() {
       // window.innerHeight excludes the home indicator area on iOS.
       // screen.height gives the full physical screen height in CSS pixels.
-      const h = window.screen.height
+      const h = window.innerHeight
       document.documentElement.style.setProperty('--app-height', `${h}px`)
     }
     setHeight()
