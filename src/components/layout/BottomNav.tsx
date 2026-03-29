@@ -11,21 +11,21 @@ const navItems = [
 export default function BottomNav() {
   return (
     <nav className="bottom-nav md:hidden">
-      <div className="flex justify-around items-center h-11">
+      <div className="flex justify-around items-center h-12">
         {navItems.map(({ to, icon: Icon, label }) => (
           <NavLink
             key={to}
             to={to}
             end={to === '/'}
             className={({ isActive }) =>
-              `flex flex-col items-center gap-px px-3 text-[9px] font-medium transition-colors duration-200 ${
+              `flex flex-col items-center gap-0.5 py-0.5 px-3 text-[10px] font-medium transition-colors duration-200 ${
                 isActive
                   ? 'text-purple'
                   : 'text-text-secondary'
               }`
             }
           >
-            <Icon size={20} strokeWidth={1.8} />
+            <Icon size={22} />
             {label}
           </NavLink>
         ))}
