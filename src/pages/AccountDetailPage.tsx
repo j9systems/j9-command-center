@@ -312,53 +312,80 @@ export default function AccountDetailPage() {
         )
       }
 
-      // Fetch meetings involving account contacts
-      const contactIds = (contactLinks ?? [])
-        .filter((cl) => cl.contacts)
-        .map((cl) => cl.contact_id)
-        .filter(Boolean) as string[]
+      // Fetch meetings for this account using two-part query:
+      // 1. Meetings directly linked via account_id
+      // 2. Meetings where raw_attendees contains any contact email linked to this account
+      const meetingSelect = 'row_id, name, meeting_start, meeting_end, duration, description_agenda, meeting_notes, gmeet_link, meeting_link, location, status, meeting_type, account_id, raw_attendees'
 
-      if (contactIds.length > 0) {
-        // Find meeting IDs where any account contact is an attendee
-        const { data: attendeeRows } = await supabase
-          .from('meeting_attendees')
-          .select('meeting_id')
-          .in('external_attendee_id', contactIds)
+      // Query A: meetings directly linked to this account
+      const { data: directMeetings } = await supabase
+        .from('meetings')
+        .select(meetingSelect)
+        .eq('account_id', id!)
+        .neq('status', 'cancelled')
+        .order('meeting_start', { ascending: false })
 
-        const meetingIds = [...new Set((attendeeRows ?? []).map((a) => a.meeting_id).filter(Boolean))] as string[]
+      // Get contact emails for this account
+      const contactEmails = (contactLinks ?? [])
+        .filter((cl) => cl.contacts && cl.contacts.email)
+        .map((cl) => (cl.contacts as Contact).email!.toLowerCase())
 
-        if (meetingIds.length > 0) {
-          const { data: meetingsData } = await supabase
+      // Query B: meetings where raw_attendees contains any of these contact emails
+      let attendeeMeetings: typeof directMeetings = []
+      if (contactEmails.length > 0) {
+        // Query each contact email using jsonb containment
+        const emailPromises = contactEmails.map((email) =>
+          supabase
             .from('meetings')
-            .select('row_id, name, meeting_start, meeting_end, duration, description_agenda, meeting_notes, gmeet_link, meeting_link, location, status, meeting_type, account_id')
-            .in('row_id', meetingIds)
+            .select(meetingSelect)
+            .contains('raw_attendees', JSON.stringify([{ email }]))
+            .neq('status', 'cancelled')
             .order('meeting_start', { ascending: false })
+        )
+        const emailResults = await Promise.all(emailPromises)
+        const allEmailMeetings = emailResults.flatMap((r) => r.data ?? [])
+        attendeeMeetings = allEmailMeetings
+      }
 
-          // Fetch all attendees for these meetings
-          const { data: allAttendees } = await supabase
-            .from('meeting_attendees')
-            .select('row_id, meeting_id, external_attendee_id, internal_attendee_id, attendee_group, contacts(id, first_name, last_name, email), team(id, first_name, last_name, email, photo)')
-            .in('meeting_id', meetingIds)
-
-          const attendeesByMeeting: Record<string, { contact: Contact | null; team_member: TeamMember | null }[]> = {}
-          for (const att of allAttendees ?? []) {
-            const mid = att.meeting_id as string
-            if (!attendeesByMeeting[mid]) attendeesByMeeting[mid] = []
-            attendeesByMeeting[mid].push({
-              contact: att.contacts as unknown as Contact | null,
-              team_member: att.team as unknown as TeamMember | null,
-            })
-          }
-
-          if (meetingsData) {
-            setMeetings(
-              (meetingsData as Meeting[]).map((m) => ({
-                ...m,
-                attendees: attendeesByMeeting[m.row_id] ?? [],
-              }))
-            )
-          }
+      // Merge and deduplicate
+      const allMeetingsMap = new Map<string, Meeting>()
+      for (const m of [...(directMeetings ?? []), ...(attendeeMeetings ?? [])]) {
+        if (!allMeetingsMap.has(m.row_id)) {
+          allMeetingsMap.set(m.row_id, m as Meeting)
         }
+      }
+      const allMeetings = [...allMeetingsMap.values()]
+
+      // Sort by meeting_start descending
+      allMeetings.sort((a, b) => (b.meeting_start ?? '').localeCompare(a.meeting_start ?? ''))
+
+      if (allMeetings.length > 0) {
+        const meetingIds = allMeetings.map((m) => m.row_id)
+
+        // Fetch all attendees for these meetings
+        const { data: allAttendees } = await supabase
+          .from('meeting_attendees')
+          .select('row_id, meeting_id, external_attendee_id, internal_attendee_id, attendee_group, contacts(id, first_name, last_name, email), team(id, first_name, last_name, email, photo)')
+          .in('meeting_id', meetingIds)
+
+        const attendeesByMeeting: Record<string, { contact: Contact | null; team_member: TeamMember | null }[]> = {}
+        for (const att of allAttendees ?? []) {
+          const mid = att.meeting_id as string
+          if (!attendeesByMeeting[mid]) attendeesByMeeting[mid] = []
+          attendeesByMeeting[mid].push({
+            contact: att.contacts as unknown as Contact | null,
+            team_member: att.team as unknown as TeamMember | null,
+          })
+        }
+
+        setMeetings(
+          allMeetings.map((m) => ({
+            ...m,
+            attendees: attendeesByMeeting[m.row_id] ?? [],
+          }))
+        )
+      } else {
+        setMeetings([])
       }
 
       setLoading(false)

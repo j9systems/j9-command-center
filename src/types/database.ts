@@ -169,6 +169,7 @@ export interface Meeting {
   status: string | null
   meeting_type: string | null
   account_id: string | null
+  raw_attendees: { email: string; displayName?: string }[] | null
 }
 
 export interface MeetingAttendee {

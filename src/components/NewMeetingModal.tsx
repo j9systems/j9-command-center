@@ -48,6 +48,18 @@ export default function NewMeetingModal({
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
 
+  // Auto-populate end time 30 minutes after start time
+  function handleStartTimeChange(value: string) {
+    setStartTime(value)
+    if (value) {
+      const [h, m] = value.split(':').map(Number)
+      const totalMinutes = h * 60 + m + 30
+      const endH = Math.floor(totalMinutes / 60) % 24
+      const endM = totalMinutes % 60
+      setEndTime(`${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`)
+    }
+  }
+
   useEffect(() => {
     async function fetchTeam() {
       const { data } = await supabase
@@ -193,18 +205,20 @@ export default function NewMeetingModal({
         </div>
 
         {/* Date / Start / End */}
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <div>
             <label className={labelClass}>Date *</label>
             <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inputClass} required />
           </div>
-          <div>
-            <label className={labelClass}>Start *</label>
-            <input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} className={inputClass} required />
-          </div>
-          <div>
-            <label className={labelClass}>End *</label>
-            <input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} className={inputClass} required />
+          <div className="grid grid-cols-2 gap-3 md:contents">
+            <div>
+              <label className={labelClass}>Start *</label>
+              <input type="time" value={startTime} onChange={(e) => handleStartTimeChange(e.target.value)} className={inputClass} required />
+            </div>
+            <div>
+              <label className={labelClass}>End *</label>
+              <input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} className={inputClass} required />
+            </div>
           </div>
         </div>
 
