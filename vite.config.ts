@@ -22,6 +22,7 @@ export default defineConfig({
         theme_color: '#111111',
         background_color: '#111111',
         display: 'standalone',
+        orientation: 'portrait',
         icons: [
           {
             src: 'https://res.cloudinary.com/duy32f0q4/image/upload/w_192,h_192,c_pad,b_black/v1773874676/20A38445-8946-49E1-8330-AA60BFA12F74_1_1_fuobbj.png',
