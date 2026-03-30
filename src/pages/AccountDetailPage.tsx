@@ -22,7 +22,6 @@ import {
   Briefcase,
   CreditCard,
   ChevronDown,
-  BarChart3,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import type {
@@ -1281,7 +1280,6 @@ function TimeLogsTab({
   const sortedWeeks = [...weekMap.entries()].sort(([a], [b]) => a.localeCompare(b))
   // Show at most 12 most recent weeks
   for (const [, val] of sortedWeeks.slice(-12)) {
-    const wEnd = new Date(val.weekStart.getFullYear(), val.weekStart.getMonth(), val.weekStart.getDate() + 6)
     weeklyChartData.push({
       weekLabel: `${val.weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`,
       weekStart: val.weekStart,
