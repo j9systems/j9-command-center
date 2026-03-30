@@ -17,46 +17,19 @@ html {
   background-color: #111111;
 }
 
-@layer base {
-  html {
-    height: 100%;
-    margin: 0;
-    overscroll-behavior: none;
-  }
-
-  body {
-    height: 100%;
-    margin: 0;
-    overscroll-behavior: none;
-    background-color: #111111;
-    color: var(--color-text-primary);
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-    color-scheme: dark;
-  }
-
-  #root {
-    height: 100%;
-  }
-
-  a, button, [role="button"], [tabindex="0"] {
-    cursor: pointer;
-  }
+body {
+  background-color: #111111;
+  color: var(--color-text-primary);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  color-scheme: dark;
 }
 
-/* Bottom nav — explicit CSS, not relying on Tailwind utilities for positioning */
-.bottom-nav {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 40;
-  background-color: var(--color-surface);
-  border-top: 1px solid var(--color-border);
-  padding-bottom: env(safe-area-inset-bottom, 0px);
-  touch-action: none;
+button, select, a, [role="button"], [tabindex="0"] {
+  cursor: pointer;
 }
+
 
 /* Safe area handling for iOS */
 .safe-top {
