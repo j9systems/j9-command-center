@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft,
@@ -18,6 +18,10 @@ import {
   Calendar,
   Video,
   MapPin,
+  DollarSign,
+  Briefcase,
+  CreditCard,
+  ChevronDown,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import type {
@@ -100,7 +104,7 @@ export default function AccountDetailPage() {
   const [accountContacts, setAccountContacts] = useState<(AccountContact & { contact: Contact })[]>([])
   const [meetings, setMeetings] = useState<(Meeting & { attendees: { contact: Contact | null; team_member: TeamMember | null }[] })[]>([])
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<'projects' | 'tasks' | 'time_logs' | 'invoices' | 'contacts' | 'team' | 'meetings'>('projects')
+  const [activeTab, setActiveTab] = useState<'projects' | 'tasks' | 'time_logs' | 'invoices' | 'contacts' | 'team' | 'meetings' | 'leads' | 'billing' | 'payroll'>('projects')
   const [refreshKey, setRefreshKey] = useState(0)
 
   useEffect(() => {
@@ -394,6 +398,20 @@ export default function AccountDetailPage() {
     fetchData()
   }, [id, refreshKey])
 
+  // Close mobile "More" dropdown on outside click
+  const mobileMoreRef = useRef<HTMLDivElement>(null)
+  const [mobileMoreOpen, setMobileMoreOpen] = useState(false)
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (mobileMoreRef.current && !mobileMoreRef.current.contains(e.target as Node)) {
+        setMobileMoreOpen(false)
+      }
+    }
+    if (mobileMoreOpen) document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [mobileMoreOpen])
+
   if (loading) {
     return (
       <div className="p-4 md:p-8 max-w-4xl mx-auto">
@@ -441,7 +459,12 @@ export default function AccountDetailPage() {
     { key: 'contacts' as const, label: 'Contacts', icon: User },
     { key: 'team' as const, label: 'Team', icon: Users },
     { key: 'meetings' as const, label: 'Meetings', icon: Calendar },
+    { key: 'leads' as const, label: 'Leads', icon: Briefcase },
+    { key: 'billing' as const, label: 'Billing', icon: CreditCard },
+    { key: 'payroll' as const, label: 'Payroll', icon: DollarSign },
   ]
+
+  const MOBILE_TAB_LIMIT = 6
 
   return (
     <div className="p-4 md:p-8 max-w-4xl mx-auto overflow-x-hidden">
@@ -495,82 +518,228 @@ export default function AccountDetailPage() {
         </div>
       </div>
 
-      {/* Open Tasks */}
-      <div className="mb-8">
-        {/* Open Tasks Card */}
-        <div className="bg-surface rounded-xl border border-border p-5">
-          <h3 className="text-sm font-semibold text-text-secondary uppercase tracking-wider mb-4">
-            Open Tasks
-          </h3>
-          {(() => {
-            const openTasks = tasks.filter((t) => {
-              const key = t.status_option?.option_key?.toLowerCase()
-              return key !== 'complete'
-            })
-            return openTasks.length > 0 ? (
-              <div className="space-y-3 max-h-48 overflow-y-auto">
-                {openTasks.map((task) => (
-                  <div key={task.row_id} className="flex items-start gap-3">
-                    <CheckCircle2
-                      size={16}
-                      className="text-text-secondary mt-0.5 flex-shrink-0"
-                    />
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm text-text-primary truncate">
-                        {task.name ?? 'Untitled Task'}
-                      </p>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        {task.status_option && (
-                          <span
-                            className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${getTaskStatusColor(task.status_option.option_key)}`}
-                          >
-                            {task.status_option.option_label}
-                          </span>
-                        )}
-                        {task.due && (
-                          <span className="text-[10px] text-text-secondary flex items-center gap-1">
-                            <CalendarDays size={10} />
-                            {new Date(task.due).toLocaleDateString()}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
+      {/* Account Summary */}
+      {(() => {
+        const openTasks = tasks.filter((t) => {
+          const key = t.status_option?.option_key?.toLowerCase()
+          return key !== 'complete'
+        })
+        const activeProjects = projects.filter((p) => p.status?.toLowerCase() === 'active')
+        const now = new Date()
+        const nextMeeting = [...meetings]
+          .filter((m) => m.meeting_start && new Date(m.meeting_start) >= now)
+          .sort((a, b) => (a.meeting_start ?? '').localeCompare(b.meeting_start ?? ''))
+          [0] ?? null
+
+        return (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+            {/* Open Tasks */}
+            <div
+              className="bg-surface rounded-xl border border-border p-5 cursor-pointer hover:border-purple/30 transition-colors"
+              onClick={() => setActiveTab('tasks')}
+            >
+              <div className="flex items-center gap-3 mb-2">
+                <div className="w-9 h-9 rounded-lg bg-amber-500/15 flex items-center justify-center flex-shrink-0">
+                  <ClipboardList size={18} className="text-amber-400" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-text-primary leading-none">{openTasks.length}</p>
+                  <p className="text-xs text-text-secondary mt-0.5">Open Tasks</p>
+                </div>
               </div>
-            ) : (
-              <p className="text-sm text-text-secondary">No open tasks.</p>
-            )
-          })()}
-        </div>
-      </div>
+              {openTasks.length > 0 && (
+                <div className="mt-3 space-y-1.5">
+                  {openTasks.slice(0, 3).map((t) => (
+                    <div key={t.row_id} className="flex items-center gap-2">
+                      <CheckCircle2 size={12} className="text-text-secondary flex-shrink-0" />
+                      <p className="text-xs text-text-secondary truncate">{t.name ?? 'Untitled'}</p>
+                    </div>
+                  ))}
+                  {openTasks.length > 3 && (
+                    <p className="text-[10px] text-text-secondary/60">+{openTasks.length - 3} more</p>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Active Projects */}
+            <div
+              className="bg-surface rounded-xl border border-border p-5 cursor-pointer hover:border-purple/30 transition-colors"
+              onClick={() => setActiveTab('projects')}
+            >
+              <div className="flex items-center gap-3 mb-2">
+                <div className="w-9 h-9 rounded-lg bg-emerald-500/15 flex items-center justify-center flex-shrink-0">
+                  <FolderKanban size={18} className="text-emerald-400" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-text-primary leading-none">{activeProjects.length}</p>
+                  <p className="text-xs text-text-secondary mt-0.5">Active Projects</p>
+                </div>
+              </div>
+              {activeProjects.length > 0 && (
+                <div className="mt-3 space-y-1.5">
+                  {activeProjects.slice(0, 3).map((p) => (
+                    <div key={p.id} className="flex items-center gap-2">
+                      <FolderKanban size={12} className="text-text-secondary flex-shrink-0" />
+                      <p className="text-xs text-text-secondary truncate">{p.name ?? 'Unnamed'}</p>
+                    </div>
+                  ))}
+                  {activeProjects.length > 3 && (
+                    <p className="text-[10px] text-text-secondary/60">+{activeProjects.length - 3} more</p>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Next Meeting */}
+            <div
+              className="bg-surface rounded-xl border border-border p-5 cursor-pointer hover:border-purple/30 transition-colors"
+              onClick={() => setActiveTab('meetings')}
+            >
+              <div className="flex items-center gap-3 mb-2">
+                <div className="w-9 h-9 rounded-lg bg-purple-500/15 flex items-center justify-center flex-shrink-0">
+                  <Calendar size={18} className="text-purple-400" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-text-primary leading-none">
+                    {nextMeeting ? 'Next Meeting' : 'No Meetings'}
+                  </p>
+                  <p className="text-xs text-text-secondary mt-0.5">Scheduled</p>
+                </div>
+              </div>
+              {nextMeeting ? (
+                <div className="mt-3">
+                  <p className="text-sm font-medium text-text-primary truncate">{nextMeeting.name ?? 'Untitled'}</p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <CalendarDays size={12} className="text-text-secondary flex-shrink-0" />
+                    <p className="text-xs text-text-secondary">
+                      {new Date(nextMeeting.meeting_start!).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
+                      {' at '}
+                      {new Date(nextMeeting.meeting_start!).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
+                    </p>
+                  </div>
+                  {nextMeeting.attendees?.length > 0 && (
+                    <div className="flex gap-1 mt-2 flex-wrap">
+                      {nextMeeting.attendees.slice(0, 3).map((a, i) => {
+                        const name = a.contact
+                          ? [a.contact.first_name, a.contact.last_name].filter(Boolean).join(' ')
+                          : a.team_member
+                            ? [a.team_member.first_name, a.team_member.last_name].filter(Boolean).join(' ')
+                            : null
+                        return name ? (
+                          <span key={i} className="text-[10px] px-1.5 py-0.5 rounded-full bg-purple-muted text-purple">
+                            {name}
+                          </span>
+                        ) : null
+                      })}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <p className="text-xs text-text-secondary mt-3">No upcoming meetings scheduled.</p>
+              )}
+            </div>
+          </div>
+        )
+      })()}
 
       {/* Gantt Chart */}
-      {projects.length > 0 && (
-        <GanttChart projects={projects} accountId={id!} />
-      )}
+      <GanttChart projects={projects} accountId={id!} />
 
       {/* Tabbed Container */}
       <div className="bg-surface rounded-xl border border-border overflow-hidden">
         {/* Tab headers */}
         <div className="flex border-b border-border overflow-x-auto scrollbar-hide">
-          {tabs.map((tab) => (
-            <button
-              key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
-              className={`flex items-center gap-2 px-5 py-3 text-sm font-medium transition-colors relative whitespace-nowrap flex-shrink-0 ${
-                activeTab === tab.key
-                  ? 'text-purple'
-                  : 'text-text-secondary hover:text-text-primary'
-              }`}
-            >
-              <tab.icon size={16} />
-              {tab.label}
-              {activeTab === tab.key && (
-                <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-purple" />
-              )}
-            </button>
-          ))}
+          {/* Desktop: show all tabs */}
+          <div className="hidden md:flex">
+            {tabs.map((tab) => (
+              <button
+                key={tab.key}
+                onClick={() => setActiveTab(tab.key)}
+                className={`flex items-center gap-2 px-5 py-3 text-sm font-medium transition-colors relative whitespace-nowrap flex-shrink-0 ${
+                  activeTab === tab.key
+                    ? 'text-purple'
+                    : 'text-text-secondary hover:text-text-primary'
+                }`}
+              >
+                <tab.icon size={16} />
+                {tab.label}
+                {activeTab === tab.key && (
+                  <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-purple" />
+                )}
+              </button>
+            ))}
+          </div>
+          {/* Mobile: show first N tabs + overflow dropdown */}
+          <div className="flex md:hidden flex-1">
+            {tabs.slice(0, MOBILE_TAB_LIMIT).map((tab) => (
+              <button
+                key={tab.key}
+                onClick={() => setActiveTab(tab.key)}
+                className={`flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors relative whitespace-nowrap flex-shrink-0 ${
+                  activeTab === tab.key
+                    ? 'text-purple'
+                    : 'text-text-secondary hover:text-text-primary'
+                }`}
+              >
+                <tab.icon size={16} />
+                {tab.label}
+                {activeTab === tab.key && (
+                  <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-purple" />
+                )}
+              </button>
+            ))}
+            {tabs.length > MOBILE_TAB_LIMIT && (
+              <div className="relative flex-shrink-0" ref={mobileMoreRef}>
+                <button
+                  onClick={() => setMobileMoreOpen(!mobileMoreOpen)}
+                  className={`flex items-center gap-1.5 px-4 py-3 text-sm font-medium transition-colors relative whitespace-nowrap ${
+                    tabs.slice(MOBILE_TAB_LIMIT).some((t) => t.key === activeTab)
+                      ? 'text-purple'
+                      : 'text-text-secondary hover:text-text-primary'
+                  }`}
+                >
+                  {(() => {
+                    const activeOverflow = tabs.slice(MOBILE_TAB_LIMIT).find((t) => t.key === activeTab)
+                    if (activeOverflow) {
+                      return (
+                        <>
+                          <activeOverflow.icon size={16} />
+                          {activeOverflow.label}
+                        </>
+                      )
+                    }
+                    return <>More</>
+                  })()}
+                  <ChevronDown size={14} className={`transition-transform ${mobileMoreOpen ? 'rotate-180' : ''}`} />
+                  {tabs.slice(MOBILE_TAB_LIMIT).some((t) => t.key === activeTab) && (
+                    <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-purple" />
+                  )}
+                </button>
+                {mobileMoreOpen && (
+                  <div className="absolute right-0 top-full mt-1 z-50 bg-surface border border-border rounded-lg shadow-lg overflow-hidden min-w-[160px]">
+                    {tabs.slice(MOBILE_TAB_LIMIT).map((tab) => (
+                      <button
+                        key={tab.key}
+                        onClick={() => {
+                          setActiveTab(tab.key)
+                          setMobileMoreOpen(false)
+                        }}
+                        className={`flex items-center gap-2.5 w-full px-4 py-2.5 text-sm font-medium transition-colors ${
+                          activeTab === tab.key
+                            ? 'text-purple bg-purple/5'
+                            : 'text-text-secondary hover:text-text-primary hover:bg-surface-hover'
+                        }`}
+                      >
+                        <tab.icon size={16} />
+                        {tab.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Tab content */}
@@ -610,6 +779,7 @@ export default function AccountDetailPage() {
               statuses={timeLogStatuses}
               projects={projects}
               accountId={id!}
+              invoices={invoices}
               onStatusUpdate={(logId, statusId) => {
                 setTimeLogs((prev) =>
                   prev.map((tl) =>
@@ -650,6 +820,24 @@ export default function AccountDetailPage() {
               accountContacts={accountContacts}
               onRefresh={() => setRefreshKey((k) => k + 1)}
             />
+          )}
+          {activeTab === 'leads' && (
+            <div className="text-center py-16">
+              <Briefcase size={32} className="text-text-secondary/30 mx-auto mb-3" />
+              <p className="text-sm text-text-secondary">Leads coming soon.</p>
+            </div>
+          )}
+          {activeTab === 'billing' && (
+            <div className="text-center py-16">
+              <CreditCard size={32} className="text-text-secondary/30 mx-auto mb-3" />
+              <p className="text-sm text-text-secondary">Billing coming soon.</p>
+            </div>
+          )}
+          {activeTab === 'payroll' && (
+            <div className="text-center py-16">
+              <DollarSign size={32} className="text-text-secondary/30 mx-auto mb-3" />
+              <p className="text-sm text-text-secondary">Payroll coming soon.</p>
+            </div>
           )}
         </div>
       </div>
@@ -915,6 +1103,7 @@ function TimeLogsTab({
   statuses,
   projects,
   accountId,
+  invoices,
   onStatusUpdate,
   onLogCreated,
 }: {
@@ -922,6 +1111,7 @@ function TimeLogsTab({
   statuses: Option[]
   projects: (Project & { project_manager?: TeamMember | null; logged_hours: number })[]
   accountId: string
+  invoices: (Invoice & { project?: { name: string | null } | null; status_option?: Option | null })[]
   onStatusUpdate: (logId: string, statusId: number) => void
   onLogCreated: (log: LogEntry) => void
 }) {
@@ -1045,6 +1235,69 @@ function TimeLogsTab({
     }
   }
 
+  // Derive hourly rate from most recent invoice with a rate
+  const hourlyRate = invoices
+    .filter((inv) => inv.rate != null && inv.rate > 0)
+    .sort((a, b) => (b.created_date ?? '').localeCompare(a.created_date ?? ''))
+    [0]?.rate ?? null
+
+  // Billable hours calculations
+  const billableStatuses = new Set(['approved', 'backlog', 'retainer'])
+  const thisWeekBillable = groups[0].logs
+    .filter((l) => billableStatuses.has(l.status_option?.option_key ?? '') || !l.status_option)
+    .reduce((sum, l) => sum + (l.hours ?? 0), 0)
+  const lastWeekBillable = groups[1].logs
+    .filter((l) => billableStatuses.has(l.status_option?.option_key ?? '') || !l.status_option)
+    .reduce((sum, l) => sum + (l.hours ?? 0), 0)
+  const unbilledHours = timeLogs
+    .filter((l) => {
+      const key = l.status_option?.option_key
+      return key !== 'approved' && key !== 'will_not_bill'
+    })
+    .reduce((sum, l) => sum + (l.hours ?? 0), 0)
+
+  // Stacked bar chart data: hours per week grouped by status
+  const weeklyChartData: { weekLabel: string; weekStart: Date; byStatus: Record<string, number> }[] = []
+  const allStatuses = new Set<string>()
+
+  // Build a map of week-start -> { status -> hours }
+  const weekMap = new Map<string, { weekStart: Date; byStatus: Record<string, number> }>()
+  for (const log of timeLogs) {
+    if (!log.date || !log.hours) continue
+    const logDate = new Date(log.date)
+    if (isNaN(logDate.getTime())) continue
+    const day = logDate.getDay()
+    const monOff = day === 0 ? 6 : day - 1
+    const weekStart = new Date(logDate.getFullYear(), logDate.getMonth(), logDate.getDate() - monOff)
+    const key = weekStart.toISOString().slice(0, 10)
+    const statusKey = log.status_option?.option_key ?? 'unset'
+    allStatuses.add(statusKey)
+    if (!weekMap.has(key)) weekMap.set(key, { weekStart, byStatus: {} })
+    const entry = weekMap.get(key)!
+    entry.byStatus[statusKey] = (entry.byStatus[statusKey] ?? 0) + (log.hours ?? 0)
+  }
+
+  const sortedWeeks = [...weekMap.entries()].sort(([a], [b]) => a.localeCompare(b))
+  // Show at most 12 most recent weeks
+  for (const [, val] of sortedWeeks.slice(-12)) {
+    weeklyChartData.push({
+      weekLabel: `${val.weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`,
+      weekStart: val.weekStart,
+      byStatus: val.byStatus,
+    })
+  }
+
+  const chartStatusColors: Record<string, string> = {
+    approved: '#10b981',
+    will_not_bill: '#ef4444',
+    backlog: '#f59e0b',
+    retainer: '#3b82f6',
+    unset: '#6b7280',
+  }
+  const statusOrder = ['approved', 'retainer', 'backlog', 'unset', 'will_not_bill']
+  const orderedStatuses = statusOrder.filter((s) => allStatuses.has(s))
+  const maxWeekTotal = Math.max(...weeklyChartData.map((w) => Object.values(w.byStatus).reduce((a, b) => a + b, 0)), 1)
+
   function renderLogEntry(log: LogEntry) {
     const statusKey = log.status_option?.option_key ?? null
     const isUpdating = updatingId === log.id
@@ -1149,6 +1402,82 @@ function TimeLogsTab({
           </button>
         )}
       </div>
+
+      {/* Billable Hours Summary */}
+      <div className="grid grid-cols-3 gap-3 mb-5">
+        {[
+          { label: 'Last Week', hours: lastWeekBillable },
+          { label: 'This Week', hours: thisWeekBillable },
+          { label: 'Unbilled', hours: unbilledHours },
+        ].map((item) => (
+          <div
+            key={item.label}
+            className="bg-black/20 rounded-lg border border-border/50 p-4 text-center"
+          >
+            <p className="text-xs text-text-secondary uppercase tracking-wider mb-1">{item.label}</p>
+            <p className="text-xl font-bold text-text-primary">{item.hours.toFixed(1)}h</p>
+            {hourlyRate != null && (
+              <p className="text-xs text-text-secondary mt-0.5">
+                ${(item.hours * hourlyRate).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </p>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Weekly Hours Chart */}
+      {weeklyChartData.length > 0 && (
+        <div className="bg-black/20 rounded-lg border border-border/50 p-4 mb-5">
+          <div className="flex items-center justify-between mb-3">
+            <h4 className="text-xs font-semibold text-text-secondary uppercase tracking-wider">
+              Hours by Week
+            </h4>
+            <div className="flex items-center gap-3 flex-wrap">
+              {orderedStatuses.map((s) => (
+                <div key={s} className="flex items-center gap-1.5">
+                  <div
+                    className="w-2.5 h-2.5 rounded-sm"
+                    style={{ backgroundColor: chartStatusColors[s] ?? '#6b7280' }}
+                  />
+                  <span className="text-[10px] text-text-secondary capitalize">
+                    {s === 'unset' ? 'Pending' : s.replace(/_/g, ' ')}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="flex items-end gap-1.5" style={{ height: 160 }}>
+            {weeklyChartData.map((week, wi) => {
+              const total = Object.values(week.byStatus).reduce((a, b) => a + b, 0)
+              return (
+                <div key={wi} className="flex-1 flex flex-col items-center gap-1 min-w-0">
+                  <div className="w-full flex flex-col-reverse rounded-t overflow-hidden" style={{ height: (total / maxWeekTotal) * 140 }}>
+                    {orderedStatuses.map((status) => {
+                      const val = week.byStatus[status] ?? 0
+                      if (val === 0) return null
+                      const pct = (val / total) * 100
+                      return (
+                        <div
+                          key={status}
+                          style={{
+                            height: `${pct}%`,
+                            backgroundColor: chartStatusColors[status] ?? '#6b7280',
+                            minHeight: val > 0 ? 2 : 0,
+                          }}
+                          title={`${status.replace(/_/g, ' ')}: ${val.toFixed(1)}h`}
+                        />
+                      )
+                    })}
+                  </div>
+                  <span className="text-[9px] text-text-secondary truncate w-full text-center">
+                    {week.weekLabel}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {/* New time log form */}
       {showForm && currentTeamMember && (

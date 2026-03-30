@@ -583,10 +583,6 @@ export default function GanttChart({
     )
   }
 
-  if (rows.length === 0) {
-    return null
-  }
-
   return (
     <div className="bg-surface rounded-xl border border-border p-3 sm:p-5 mb-8 overflow-hidden" ref={containerRef}>
       {/* Header */}
@@ -640,6 +636,11 @@ export default function GanttChart({
       </div>
 
       {/* Chart */}
+      {rows.length === 0 ? (
+        <div className="flex items-center justify-center py-12">
+          <p className="text-sm text-text-secondary">No active projects for the selected range.</p>
+        </div>
+      ) : (
       <div ref={wheelRef} className="flex overflow-hidden relative select-none max-w-full">
         {/* Labels column */}
         <div className="flex-shrink-0 overflow-hidden" style={{ width: labelWidth }}>
@@ -820,6 +821,7 @@ export default function GanttChart({
           </svg>
         </div>
       </div>
+      )}
 
       {/* Tooltip */}
       {tooltip && (
