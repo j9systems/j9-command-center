@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import type { Session } from '@supabase/supabase-js'
+import { ActiveTimeLogProvider } from '@/context/ActiveTimeLogContext'
+import ActiveTimeLogWidget from '@/components/timelog/ActiveTimeLogWidget'
 import AppLayout from './components/layout/AppLayout'
 import LoginPage from './pages/LoginPage'
 import HomePage from './pages/HomePage'
@@ -54,30 +56,33 @@ export default function App() {
   }
 
   return (
-    <Routes>
-      <Route path="/login" element={<Navigate to="/" replace />} />
-      <Route element={<AppLayout />}>
-        <Route path="/" element={<HomePage />} />
-        <Route path="/accounts" element={<AccountsPage />} />
-        <Route path="/accounts/:id" element={<AccountDetailPage />} />
-        <Route path="/accounts/:id/tasks/:taskId" element={<TaskDetailPage />} />
-        <Route path="/accounts/:id/meetings/:meetingId" element={<MeetingDetailPage />} />
-        <Route path="/accounts/:id/invoices/:invoiceId" element={<InvoiceDetailPage />} />
-        <Route path="/accounts/:id/time-logs/:timeLogId" element={<TimeLogDetailPage />} />
-        <Route path="/accounts/:id/projects/:projectId" element={<ProjectDetailPage />} />
-        <Route path="/accounts/:id/projects/:projectId/features/:featureId" element={<FeatureDetailPage />} />
-        <Route path="/accounts/:id/leads" element={<AccountLeadsPage />} />
-        <Route path="/accounts/:id/billing" element={<AccountBillingPage />} />
-        <Route path="/accounts/:id/payroll" element={<AccountPayrollPage />} />
-        <Route path="/contacts" element={<ContactsPage />} />
-        <Route path="/team" element={<TeamPage />} />
-        <Route path="/team/:teamId" element={<TeamMemberDetailPage />} />
-        <Route path="/leads" element={<LeadsPage />} />
-        <Route path="/billing" element={<BillingPage />} />
-        <Route path="/billing/invoices/:invoiceId" element={<BillingInvoiceDetailPage />} />
-        <Route path="/billing/payments/:paymentId" element={<PaymentDetailPage />} />
-        <Route path="/payroll" element={<PayrollPage />} />
-      </Route>
-    </Routes>
+    <ActiveTimeLogProvider>
+      <ActiveTimeLogWidget />
+      <Routes>
+        <Route path="/login" element={<Navigate to="/" replace />} />
+        <Route element={<AppLayout />}>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/accounts" element={<AccountsPage />} />
+          <Route path="/accounts/:id" element={<AccountDetailPage />} />
+          <Route path="/accounts/:id/tasks/:taskId" element={<TaskDetailPage />} />
+          <Route path="/accounts/:id/meetings/:meetingId" element={<MeetingDetailPage />} />
+          <Route path="/accounts/:id/invoices/:invoiceId" element={<InvoiceDetailPage />} />
+          <Route path="/accounts/:id/time-logs/:timeLogId" element={<TimeLogDetailPage />} />
+          <Route path="/accounts/:id/projects/:projectId" element={<ProjectDetailPage />} />
+          <Route path="/accounts/:id/projects/:projectId/features/:featureId" element={<FeatureDetailPage />} />
+          <Route path="/accounts/:id/leads" element={<AccountLeadsPage />} />
+          <Route path="/accounts/:id/billing" element={<AccountBillingPage />} />
+          <Route path="/accounts/:id/payroll" element={<AccountPayrollPage />} />
+          <Route path="/contacts" element={<ContactsPage />} />
+          <Route path="/team" element={<TeamPage />} />
+          <Route path="/team/:teamId" element={<TeamMemberDetailPage />} />
+          <Route path="/leads" element={<LeadsPage />} />
+          <Route path="/billing" element={<BillingPage />} />
+          <Route path="/billing/invoices/:invoiceId" element={<BillingInvoiceDetailPage />} />
+          <Route path="/billing/payments/:paymentId" element={<PaymentDetailPage />} />
+          <Route path="/payroll" element={<PayrollPage />} />
+        </Route>
+      </Routes>
+    </ActiveTimeLogProvider>
   )
 }

@@ -122,12 +122,23 @@ export interface TimeLog {
   id: string
   account_id: string | null
   project_id: string | null
+  task_id: string | null
   assigned_to_id: string | null
   date: string | null
   hours: number | null
   name: string | null
   created_at: string | null
   status_id: number | null
+  start_date_time: string | null
+  end_date_time: string | null
+}
+
+export interface TimeLogBreak {
+  id: string
+  time_log_id: string
+  break_start: string
+  break_end: string | null
+  created_at: string
 }
 
 export interface Invoice {

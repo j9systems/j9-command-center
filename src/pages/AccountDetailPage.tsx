@@ -25,6 +25,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Trash2,
+  Play,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import type {
@@ -43,6 +44,7 @@ import type {
 import GanttChart from '@/components/GanttChart'
 import MobileFormOverlay from '@/components/MobileFormOverlay'
 import NewMeetingModal from '@/components/NewMeetingModal'
+import StartTimeLogModal from '@/components/timelog/StartTimeLogModal'
 
 type AccountTeamMember = {
   id: string
@@ -121,6 +123,7 @@ export default function AccountDetailPage() {
   const [meetings, setMeetings] = useState<(Meeting & { attendees: { contact: Contact | null; team_member: TeamMember | null }[] })[]>([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<'projects' | 'tasks' | 'time_logs' | 'invoices' | 'contacts' | 'team' | 'meetings' | 'admin'>('projects')
+  const [showTimerModal, setShowTimerModal] = useState(false)
   const tabsContainerRef = useRef<HTMLDivElement>(null)
   const [canScrollLeft, setCanScrollLeft] = useState(false)
   const [canScrollRight, setCanScrollRight] = useState(false)
@@ -553,6 +556,13 @@ export default function AccountDetailPage() {
         Back to Accounts
       </Link>
 
+      {/* Start Timer Modal */}
+      <StartTimeLogModal
+        open={showTimerModal}
+        onClose={() => setShowTimerModal(false)}
+        preSelectedAccount={{ id: account.id, company_name: account.company_name }}
+      />
+
       {/* Account header */}
       <div className="flex items-center gap-4 mb-8">
         {account.logo_path ? (
@@ -592,6 +602,13 @@ export default function AccountDetailPage() {
             )}
           </div>
         </div>
+        <button
+          onClick={() => setShowTimerModal(true)}
+          className="ml-auto flex-shrink-0 flex items-center gap-1.5 px-3 py-2 bg-purple hover:bg-purple-hover text-white text-xs font-medium rounded-lg transition-colors"
+        >
+          <Play size={12} />
+          Timer
+        </button>
       </div>
 
       {/* Account Summary */}
