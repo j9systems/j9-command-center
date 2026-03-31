@@ -44,6 +44,18 @@ import GanttChart from '@/components/GanttChart'
 import MobileFormOverlay from '@/components/MobileFormOverlay'
 import NewMeetingModal from '@/components/NewMeetingModal'
 
+type AccountTeamMember = {
+  id: string
+  team_member: TeamMember | null
+  role: AccountRole | null
+  role_id: number | null
+  expected_weekly_hrs: string | null
+  rate_override: string | null
+  commission_override: string | null
+  default_rate: string | null
+  default_commission: number | null
+}
+
 const statusColors: Record<string, string> = {
   active: 'bg-emerald-500/15 text-emerald-400',
   inactive: 'bg-zinc-500/15 text-zinc-400',
@@ -102,7 +114,7 @@ export default function AccountDetailPage() {
   const [projects, setProjects] = useState<(Project & { project_manager?: TeamMember | null; logged_hours: number })[]>([])
   const [timeLogs, setTimeLogs] = useState<(TimeLog & { team_member?: TeamMember | null; project?: { name: string | null } | null; status_option?: Option | null })[]>([])
   const [timeLogStatuses, setTimeLogStatuses] = useState<Option[]>([])
-  const [accountTeamMembers, setAccountTeamMembers] = useState<{ id: string; team_member: TeamMember | null; role: AccountRole | null; expected_weekly_hrs: string | null; rate_override: string | null; commission_override: string | null }[]>([])
+  const [accountTeamMembers, setAccountTeamMembers] = useState<AccountTeamMember[]>([])
   const [accountRoles, setAccountRoles] = useState<AccountRole[]>([])
   const [invoices, setInvoices] = useState<(Invoice & { project?: { name: string | null } | null; status_option?: Option | null })[]>([])
   const [accountContacts, setAccountContacts] = useState<(AccountContact & { contact: Contact })[]>([])
@@ -334,7 +346,7 @@ export default function AccountDetailPage() {
       if (accountTeamData) {
         setAccountTeamMembers(
           accountTeamData.map((at) => {
-            const teamData = at.team as Record<string, unknown> | null
+            const teamData = at.team as unknown as Record<string, unknown> | null
             return {
               id: at.id,
               team_member: teamData as unknown as TeamMember | null,
@@ -2346,18 +2358,6 @@ const roleColors: Record<string, string> = {
   'Account Manager': 'bg-purple-500/15 text-purple-400',
   'Developer': 'bg-blue-500/15 text-blue-400',
   'Executive Sponsor': 'bg-amber-500/15 text-amber-400',
-}
-
-type AccountTeamMember = {
-  id: string
-  team_member: TeamMember | null
-  role: AccountRole | null
-  role_id: number | null
-  expected_weekly_hrs: string | null
-  rate_override: string | null
-  commission_override: string | null
-  default_rate: string | null
-  default_commission: number | null
 }
 
 function AccountTeamTab({
