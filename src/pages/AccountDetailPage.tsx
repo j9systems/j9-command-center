@@ -24,6 +24,7 @@ import {
   Save,
   ChevronLeft,
   ChevronRight,
+  Trash2,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import type {
@@ -42,6 +43,18 @@ import type {
 import GanttChart from '@/components/GanttChart'
 import MobileFormOverlay from '@/components/MobileFormOverlay'
 import NewMeetingModal from '@/components/NewMeetingModal'
+
+type AccountTeamMember = {
+  id: string
+  team_member: TeamMember | null
+  role: AccountRole | null
+  role_id: number | null
+  expected_weekly_hrs: string | null
+  rate_override: string | null
+  commission_override: string | null
+  default_rate: string | null
+  default_commission: number | null
+}
 
 const statusColors: Record<string, string> = {
   active: 'bg-emerald-500/15 text-emerald-400',
@@ -101,7 +114,7 @@ export default function AccountDetailPage() {
   const [projects, setProjects] = useState<(Project & { project_manager?: TeamMember | null; logged_hours: number })[]>([])
   const [timeLogs, setTimeLogs] = useState<(TimeLog & { team_member?: TeamMember | null; project?: { name: string | null } | null; status_option?: Option | null })[]>([])
   const [timeLogStatuses, setTimeLogStatuses] = useState<Option[]>([])
-  const [accountTeamMembers, setAccountTeamMembers] = useState<{ id: string; team_member: TeamMember | null; role: AccountRole | null; expected_weekly_hrs: string | null; rate_override: string | null; commission_override: string | null }[]>([])
+  const [accountTeamMembers, setAccountTeamMembers] = useState<AccountTeamMember[]>([])
   const [accountRoles, setAccountRoles] = useState<AccountRole[]>([])
   const [invoices, setInvoices] = useState<(Invoice & { project?: { name: string | null } | null; status_option?: Option | null })[]>([])
   const [accountContacts, setAccountContacts] = useState<(AccountContact & { contact: Contact })[]>([])
@@ -327,19 +340,25 @@ export default function AccountDetailPage() {
       // Fetch account team members with roles
       const { data: accountTeamData } = await supabase
         .from('account_team')
-        .select('id, expected_weekly_hrs, rate_override, commission_override, team(id, first_name, last_name, email, photo), account_roles!account_team_role_id_fkey(id, name)')
+        .select('id, expected_weekly_hrs, rate_override, commission_override, role_id, team(id, first_name, last_name, email, photo, payouts_contractor_rate, payouts_commission_), account_roles!account_team_role_id_fkey(id, name)')
         .eq('account_id', id!)
 
       if (accountTeamData) {
         setAccountTeamMembers(
-          accountTeamData.map((at) => ({
-            id: at.id,
-            team_member: at.team as unknown as TeamMember | null,
-            role: at.account_roles as unknown as AccountRole | null,
-            expected_weekly_hrs: at.expected_weekly_hrs,
-            rate_override: (at as Record<string, unknown>).rate_override as string | null,
-            commission_override: (at as Record<string, unknown>).commission_override as string | null,
-          }))
+          accountTeamData.map((at) => {
+            const teamData = at.team as unknown as Record<string, unknown> | null
+            return {
+              id: at.id,
+              team_member: teamData as unknown as TeamMember | null,
+              role: at.account_roles as unknown as AccountRole | null,
+              role_id: (at as Record<string, unknown>).role_id as number | null,
+              expected_weekly_hrs: at.expected_weekly_hrs,
+              rate_override: (at as Record<string, unknown>).rate_override as string | null,
+              commission_override: (at as Record<string, unknown>).commission_override as string | null,
+              default_rate: teamData?.payouts_contractor_rate as string | null ?? null,
+              default_commission: teamData?.payouts_commission_ as number | null ?? null,
+            }
+          })
         )
       }
 
@@ -2341,15 +2360,6 @@ const roleColors: Record<string, string> = {
   'Executive Sponsor': 'bg-amber-500/15 text-amber-400',
 }
 
-type AccountTeamMember = {
-  id: string
-  team_member: TeamMember | null
-  role: AccountRole | null
-  expected_weekly_hrs: string | null
-  rate_override: string | null
-  commission_override: string | null
-}
-
 function AccountTeamTab({
   members,
   allTeamMembers,
@@ -2366,7 +2376,9 @@ function AccountTeamTab({
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editRate, setEditRate] = useState('')
   const [editCommission, setEditCommission] = useState('')
+  const [editRoleId, setEditRoleId] = useState('')
   const [saving, setSaving] = useState(false)
+  const [removing, setRemoving] = useState<string | null>(null)
   const [showAddForm, setShowAddForm] = useState(false)
   const [newTeamMemberId, setNewTeamMemberId] = useState('')
   const [newRoleId, setNewRoleId] = useState('')
@@ -2376,6 +2388,7 @@ function AccountTeamTab({
     setEditingId(member.id)
     setEditRate(member.rate_override ?? '')
     setEditCommission(member.commission_override ?? '')
+    setEditRoleId(member.role_id?.toString() ?? '')
   }
 
   async function saveEdit(memberId: string) {
@@ -2385,9 +2398,21 @@ function AccountTeamTab({
       .update({
         rate_override: editRate || null,
         commission_override: editCommission || null,
+        role_id: editRoleId ? parseInt(editRoleId) : null,
       })
       .eq('id', memberId)
     setSaving(false)
+    setEditingId(null)
+    onRefresh()
+  }
+
+  async function handleRemove(memberId: string) {
+    setRemoving(memberId)
+    await supabase
+      .from('account_team')
+      .delete()
+      .eq('id', memberId)
+    setRemoving(null)
     setEditingId(null)
     onRefresh()
   }
@@ -2487,8 +2512,11 @@ function AccountTeamTab({
               ? [member.team_member.first_name, member.team_member.last_name].filter(Boolean).join(' ')
               : 'Unknown Member'
             const isEditing = editingId === member.id
-            const isDeveloper = member.role?.name === 'Developer'
-            const isAccountManager = member.role?.name === 'Account Manager'
+            const currentRoleName = isEditing && editRoleId
+              ? accountRoles.find((r) => r.id === parseInt(editRoleId))?.name
+              : member.role?.name
+            const isDeveloper = currentRoleName === 'Developer'
+            const isAccountManager = currentRoleName === 'Account Manager'
 
             return (
               <div
@@ -2528,6 +2556,16 @@ function AccountTeamTab({
                     </div>
                   </div>
                   <div className="flex items-center gap-3 flex-shrink-0">
+                    {isDeveloper && (
+                      <span className="text-xs text-text-secondary">
+                        ${member.rate_override ?? member.default_rate ?? '--'}/hr
+                      </span>
+                    )}
+                    {isAccountManager && (
+                      <span className="text-xs text-text-secondary">
+                        {member.commission_override ?? member.default_commission?.toString() ?? '--'}%
+                      </span>
+                    )}
                     {member.expected_weekly_hrs && (
                       <span className="text-xs text-text-secondary flex items-center gap-1">
                         <Clock size={12} />
@@ -2539,6 +2577,19 @@ function AccountTeamTab({
 
                 {isEditing && (
                   <div className="mt-3 pt-3 border-t border-border/30 space-y-3">
+                    <div>
+                      <label className="block text-xs text-text-secondary mb-1">Role</label>
+                      <select
+                        value={editRoleId}
+                        onChange={(e) => setEditRoleId(e.target.value)}
+                        className="w-full text-sm bg-surface border border-border rounded-lg px-3 py-2 text-text-primary focus:outline-none focus:border-purple/50"
+                      >
+                        <option value="">No role</option>
+                        {accountRoles.map((r) => (
+                          <option key={r.id} value={r.id}>{r.name}</option>
+                        ))}
+                      </select>
+                    </div>
                     {isDeveloper && (
                       <>
                         <div>
@@ -2554,11 +2605,11 @@ function AccountTeamTab({
                         <div className="grid grid-cols-2 gap-3">
                           <div>
                             <label className="block text-[10px] text-text-secondary/70 mb-0.5">Default Rate</label>
-                            <p className="text-xs text-text-secondary">--</p>
+                            <p className="text-xs text-text-secondary">{member.default_rate ? `$${member.default_rate}` : '--'}</p>
                           </div>
                           <div>
                             <label className="block text-[10px] text-text-secondary/70 mb-0.5">Effective Rate</label>
-                            <p className="text-xs text-text-primary">{editRate || '--'}</p>
+                            <p className="text-xs text-text-primary">{editRate ? `$${editRate}` : (member.default_rate ? `$${member.default_rate}` : '--')}</p>
                           </div>
                         </div>
                       </>
@@ -2578,7 +2629,7 @@ function AccountTeamTab({
                         <div className="grid grid-cols-3 gap-3">
                           <div>
                             <label className="block text-[10px] text-text-secondary/70 mb-0.5">Default Commission</label>
-                            <p className="text-xs text-text-secondary">--</p>
+                            <p className="text-xs text-text-secondary">{member.default_commission != null ? `${member.default_commission}%` : '--'}</p>
                           </div>
                           <div>
                             <label className="block text-[10px] text-text-secondary/70 mb-0.5">Commission Override</label>
@@ -2586,7 +2637,7 @@ function AccountTeamTab({
                           </div>
                           <div>
                             <label className="block text-[10px] text-text-secondary/70 mb-0.5">Effective Commission</label>
-                            <p className="text-xs text-text-primary">{editCommission ? `${editCommission}%` : '--'}</p>
+                            <p className="text-xs text-text-primary">{editCommission ? `${editCommission}%` : (member.default_commission != null ? `${member.default_commission}%` : '--')}</p>
                           </div>
                         </div>
                       </>
@@ -2608,6 +2659,14 @@ function AccountTeamTab({
                         className="px-3 py-1.5 text-xs font-medium text-text-secondary hover:text-text-primary transition-colors"
                       >
                         Cancel
+                      </button>
+                      <button
+                        onClick={() => { if (confirm(`Remove ${name} from this account?`)) handleRemove(member.id) }}
+                        disabled={removing === member.id}
+                        className="ml-auto inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg disabled:opacity-50 transition-colors"
+                      >
+                        <Trash2 size={12} />
+                        {removing === member.id ? 'Removing...' : 'Remove'}
                       </button>
                     </div>
                   </div>
