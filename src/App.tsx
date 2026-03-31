@@ -14,6 +14,7 @@ import TaskDetailPage from './pages/TaskDetailPage'
 import TeamPage from './pages/TeamPage'
 import InvoiceDetailPage from './pages/InvoiceDetailPage'
 import TimeLogDetailPage from './pages/TimeLogDetailPage'
+import MeetingDetailPage from './pages/MeetingDetailPage'
 import AccountLeadsPage from './pages/AccountLeadsPage'
 import AccountBillingPage from './pages/AccountBillingPage'
 import AccountPayrollPage from './pages/AccountPayrollPage'
@@ -57,6 +58,7 @@ export default function App() {
         <Route path="/accounts" element={<AccountsPage />} />
         <Route path="/accounts/:id" element={<AccountDetailPage />} />
         <Route path="/accounts/:id/tasks/:taskId" element={<TaskDetailPage />} />
+        <Route path="/accounts/:id/meetings/:meetingId" element={<MeetingDetailPage />} />
         <Route path="/accounts/:id/invoices/:invoiceId" element={<InvoiceDetailPage />} />
         <Route path="/accounts/:id/time-logs/:timeLogId" element={<TimeLogDetailPage />} />
         <Route path="/accounts/:id/projects/:projectId" element={<ProjectDetailPage />} />

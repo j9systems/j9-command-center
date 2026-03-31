@@ -691,7 +691,7 @@ export default function AccountDetailPage() {
       <GanttChart projects={projects} accountId={id!} />
 
       {/* Tab headers */}
-      <div className="bg-surface rounded-t-xl border border-b-0 border-border">
+      <div className="bg-surface rounded-t-xl border border-b-0 border-border overflow-hidden">
         <div className="relative border-b border-border">
           <div ref={tabsContainerRef} className="flex overflow-x-auto scrollbar-hide">
             {tabs.map((tab) => (
@@ -715,7 +715,7 @@ export default function AccountDetailPage() {
           {canScrollLeft && (
             <button
               onClick={() => tabsContainerRef.current?.scrollBy({ left: -200, behavior: 'smooth' })}
-              className="absolute left-0 top-0 bottom-0 z-10 flex items-center px-1.5 bg-surface border-r border-border text-text-secondary hover:text-text-primary"
+              className="absolute left-0 top-0 bottom-0 z-10 flex items-center px-1.5 rounded-tl-xl bg-surface border-r border-border text-text-secondary hover:text-text-primary"
             >
               <ChevronLeft size={16} />
             </button>
@@ -723,7 +723,7 @@ export default function AccountDetailPage() {
           {canScrollRight && (
             <button
               onClick={() => tabsContainerRef.current?.scrollBy({ left: 200, behavior: 'smooth' })}
-              className="absolute right-0 top-0 bottom-0 z-10 flex items-center px-1.5 bg-surface border-l border-border text-text-secondary hover:text-text-primary"
+              className="absolute right-0 top-0 bottom-0 z-10 flex items-center px-1.5 rounded-tr-xl bg-surface border-l border-border text-text-secondary hover:text-text-primary"
             >
               <ChevronRight size={16} />
             </button>
@@ -2407,6 +2407,7 @@ function MeetingsTab({
   accountContacts: (AccountContact & { contact: Contact })[]
   onRefresh: () => void
 }) {
+  const navigate = useNavigate()
   const [showForm, setShowForm] = useState(false)
 
   function formatDateTime(dateStr: string | null): string {
@@ -2480,7 +2481,8 @@ function MeetingsTab({
               return (
                 <div
                   key={meeting.row_id}
-                  className="p-3 bg-black/20 rounded-lg border border-border/50"
+                  onClick={() => navigate(`/accounts/${accountId}/meetings/${meeting.row_id}`)}
+                  className="p-3 bg-black/20 rounded-lg border border-border/50 cursor-pointer hover:border-purple/30 transition-colors"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
@@ -2523,6 +2525,7 @@ function MeetingsTab({
                           href={meetLink}
                           target="_blank"
                           rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
                           className="text-purple hover:text-purple/80 transition-colors"
                           title="Join meeting"
                         >
