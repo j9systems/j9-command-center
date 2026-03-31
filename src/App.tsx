@@ -12,6 +12,7 @@ import ProjectDetailPage from './pages/ProjectDetailPage'
 import FeatureDetailPage from './pages/FeatureDetailPage'
 import TaskDetailPage from './pages/TaskDetailPage'
 import TeamPage from './pages/TeamPage'
+import TeamMemberDetailPage from './pages/TeamMemberDetailPage'
 import InvoiceDetailPage from './pages/InvoiceDetailPage'
 import TimeLogDetailPage from './pages/TimeLogDetailPage'
 import MeetingDetailPage from './pages/MeetingDetailPage'
@@ -68,6 +69,7 @@ export default function App() {
         <Route path="/accounts/:id/payroll" element={<AccountPayrollPage />} />
         <Route path="/contacts" element={<ContactsPage />} />
         <Route path="/team" element={<TeamPage />} />
+        <Route path="/team/:teamId" element={<TeamMemberDetailPage />} />
         <Route path="/leads" element={<LeadsPage />} />
         <Route path="/billing" element={<BillingPage />} />
         <Route path="/payroll" element={<PayrollPage />} />

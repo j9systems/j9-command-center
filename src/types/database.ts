@@ -83,6 +83,8 @@ export interface AccountTeam {
   expected_weekly_hrs: string | null
   role: string | null
   role_id: number | null
+  rate_override: string | null
+  commission_override: string | null
 }
 
 export interface AccountRole {
