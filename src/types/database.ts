@@ -237,3 +237,21 @@ export interface Feature {
   follows_id: string | null
   created_at: string | null
 }
+
+export interface Payment {
+  row_id: string
+  customer_qb_id: number | null
+  date: string | null
+  amount: number | null
+  is_retainer: unknown | null
+  qb_invoice_id: number | null
+  qb_invoice_id_ref: string | null
+}
+
+export interface RetainerPayoutQuarter {
+  row_id: string
+  retainer_payment_id: string | null
+  paid_out: boolean | null
+  week_id: string | null
+  created_date: string | null
+}
