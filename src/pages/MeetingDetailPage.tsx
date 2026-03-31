@@ -15,9 +15,11 @@ import {
   User,
   Save,
   X,
+  Pencil,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import type { Meeting, Contact, TeamMember, Task, Option } from '@/types/database'
+import RichTextEditor from '@/components/RichTextEditor'
 
 const meetingStatusColors: Record<string, string> = {
   confirmed: 'bg-emerald-500/15 text-emerald-400',
@@ -57,6 +59,44 @@ export default function MeetingDetailPage() {
   const [newTaskPriority, setNewTaskPriority] = useState('')
   const [newTaskNotes, setNewTaskNotes] = useState('')
   const [savingTask, setSavingTask] = useState(false)
+
+  // Editing state for agenda and meeting notes
+  const [editingAgenda, setEditingAgenda] = useState(false)
+  const [editingNotes, setEditingNotes] = useState(false)
+  const [savingAgenda, setSavingAgenda] = useState(false)
+  const [savingNotes, setSavingNotes] = useState(false)
+
+  async function handleSaveAgenda(html: string) {
+    if (!meetingId) return
+    setSavingAgenda(true)
+    const { data, error } = await supabase
+      .from('meetings')
+      .update({ description_agenda: html })
+      .eq('row_id', meetingId)
+      .select('*')
+      .single()
+    if (data && !error) {
+      setMeeting((prev) => prev ? { ...prev, description_agenda: html } : prev)
+      setEditingAgenda(false)
+    }
+    setSavingAgenda(false)
+  }
+
+  async function handleSaveNotes(html: string) {
+    if (!meetingId) return
+    setSavingNotes(true)
+    const { data, error } = await supabase
+      .from('meetings')
+      .update({ meeting_notes: html })
+      .eq('row_id', meetingId)
+      .select('*')
+      .single()
+    if (data && !error) {
+      setMeeting((prev) => prev ? { ...prev, meeting_notes: html } : prev)
+      setEditingNotes(false)
+    }
+    setSavingNotes(false)
+  }
 
   useEffect(() => {
     if (!meetingId) return
@@ -425,14 +465,33 @@ export default function MeetingDetailPage() {
 
       {/* Agenda */}
       <div className="bg-surface rounded-xl border border-border p-5 mb-6">
-        <h3 className="text-sm font-semibold text-text-secondary uppercase tracking-wider mb-4 flex items-center gap-2">
-          <FileText size={14} />
-          Agenda
-        </h3>
-        {meeting.description_agenda ? (
-          <p className="text-sm text-text-primary whitespace-pre-wrap leading-relaxed">
-            {meeting.description_agenda}
-          </p>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-sm font-semibold text-text-secondary uppercase tracking-wider flex items-center gap-2">
+            <FileText size={14} />
+            Agenda
+          </h3>
+          {!editingAgenda && (
+            <button
+              onClick={() => setEditingAgenda(true)}
+              className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-border text-text-secondary hover:text-text-primary transition-colors"
+            >
+              <Pencil size={12} />
+              Edit
+            </button>
+          )}
+        </div>
+        {editingAgenda ? (
+          <RichTextEditor
+            content={meeting.description_agenda ?? ''}
+            onSave={handleSaveAgenda}
+            onCancel={() => setEditingAgenda(false)}
+            saving={savingAgenda}
+          />
+        ) : meeting.description_agenda ? (
+          <div
+            className="text-sm text-text-primary leading-relaxed prose prose-invert prose-sm max-w-none"
+            dangerouslySetInnerHTML={{ __html: meeting.description_agenda }}
+          />
         ) : (
           <p className="text-sm text-text-secondary">No agenda provided.</p>
         )}
@@ -440,14 +499,33 @@ export default function MeetingDetailPage() {
 
       {/* Meeting Notes */}
       <div className="bg-surface rounded-xl border border-border p-5 mb-6">
-        <h3 className="text-sm font-semibold text-text-secondary uppercase tracking-wider mb-4 flex items-center gap-2">
-          <StickyNote size={14} />
-          Meeting Notes
-        </h3>
-        {meeting.meeting_notes ? (
-          <p className="text-sm text-text-primary whitespace-pre-wrap leading-relaxed">
-            {meeting.meeting_notes}
-          </p>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-sm font-semibold text-text-secondary uppercase tracking-wider flex items-center gap-2">
+            <StickyNote size={14} />
+            Meeting Notes
+          </h3>
+          {!editingNotes && (
+            <button
+              onClick={() => setEditingNotes(true)}
+              className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-border text-text-secondary hover:text-text-primary transition-colors"
+            >
+              <Pencil size={12} />
+              Edit
+            </button>
+          )}
+        </div>
+        {editingNotes ? (
+          <RichTextEditor
+            content={meeting.meeting_notes ?? ''}
+            onSave={handleSaveNotes}
+            onCancel={() => setEditingNotes(false)}
+            saving={savingNotes}
+          />
+        ) : meeting.meeting_notes ? (
+          <div
+            className="text-sm text-text-primary leading-relaxed prose prose-invert prose-sm max-w-none"
+            dangerouslySetInnerHTML={{ __html: meeting.meeting_notes }}
+          />
         ) : (
           <p className="text-sm text-text-secondary">No meeting notes.</p>
         )}

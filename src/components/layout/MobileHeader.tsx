@@ -99,9 +99,6 @@ export default function MobileHeader() {
             alt="J9 Logo"
             className="w-7 h-7 rounded"
           />
-          <span className="text-base font-bold tracking-tight text-text-primary">
-            <span className="text-purple">J9</span> Command Center
-          </span>
         </div>
 
         <div ref={menuRef} className="relative">

@@ -88,15 +88,12 @@ export default function Sidebar() {
 
   return (
     <aside className="hidden md:flex flex-col w-56 bg-surface border-r border-border h-full">
-      <div className="p-5 border-b border-border flex flex-col items-center gap-2">
+      <div className="p-5 border-b border-border flex items-center justify-center">
         <img
           src="https://res.cloudinary.com/duy32f0q4/image/upload/v1773874676/20A38445-8946-49E1-8330-AA60BFA12F74_1_1_fuobbj.png"
           alt="J9 Logo"
           className="w-8 h-8 rounded"
         />
-        <h1 className="text-lg font-bold tracking-tight text-text-primary">
-          <span className="text-purple">J9</span> Command Center
-        </h1>
       </div>
       <nav className="flex-1 p-3 flex flex-col gap-1 overflow-y-auto min-h-0">
         {navItems.map(({ to, icon: Icon, label }) => (

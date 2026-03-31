@@ -29,9 +29,6 @@ export default function LoginPage() {
             alt="J9 Logo"
             className="w-12 h-12 rounded"
           />
-          <h1 className="text-xl font-bold text-text-primary">
-            <span className="text-purple">J9</span> Command Center
-          </h1>
           <p className="text-text-secondary text-sm">Sign in to your account</p>
         </div>
 
