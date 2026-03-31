@@ -17,6 +17,9 @@ import TimeLogDetailPage from './pages/TimeLogDetailPage'
 import AccountLeadsPage from './pages/AccountLeadsPage'
 import AccountBillingPage from './pages/AccountBillingPage'
 import AccountPayrollPage from './pages/AccountPayrollPage'
+import LeadsPage from './pages/LeadsPage'
+import BillingPage from './pages/BillingPage'
+import PayrollPage from './pages/PayrollPage'
 
 export default function App() {
   const [session, setSession] = useState<Session | null>(null)
@@ -63,6 +66,9 @@ export default function App() {
         <Route path="/accounts/:id/payroll" element={<AccountPayrollPage />} />
         <Route path="/contacts" element={<ContactsPage />} />
         <Route path="/team" element={<TeamPage />} />
+        <Route path="/leads" element={<LeadsPage />} />
+        <Route path="/billing" element={<BillingPage />} />
+        <Route path="/payroll" element={<PayrollPage />} />
       </Route>
     </Routes>
   )
