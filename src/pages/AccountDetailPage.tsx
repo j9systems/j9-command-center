@@ -646,12 +646,11 @@ export default function AccountDetailPage() {
       {/* Gantt Chart */}
       <GanttChart projects={projects} accountId={id!} />
 
-      {/* Tabbed Container */}
-      <div className="bg-surface rounded-xl border border-border overflow-hidden">
-        {/* Tab headers */}
+      {/* Tab headers (outside card so dropdown isn't clipped) */}
+      <div className="bg-surface rounded-t-xl border border-b-0 border-border relative">
         <div className="flex border-b border-border overflow-x-auto scrollbar-hide">
           {/* Desktop: show all tabs */}
-          <div className="hidden md:flex">
+          <div className="hidden md:flex overflow-x-auto scrollbar-hide">
             {tabs.map((tab) => (
               <button
                 key={tab.key}
@@ -741,8 +740,10 @@ export default function AccountDetailPage() {
             )}
           </div>
         </div>
+      </div>
 
-        {/* Tab content */}
+      {/* Tab content */}
+      <div className="bg-surface rounded-b-xl border border-t-0 border-border">
         <div className="p-5">
           {activeTab === 'projects' && (
             <ProjectsTab projects={projects} accountId={id!} onProjectCreated={(p) => setProjects((prev) => [...prev, p])} />
