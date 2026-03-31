@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft,
@@ -21,7 +21,6 @@ import {
   DollarSign,
   Briefcase,
   CreditCard,
-  ChevronDown,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import type {
@@ -104,7 +103,7 @@ export default function AccountDetailPage() {
   const [accountContacts, setAccountContacts] = useState<(AccountContact & { contact: Contact })[]>([])
   const [meetings, setMeetings] = useState<(Meeting & { attendees: { contact: Contact | null; team_member: TeamMember | null }[] })[]>([])
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<'projects' | 'tasks' | 'time_logs' | 'invoices' | 'contacts' | 'team' | 'meetings' | 'leads' | 'billing' | 'payroll'>('projects')
+  const [activeTab, setActiveTab] = useState<'projects' | 'tasks' | 'time_logs' | 'invoices' | 'contacts' | 'team' | 'meetings'>('projects')
   const [refreshKey, setRefreshKey] = useState(0)
 
   useEffect(() => {
@@ -398,20 +397,6 @@ export default function AccountDetailPage() {
     fetchData()
   }, [id, refreshKey])
 
-  // Close mobile "More" dropdown on outside click
-  const mobileMoreRef = useRef<HTMLDivElement>(null)
-  const [mobileMoreOpen, setMobileMoreOpen] = useState(false)
-
-  useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      if (mobileMoreRef.current && !mobileMoreRef.current.contains(e.target as Node)) {
-        setMobileMoreOpen(false)
-      }
-    }
-    if (mobileMoreOpen) document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
-  }, [mobileMoreOpen])
-
   if (loading) {
     return (
       <div className="p-4 md:p-8 max-w-4xl mx-auto">
@@ -459,12 +444,13 @@ export default function AccountDetailPage() {
     { key: 'contacts' as const, label: 'Contacts', icon: User },
     { key: 'team' as const, label: 'Team', icon: Users },
     { key: 'meetings' as const, label: 'Meetings', icon: Calendar },
-    { key: 'leads' as const, label: 'Leads', icon: Briefcase },
-    { key: 'billing' as const, label: 'Billing', icon: CreditCard },
-    { key: 'payroll' as const, label: 'Payroll', icon: DollarSign },
   ]
 
-  const MOBILE_TAB_LIMIT = 6
+  const accountPages = [
+    { label: 'Leads', icon: Briefcase, path: `/accounts/${id}/leads` },
+    { label: 'Billing', icon: CreditCard, path: `/accounts/${id}/billing` },
+    { label: 'Payroll', icon: DollarSign, path: `/accounts/${id}/payroll` },
+  ]
 
   return (
     <div className="p-4 md:p-8 max-w-4xl mx-auto overflow-x-hidden">
@@ -646,99 +632,26 @@ export default function AccountDetailPage() {
       {/* Gantt Chart */}
       <GanttChart projects={projects} accountId={id!} />
 
-      {/* Tab headers (outside card so dropdown isn't clipped) */}
-      <div className="bg-surface rounded-t-xl border border-b-0 border-border relative">
+      {/* Tab headers */}
+      <div className="bg-surface rounded-t-xl border border-b-0 border-border">
         <div className="flex border-b border-border overflow-x-auto scrollbar-hide">
-          {/* Desktop: show all tabs */}
-          <div className="hidden md:flex overflow-x-auto scrollbar-hide">
-            {tabs.map((tab) => (
-              <button
-                key={tab.key}
-                onClick={() => setActiveTab(tab.key)}
-                className={`flex items-center gap-2 px-5 py-3 text-sm font-medium transition-colors relative whitespace-nowrap flex-shrink-0 ${
-                  activeTab === tab.key
-                    ? 'text-purple'
-                    : 'text-text-secondary hover:text-text-primary'
-                }`}
-              >
-                <tab.icon size={16} />
-                {tab.label}
-                {activeTab === tab.key && (
-                  <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-purple" />
-                )}
-              </button>
-            ))}
-          </div>
-          {/* Mobile: show first N tabs + overflow dropdown */}
-          <div className="flex md:hidden flex-1">
-            {tabs.slice(0, MOBILE_TAB_LIMIT).map((tab) => (
-              <button
-                key={tab.key}
-                onClick={() => setActiveTab(tab.key)}
-                className={`flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors relative whitespace-nowrap flex-shrink-0 ${
-                  activeTab === tab.key
-                    ? 'text-purple'
-                    : 'text-text-secondary hover:text-text-primary'
-                }`}
-              >
-                <tab.icon size={16} />
-                {tab.label}
-                {activeTab === tab.key && (
-                  <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-purple" />
-                )}
-              </button>
-            ))}
-            {tabs.length > MOBILE_TAB_LIMIT && (
-              <div className="relative flex-shrink-0" ref={mobileMoreRef}>
-                <button
-                  onClick={() => setMobileMoreOpen(!mobileMoreOpen)}
-                  className={`flex items-center gap-1.5 px-4 py-3 text-sm font-medium transition-colors relative whitespace-nowrap ${
-                    tabs.slice(MOBILE_TAB_LIMIT).some((t) => t.key === activeTab)
-                      ? 'text-purple'
-                      : 'text-text-secondary hover:text-text-primary'
-                  }`}
-                >
-                  {(() => {
-                    const activeOverflow = tabs.slice(MOBILE_TAB_LIMIT).find((t) => t.key === activeTab)
-                    if (activeOverflow) {
-                      return (
-                        <>
-                          <activeOverflow.icon size={16} />
-                          {activeOverflow.label}
-                        </>
-                      )
-                    }
-                    return <>More</>
-                  })()}
-                  <ChevronDown size={14} className={`transition-transform ${mobileMoreOpen ? 'rotate-180' : ''}`} />
-                  {tabs.slice(MOBILE_TAB_LIMIT).some((t) => t.key === activeTab) && (
-                    <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-purple" />
-                  )}
-                </button>
-                {mobileMoreOpen && (
-                  <div className="absolute right-0 top-full mt-1 z-50 bg-surface border border-border rounded-lg shadow-lg overflow-hidden min-w-[160px]">
-                    {tabs.slice(MOBILE_TAB_LIMIT).map((tab) => (
-                      <button
-                        key={tab.key}
-                        onClick={() => {
-                          setActiveTab(tab.key)
-                          setMobileMoreOpen(false)
-                        }}
-                        className={`flex items-center gap-2.5 w-full px-4 py-2.5 text-sm font-medium transition-colors ${
-                          activeTab === tab.key
-                            ? 'text-purple bg-purple/5'
-                            : 'text-text-secondary hover:text-text-primary hover:bg-surface-hover'
-                        }`}
-                      >
-                        <tab.icon size={16} />
-                        {tab.label}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
+          {tabs.map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              className={`flex items-center gap-2 px-4 md:px-5 py-3 text-sm font-medium transition-colors relative whitespace-nowrap flex-shrink-0 ${
+                activeTab === tab.key
+                  ? 'text-purple'
+                  : 'text-text-secondary hover:text-text-primary'
+              }`}
+            >
+              <tab.icon size={16} />
+              {tab.label}
+              {activeTab === tab.key && (
+                <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-purple" />
+              )}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -822,25 +735,23 @@ export default function AccountDetailPage() {
               onRefresh={() => setRefreshKey((k) => k + 1)}
             />
           )}
-          {activeTab === 'leads' && (
-            <div className="text-center py-16">
-              <Briefcase size={32} className="text-text-secondary/30 mx-auto mb-3" />
-              <p className="text-sm text-text-secondary">Leads coming soon.</p>
-            </div>
-          )}
-          {activeTab === 'billing' && (
-            <div className="text-center py-16">
-              <CreditCard size={32} className="text-text-secondary/30 mx-auto mb-3" />
-              <p className="text-sm text-text-secondary">Billing coming soon.</p>
-            </div>
-          )}
-          {activeTab === 'payroll' && (
-            <div className="text-center py-16">
-              <DollarSign size={32} className="text-text-secondary/30 mx-auto mb-3" />
-              <p className="text-sm text-text-secondary">Payroll coming soon.</p>
-            </div>
-          )}
         </div>
+      </div>
+
+      {/* Page links */}
+      <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-3">
+        {accountPages.map((page) => (
+          <Link
+            key={page.path}
+            to={page.path}
+            className="flex items-center gap-3 bg-surface rounded-xl border border-border p-4 hover:border-purple/30 transition-colors"
+          >
+            <div className="w-9 h-9 rounded-lg bg-purple-muted flex items-center justify-center flex-shrink-0">
+              <page.icon size={18} className="text-purple" />
+            </div>
+            <span className="text-sm font-medium text-text-primary">{page.label}</span>
+          </Link>
+        ))}
       </div>
     </div>
   )
