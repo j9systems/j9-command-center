@@ -14,6 +14,9 @@ import TaskDetailPage from './pages/TaskDetailPage'
 import TeamPage from './pages/TeamPage'
 import InvoiceDetailPage from './pages/InvoiceDetailPage'
 import TimeLogDetailPage from './pages/TimeLogDetailPage'
+import AccountLeadsPage from './pages/AccountLeadsPage'
+import AccountBillingPage from './pages/AccountBillingPage'
+import AccountPayrollPage from './pages/AccountPayrollPage'
 
 export default function App() {
   const [session, setSession] = useState<Session | null>(null)
@@ -55,6 +58,9 @@ export default function App() {
         <Route path="/accounts/:id/time-logs/:timeLogId" element={<TimeLogDetailPage />} />
         <Route path="/accounts/:id/projects/:projectId" element={<ProjectDetailPage />} />
         <Route path="/accounts/:id/projects/:projectId/features/:featureId" element={<FeatureDetailPage />} />
+        <Route path="/accounts/:id/leads" element={<AccountLeadsPage />} />
+        <Route path="/accounts/:id/billing" element={<AccountBillingPage />} />
+        <Route path="/accounts/:id/payroll" element={<AccountPayrollPage />} />
         <Route path="/contacts" element={<ContactsPage />} />
         <Route path="/team" element={<TeamPage />} />
       </Route>
