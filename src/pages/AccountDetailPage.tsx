@@ -108,6 +108,7 @@ export default function AccountDetailPage() {
   const [closedByMember, setClosedByMember] = useState<TeamMember | null>(null)
   const [partnerMember, setPartnerMember] = useState<TeamMember | null>(null)
   const [allTeamMembers, setAllTeamMembers] = useState<TeamMember[]>([])
+  const [billingTypeOptions, setBillingTypeOptions] = useState<Option[]>([])
   const [refreshKey, setRefreshKey] = useState(0)
 
   useEffect(() => {
@@ -259,6 +260,17 @@ export default function AccountDetailPage() {
 
       if (taskStatusOptions) {
         setTaskStatuses(taskStatusOptions as Option[])
+      }
+
+      // Fetch billing type options
+      const { data: billingTypeOpts } = await supabase
+        .from('options')
+        .select('*')
+        .eq('category', 'billing_type')
+        .order('option_label')
+
+      if (billingTypeOpts) {
+        setBillingTypeOptions(billingTypeOpts as Option[])
       }
 
       // Fetch time logs with status option
@@ -759,6 +771,7 @@ export default function AccountDetailPage() {
               closedByMember={closedByMember}
               partnerMember={partnerMember}
               allTeamMembers={allTeamMembers}
+              billingTypeOptions={billingTypeOptions}
               onUpdate={(updated) => {
                 setAccount(updated)
                 // Re-resolve closed by and partner
@@ -2504,15 +2517,17 @@ function AdminTab({
   closedByMember,
   partnerMember,
   allTeamMembers,
+  billingTypeOptions,
   onUpdate,
 }: {
   account: AccountWithStatus
   closedByMember: TeamMember | null
   partnerMember: TeamMember | null
   allTeamMembers: TeamMember[]
+  billingTypeOptions: Option[]
   onUpdate: (updated: AccountWithStatus) => void
 }) {
-  const [billingType, setBillingType] = useState(account.billing_billing_type_override ?? '')
+  const [billingType, setBillingType] = useState(account.billing_billing_type_override?.toString() ?? '')
   const [quickbooksId, setQuickbooksId] = useState(account.quickbooks_id?.toString() ?? '')
   const [apEmail, setApEmail] = useState(account.ap_email ?? '')
   const [logoPath, setLogoPath] = useState(account.logo_path ?? '')
@@ -2529,7 +2544,7 @@ function AdminTab({
       .update({
         sales_closed_by_override: closedById || null,
         partner_id: partnerId || null,
-        billing_billing_type_override: billingType || null,
+        billing_billing_type_override: billingType ? parseInt(billingType, 10) : null,
         quickbooks_id: quickbooksId ? parseInt(quickbooksId, 10) : null,
         logo_path: logoPath || null,
         ap_email: apEmail || null,
@@ -2541,7 +2556,7 @@ function AdminTab({
         ...account,
         sales_closed_by_override: closedById || null,
         partner_id: partnerId || null,
-        billing_billing_type_override: billingType || null,
+        billing_billing_type_override: billingType ? parseInt(billingType, 10) : null,
         quickbooks_id: quickbooksId ? parseInt(quickbooksId, 10) : null,
         logo_path: logoPath || null,
         ap_email: apEmail || null,
@@ -2641,8 +2656,11 @@ function AdminTab({
           className="w-full bg-black/20 border border-border rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-purple"
         >
           <option value="">— None —</option>
-          <option value="Hourly">Hourly</option>
-          <option value="Retainer">Retainer</option>
+          {billingTypeOptions.map((opt) => (
+            <option key={opt.id} value={opt.id}>
+              {opt.option_label}
+            </option>
+          ))}
         </select>
       </div>
 
