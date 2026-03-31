@@ -9,7 +9,7 @@ export interface Account {
   depth_next_action: string | null
   depth_next_action_date: string | null
   depth_ready_for_next_action: string | null
-  billing_billing_type_override: string | null
+  billing_billing_type_override: number | null
   depth_inactive: string | null
   notes: string | null
   sales_closed_by_override: string | null
