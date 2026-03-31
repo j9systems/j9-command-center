@@ -52,7 +52,7 @@ export default function LeadsPage() {
       const [{ data: leadsData }, { data: statusOpts }] = await Promise.all([
         supabase
           .from('leads')
-          .select('*, options!leads_status_id_fkey(id, option_key, option_label)')
+          .select('*, options!fk_leads_status_id(id, option_key, option_label)')
           .order('submission_date', { ascending: false }),
         supabase
           .from('options')

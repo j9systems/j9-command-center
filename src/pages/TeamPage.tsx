@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { User } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import type { TeamMember, Role } from '@/types/database'
@@ -13,6 +14,7 @@ const roleColors: Record<string, string> = {
 }
 
 export default function TeamPage() {
+  const navigate = useNavigate()
   const [members, setMembers] = useState<(TeamMember & { role_option?: Role | null })[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -65,7 +67,8 @@ export default function TeamPage() {
           return (
             <div
               key={member.id}
-              className={`flex items-center gap-4 p-4 bg-surface rounded-xl border border-border ${!isActive ? 'opacity-50' : ''}`}
+              onClick={() => navigate(`/team/${member.id}`)}
+              className={`flex items-center gap-4 p-4 bg-surface rounded-xl border border-border cursor-pointer hover:border-purple/30 transition-colors ${!isActive ? 'opacity-50' : ''}`}
             >
               <div className="w-10 h-10 rounded-full bg-purple-muted flex items-center justify-center flex-shrink-0">
                 {member.photo ? (

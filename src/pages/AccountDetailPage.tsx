@@ -101,7 +101,8 @@ export default function AccountDetailPage() {
   const [projects, setProjects] = useState<(Project & { project_manager?: TeamMember | null; logged_hours: number })[]>([])
   const [timeLogs, setTimeLogs] = useState<(TimeLog & { team_member?: TeamMember | null; project?: { name: string | null } | null; status_option?: Option | null })[]>([])
   const [timeLogStatuses, setTimeLogStatuses] = useState<Option[]>([])
-  const [accountTeamMembers, setAccountTeamMembers] = useState<{ id: string; team_member: TeamMember | null; role: AccountRole | null; expected_weekly_hrs: string | null }[]>([])
+  const [accountTeamMembers, setAccountTeamMembers] = useState<{ id: string; team_member: TeamMember | null; role: AccountRole | null; expected_weekly_hrs: string | null; rate_override: string | null; commission_override: string | null }[]>([])
+  const [accountRoles, setAccountRoles] = useState<AccountRole[]>([])
   const [invoices, setInvoices] = useState<(Invoice & { project?: { name: string | null } | null; status_option?: Option | null })[]>([])
   const [accountContacts, setAccountContacts] = useState<(AccountContact & { contact: Contact })[]>([])
   const [meetings, setMeetings] = useState<(Meeting & { attendees: { contact: Contact | null; team_member: TeamMember | null }[] })[]>([])
@@ -326,7 +327,7 @@ export default function AccountDetailPage() {
       // Fetch account team members with roles
       const { data: accountTeamData } = await supabase
         .from('account_team')
-        .select('id, expected_weekly_hrs, team(id, first_name, last_name, email, photo), account_roles!account_team_role_id_fkey(id, name)')
+        .select('id, expected_weekly_hrs, rate_override, commission_override, team(id, first_name, last_name, email, photo), account_roles!account_team_role_id_fkey(id, name)')
         .eq('account_id', id!)
 
       if (accountTeamData) {
@@ -336,8 +337,20 @@ export default function AccountDetailPage() {
             team_member: at.team as unknown as TeamMember | null,
             role: at.account_roles as unknown as AccountRole | null,
             expected_weekly_hrs: at.expected_weekly_hrs,
+            rate_override: (at as Record<string, unknown>).rate_override as string | null,
+            commission_override: (at as Record<string, unknown>).commission_override as string | null,
           }))
         )
+      }
+
+      // Fetch account roles for add team member form
+      const { data: accountRolesData } = await supabase
+        .from('account_roles')
+        .select('*')
+        .order('name')
+
+      if (accountRolesData) {
+        setAccountRoles(accountRolesData as AccountRole[])
       }
 
       // Fetch all team members for admin tab lookups
@@ -801,7 +814,13 @@ export default function AccountDetailPage() {
             />
           )}
           {activeTab === 'team' && (
-            <AccountTeamTab members={accountTeamMembers} />
+            <AccountTeamTab
+              members={accountTeamMembers}
+              allTeamMembers={allTeamMembers}
+              accountRoles={accountRoles}
+              accountId={id!}
+              onRefresh={() => setRefreshKey((k) => k + 1)}
+            />
           )}
           {activeTab === 'meetings' && (
             <MeetingsTab
@@ -2322,70 +2341,282 @@ const roleColors: Record<string, string> = {
   'Executive Sponsor': 'bg-amber-500/15 text-amber-400',
 }
 
+type AccountTeamMember = {
+  id: string
+  team_member: TeamMember | null
+  role: AccountRole | null
+  expected_weekly_hrs: string | null
+  rate_override: string | null
+  commission_override: string | null
+}
+
 function AccountTeamTab({
   members,
+  allTeamMembers,
+  accountRoles,
+  accountId,
+  onRefresh,
 }: {
-  members: { id: string; team_member: TeamMember | null; role: AccountRole | null; expected_weekly_hrs: string | null }[]
+  members: AccountTeamMember[]
+  allTeamMembers: TeamMember[]
+  accountRoles: AccountRole[]
+  accountId: string
+  onRefresh: () => void
 }) {
-  if (members.length === 0) {
-    return (
-      <p className="text-sm text-text-secondary text-center py-8">
-        No team members assigned to this account.
-      </p>
-    )
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editRate, setEditRate] = useState('')
+  const [editCommission, setEditCommission] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [showAddForm, setShowAddForm] = useState(false)
+  const [newTeamMemberId, setNewTeamMemberId] = useState('')
+  const [newRoleId, setNewRoleId] = useState('')
+  const [adding, setAdding] = useState(false)
+
+  function startEdit(member: AccountTeamMember) {
+    setEditingId(member.id)
+    setEditRate(member.rate_override ?? '')
+    setEditCommission(member.commission_override ?? '')
   }
 
-  return (
-    <div className="space-y-2">
-      {members.map((member) => {
-        const name = member.team_member
-          ? [member.team_member.first_name, member.team_member.last_name].filter(Boolean).join(' ')
-          : 'Unknown Member'
+  async function saveEdit(memberId: string) {
+    setSaving(true)
+    await supabase
+      .from('account_team')
+      .update({
+        rate_override: editRate || null,
+        commission_override: editCommission || null,
+      })
+      .eq('id', memberId)
+    setSaving(false)
+    setEditingId(null)
+    onRefresh()
+  }
 
-        return (
-          <div
-            key={member.id}
-            className="flex items-center gap-4 p-3 bg-black/20 rounded-lg border border-border/50"
-          >
-            <div className="w-9 h-9 rounded-full bg-purple-muted flex items-center justify-center flex-shrink-0">
-              {member.team_member?.photo ? (
-                <img
-                  src={member.team_member.photo}
-                  alt={name}
-                  className="w-9 h-9 rounded-full object-cover"
-                />
-              ) : (
-                <User size={16} className="text-purple" />
-              )}
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-text-primary truncate">{name}</p>
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-0.5">
-                {member.role && (
-                  <span
-                    className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${
-                      roleColors[member.role.name] ?? 'bg-zinc-500/15 text-zinc-400'
-                    }`}
-                  >
-                    {member.role.name}
-                  </span>
-                )}
-                {member.team_member?.email && (
-                  <span className="text-xs text-text-secondary truncate">{member.team_member.email}</span>
+  async function handleAdd() {
+    if (!newTeamMemberId) return
+    setAdding(true)
+    const newId = crypto.randomUUID()
+    await supabase
+      .from('account_team')
+      .insert({
+        id: newId,
+        team_member_id: newTeamMemberId,
+        account_id: accountId,
+        role_id: newRoleId ? parseInt(newRoleId) : null,
+      })
+    setAdding(false)
+    setShowAddForm(false)
+    setNewTeamMemberId('')
+    setNewRoleId('')
+    onRefresh()
+  }
+
+  // Filter out already assigned team members
+  const assignedIds = new Set(members.map((m) => m.team_member?.id).filter(Boolean))
+  const availableMembers = allTeamMembers.filter((t) => !assignedIds.has(t.id) && (t.active === 'true' || t.active === '3'))
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-sm font-semibold text-text-primary">Team Members</h3>
+        <button
+          onClick={() => setShowAddForm(!showAddForm)}
+          className="inline-flex items-center gap-1 text-xs font-medium text-purple hover:text-purple/80 transition-colors"
+        >
+          <Plus size={14} />
+          Add Member
+        </button>
+      </div>
+
+      {showAddForm && (
+        <div className="p-3 bg-black/20 rounded-lg border border-border/50 mb-3 space-y-3">
+          <div>
+            <label className="block text-xs text-text-secondary mb-1">Team Member</label>
+            <select
+              value={newTeamMemberId}
+              onChange={(e) => setNewTeamMemberId(e.target.value)}
+              className="w-full text-sm bg-surface border border-border rounded-lg px-3 py-2 text-text-primary focus:outline-none focus:border-purple/50"
+            >
+              <option value="">Select team member...</option>
+              {availableMembers.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {[t.first_name, t.last_name].filter(Boolean).join(' ')}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs text-text-secondary mb-1">Account Role</label>
+            <select
+              value={newRoleId}
+              onChange={(e) => setNewRoleId(e.target.value)}
+              className="w-full text-sm bg-surface border border-border rounded-lg px-3 py-2 text-text-primary focus:outline-none focus:border-purple/50"
+            >
+              <option value="">Select role...</option>
+              {accountRoles.map((r) => (
+                <option key={r.id} value={r.id}>{r.name}</option>
+              ))}
+            </select>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={handleAdd}
+              disabled={!newTeamMemberId || adding}
+              className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-purple text-white rounded-lg hover:bg-purple/90 disabled:opacity-50 transition-colors"
+            >
+              {adding ? 'Adding...' : 'Add'}
+            </button>
+            <button
+              onClick={() => { setShowAddForm(false); setNewTeamMemberId(''); setNewRoleId('') }}
+              className="px-3 py-1.5 text-xs font-medium text-text-secondary hover:text-text-primary transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {members.length === 0 && !showAddForm ? (
+        <p className="text-sm text-text-secondary text-center py-8">
+          No team members assigned to this account.
+        </p>
+      ) : (
+        <div className="space-y-2">
+          {members.map((member) => {
+            const name = member.team_member
+              ? [member.team_member.first_name, member.team_member.last_name].filter(Boolean).join(' ')
+              : 'Unknown Member'
+            const isEditing = editingId === member.id
+            const isDeveloper = member.role?.name === 'Developer'
+            const isAccountManager = member.role?.name === 'Account Manager'
+
+            return (
+              <div
+                key={member.id}
+                className="p-3 bg-black/20 rounded-lg border border-border/50"
+              >
+                <div
+                  className="flex items-center gap-4 cursor-pointer"
+                  onClick={() => isEditing ? setEditingId(null) : startEdit(member)}
+                >
+                  <div className="w-9 h-9 rounded-full bg-purple-muted flex items-center justify-center flex-shrink-0">
+                    {member.team_member?.photo ? (
+                      <img
+                        src={member.team_member.photo}
+                        alt={name}
+                        className="w-9 h-9 rounded-full object-cover"
+                      />
+                    ) : (
+                      <User size={16} className="text-purple" />
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-text-primary truncate">{name}</p>
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-0.5">
+                      {member.role && (
+                        <span
+                          className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${
+                            roleColors[member.role.name] ?? 'bg-zinc-500/15 text-zinc-400'
+                          }`}
+                        >
+                          {member.role.name}
+                        </span>
+                      )}
+                      {member.team_member?.email && (
+                        <span className="text-xs text-text-secondary truncate">{member.team_member.email}</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 flex-shrink-0">
+                    {member.expected_weekly_hrs && (
+                      <span className="text-xs text-text-secondary flex items-center gap-1">
+                        <Clock size={12} />
+                        {member.expected_weekly_hrs}h/wk
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {isEditing && (
+                  <div className="mt-3 pt-3 border-t border-border/30 space-y-3">
+                    {isDeveloper && (
+                      <>
+                        <div>
+                          <label className="block text-xs text-text-secondary mb-1">Rate Override ($)</label>
+                          <input
+                            type="text"
+                            value={editRate}
+                            onChange={(e) => setEditRate(e.target.value)}
+                            placeholder="Default rate override"
+                            className="w-full text-sm bg-surface border border-border rounded-lg px-3 py-2 text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:border-purple/50"
+                          />
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-[10px] text-text-secondary/70 mb-0.5">Default Rate</label>
+                            <p className="text-xs text-text-secondary">--</p>
+                          </div>
+                          <div>
+                            <label className="block text-[10px] text-text-secondary/70 mb-0.5">Effective Rate</label>
+                            <p className="text-xs text-text-primary">{editRate || '--'}</p>
+                          </div>
+                        </div>
+                      </>
+                    )}
+                    {isAccountManager && (
+                      <>
+                        <div>
+                          <label className="block text-xs text-text-secondary mb-1">Commission Override (%)</label>
+                          <input
+                            type="text"
+                            value={editCommission}
+                            onChange={(e) => setEditCommission(e.target.value)}
+                            placeholder="Default commission override"
+                            className="w-full text-sm bg-surface border border-border rounded-lg px-3 py-2 text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:border-purple/50"
+                          />
+                        </div>
+                        <div className="grid grid-cols-3 gap-3">
+                          <div>
+                            <label className="block text-[10px] text-text-secondary/70 mb-0.5">Default Commission</label>
+                            <p className="text-xs text-text-secondary">--</p>
+                          </div>
+                          <div>
+                            <label className="block text-[10px] text-text-secondary/70 mb-0.5">Commission Override</label>
+                            <p className="text-xs text-text-primary">{editCommission ? `${editCommission}%` : '--'}</p>
+                          </div>
+                          <div>
+                            <label className="block text-[10px] text-text-secondary/70 mb-0.5">Effective Commission</label>
+                            <p className="text-xs text-text-primary">{editCommission ? `${editCommission}%` : '--'}</p>
+                          </div>
+                        </div>
+                      </>
+                    )}
+                    {!isDeveloper && !isAccountManager && (
+                      <p className="text-xs text-text-secondary">No overrides available for this role.</p>
+                    )}
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => saveEdit(member.id)}
+                        disabled={saving}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-purple text-white rounded-lg hover:bg-purple/90 disabled:opacity-50 transition-colors"
+                      >
+                        <Save size={12} />
+                        {saving ? 'Saving...' : 'Save'}
+                      </button>
+                      <button
+                        onClick={() => setEditingId(null)}
+                        className="px-3 py-1.5 text-xs font-medium text-text-secondary hover:text-text-primary transition-colors"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
                 )}
               </div>
-            </div>
-            <div className="flex items-center gap-3 flex-shrink-0">
-              {member.expected_weekly_hrs && (
-                <span className="text-xs text-text-secondary flex items-center gap-1">
-                  <Clock size={12} />
-                  {member.expected_weekly_hrs}h/wk
-                </span>
-              )}
-            </div>
-          </div>
-        )
-      })}
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }
