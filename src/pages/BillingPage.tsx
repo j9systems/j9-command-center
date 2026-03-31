@@ -179,6 +179,8 @@ export default function BillingPage() {
     }
   }
 
+  const [commissionToast, setCommissionToast] = useState<{ type: 'success' | 'warning'; message: string } | null>(null)
+
   async function handleMarkPaid(e: React.MouseEvent, invoiceId: string) {
     e.preventDefault()
     e.stopPropagation()
@@ -196,6 +198,36 @@ export default function BillingPage() {
             : inv
         )
       )
+
+      // Fire commission processing in the background — never blocks the UI
+      ;(async () => {
+        try {
+          const { data: { session } } = await supabase.auth.getSession()
+          const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/process-invoice-payment-commissions`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${session?.access_token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ invoice_id: invoiceId }),
+          })
+          const result = await res.json()
+          if (result.skipped) {
+            // Non-hourly account — do nothing
+          } else if (result.success) {
+            setCommissionToast({ type: 'success', message: 'Commission lines generated' })
+            setTimeout(() => setCommissionToast(null), 3000)
+          } else {
+            console.error('Commission processing failed:', result)
+            setCommissionToast({ type: 'warning', message: 'Invoice marked paid, but commission processing failed. Check payroll.' })
+            setTimeout(() => setCommissionToast(null), 5000)
+          }
+        } catch (err) {
+          console.error('Commission edge function error:', err)
+          setCommissionToast({ type: 'warning', message: 'Invoice marked paid, but commission processing failed. Check payroll.' })
+          setTimeout(() => setCommissionToast(null), 5000)
+        }
+      })()
     }
   }
 
@@ -257,6 +289,17 @@ export default function BillingPage() {
         <CreditCard size={24} className="text-purple" />
         <h1 className="text-2xl font-bold text-text-primary">Billing</h1>
       </div>
+
+      {/* Commission toast */}
+      {commissionToast && (
+        <div className={`text-xs px-3 py-2 rounded-lg mb-4 ${
+          commissionToast.type === 'success'
+            ? 'text-emerald-400 bg-emerald-500/10 border border-emerald-500/20'
+            : 'text-amber-400 bg-amber-500/10 border border-amber-500/20'
+        }`}>
+          {commissionToast.message}
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="flex gap-1 mb-4 overflow-x-auto scrollbar-hide border-b border-border">
