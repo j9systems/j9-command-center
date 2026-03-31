@@ -646,99 +646,97 @@ export default function AccountDetailPage() {
       {/* Gantt Chart */}
       <GanttChart projects={projects} accountId={id!} />
 
-      {/* Tab headers (outside card so dropdown isn't clipped) */}
+      {/* Tab headers */}
       <div className="bg-surface rounded-t-xl border border-b-0 border-border relative">
-        <div className="flex border-b border-border overflow-x-auto scrollbar-hide">
-          {/* Desktop: show all tabs */}
-          <div className="hidden md:flex overflow-x-auto scrollbar-hide">
-            {tabs.map((tab) => (
+        {/* Desktop: all tabs in a scrollable row */}
+        <div className="hidden md:flex border-b border-border overflow-x-auto scrollbar-hide">
+          {tabs.map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              className={`flex items-center gap-2 px-5 py-3 text-sm font-medium transition-colors relative whitespace-nowrap flex-shrink-0 ${
+                activeTab === tab.key
+                  ? 'text-purple'
+                  : 'text-text-secondary hover:text-text-primary'
+              }`}
+            >
+              <tab.icon size={16} />
+              {tab.label}
+              {activeTab === tab.key && (
+                <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-purple" />
+              )}
+            </button>
+          ))}
+        </div>
+        {/* Mobile: first N visible tabs + "More" dropdown for the rest */}
+        <div className="flex md:hidden border-b border-border overflow-x-auto scrollbar-hide">
+          {tabs.slice(0, MOBILE_TAB_LIMIT).map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              className={`flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors relative whitespace-nowrap flex-shrink-0 ${
+                activeTab === tab.key
+                  ? 'text-purple'
+                  : 'text-text-secondary hover:text-text-primary'
+              }`}
+            >
+              <tab.icon size={16} />
+              {tab.label}
+              {activeTab === tab.key && (
+                <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-purple" />
+              )}
+            </button>
+          ))}
+          {tabs.length > MOBILE_TAB_LIMIT && (
+            <div className="relative flex-shrink-0" ref={mobileMoreRef}>
               <button
-                key={tab.key}
-                onClick={() => setActiveTab(tab.key)}
-                className={`flex items-center gap-2 px-5 py-3 text-sm font-medium transition-colors relative whitespace-nowrap flex-shrink-0 ${
-                  activeTab === tab.key
+                onClick={() => setMobileMoreOpen(!mobileMoreOpen)}
+                className={`flex items-center gap-1.5 px-4 py-3 text-sm font-medium transition-colors relative whitespace-nowrap ${
+                  tabs.slice(MOBILE_TAB_LIMIT).some((t) => t.key === activeTab)
                     ? 'text-purple'
                     : 'text-text-secondary hover:text-text-primary'
                 }`}
               >
-                <tab.icon size={16} />
-                {tab.label}
-                {activeTab === tab.key && (
+                {(() => {
+                  const activeOverflow = tabs.slice(MOBILE_TAB_LIMIT).find((t) => t.key === activeTab)
+                  if (activeOverflow) {
+                    return (
+                      <>
+                        <activeOverflow.icon size={16} />
+                        {activeOverflow.label}
+                      </>
+                    )
+                  }
+                  return <>More</>
+                })()}
+                <ChevronDown size={14} className={`transition-transform ${mobileMoreOpen ? 'rotate-180' : ''}`} />
+                {tabs.slice(MOBILE_TAB_LIMIT).some((t) => t.key === activeTab) && (
                   <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-purple" />
                 )}
               </button>
-            ))}
-          </div>
-          {/* Mobile: show first N tabs + overflow dropdown */}
-          <div className="flex md:hidden flex-1">
-            {tabs.slice(0, MOBILE_TAB_LIMIT).map((tab) => (
-              <button
-                key={tab.key}
-                onClick={() => setActiveTab(tab.key)}
-                className={`flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors relative whitespace-nowrap flex-shrink-0 ${
-                  activeTab === tab.key
-                    ? 'text-purple'
-                    : 'text-text-secondary hover:text-text-primary'
-                }`}
-              >
-                <tab.icon size={16} />
-                {tab.label}
-                {activeTab === tab.key && (
-                  <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-purple" />
-                )}
-              </button>
-            ))}
-            {tabs.length > MOBILE_TAB_LIMIT && (
-              <div className="relative flex-shrink-0" ref={mobileMoreRef}>
-                <button
-                  onClick={() => setMobileMoreOpen(!mobileMoreOpen)}
-                  className={`flex items-center gap-1.5 px-4 py-3 text-sm font-medium transition-colors relative whitespace-nowrap ${
-                    tabs.slice(MOBILE_TAB_LIMIT).some((t) => t.key === activeTab)
-                      ? 'text-purple'
-                      : 'text-text-secondary hover:text-text-primary'
-                  }`}
-                >
-                  {(() => {
-                    const activeOverflow = tabs.slice(MOBILE_TAB_LIMIT).find((t) => t.key === activeTab)
-                    if (activeOverflow) {
-                      return (
-                        <>
-                          <activeOverflow.icon size={16} />
-                          {activeOverflow.label}
-                        </>
-                      )
-                    }
-                    return <>More</>
-                  })()}
-                  <ChevronDown size={14} className={`transition-transform ${mobileMoreOpen ? 'rotate-180' : ''}`} />
-                  {tabs.slice(MOBILE_TAB_LIMIT).some((t) => t.key === activeTab) && (
-                    <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-purple" />
-                  )}
-                </button>
-                {mobileMoreOpen && (
-                  <div className="absolute right-0 top-full mt-1 z-50 bg-surface border border-border rounded-lg shadow-lg overflow-hidden min-w-[160px]">
-                    {tabs.slice(MOBILE_TAB_LIMIT).map((tab) => (
-                      <button
-                        key={tab.key}
-                        onClick={() => {
-                          setActiveTab(tab.key)
-                          setMobileMoreOpen(false)
-                        }}
-                        className={`flex items-center gap-2.5 w-full px-4 py-2.5 text-sm font-medium transition-colors ${
-                          activeTab === tab.key
-                            ? 'text-purple bg-purple/5'
-                            : 'text-text-secondary hover:text-text-primary hover:bg-surface-hover'
-                        }`}
-                      >
-                        <tab.icon size={16} />
-                        {tab.label}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
+              {mobileMoreOpen && (
+                <div className="absolute right-0 top-full mt-1 z-50 bg-surface border border-border rounded-lg shadow-lg overflow-hidden min-w-[160px]">
+                  {tabs.slice(MOBILE_TAB_LIMIT).map((tab) => (
+                    <button
+                      key={tab.key}
+                      onClick={() => {
+                        setActiveTab(tab.key)
+                        setMobileMoreOpen(false)
+                      }}
+                      className={`flex items-center gap-2.5 w-full px-4 py-2.5 text-sm font-medium transition-colors ${
+                        activeTab === tab.key
+                          ? 'text-purple bg-purple/5'
+                          : 'text-text-secondary hover:text-text-primary hover:bg-surface-hover'
+                      }`}
+                    >
+                      <tab.icon size={16} />
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
