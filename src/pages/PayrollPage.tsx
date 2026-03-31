@@ -1,6 +1,33 @@
 import { useEffect, useState } from 'react'
-import { Wallet } from 'lucide-react'
+import { Wallet, Play, CheckCheck, Loader2, AlertTriangle, ChevronDown, ChevronUp } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+
+interface PayrollResult {
+  contractor_lines?: number
+  deduction_lines?: number
+  retainer_lines?: number
+  errors?: string[]
+  error?: string
+}
+
+interface FinalizeResult {
+  finalized?: number
+  grand_total?: number
+  totals_by_type?: Record<string, number>
+  error?: string
+}
+
+interface PreviewMember {
+  team_member: string
+  lines: { type: string; description: string; total: number }[]
+  total: number
+}
+
+interface PreviewResult {
+  week_label?: string
+  members?: PreviewMember[]
+  error?: string
+}
 
 interface PayoutRow {
   row_id: string
@@ -25,10 +52,43 @@ interface PayoutLine {
   total: number | null
 }
 
+async function callEdgeFunction<T>(name: string, body: Record<string, unknown> = {}): Promise<T> {
+  const { data: { session } } = await supabase.auth.getSession()
+  const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/${name}`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${session?.access_token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  })
+  const result = await res.json()
+  if (!res.ok && !result.error) {
+    throw new Error(`Request failed (${res.status})`)
+  }
+  return result as T
+}
+
 export default function PayrollPage() {
   const [payouts, setPayouts] = useState<PayoutRow[]>([])
   const [openTotals, setOpenTotals] = useState<Record<string, number>>({})
   const [loading, setLoading] = useState(true)
+
+  // Run Payroll state
+  const [runningPayroll, setRunningPayroll] = useState(false)
+  const [payrollResult, setPayrollResult] = useState<PayrollResult | null>(null)
+  const [payrollError, setPayrollError] = useState<string | null>(null)
+  const [showPayrollConfirm, setShowPayrollConfirm] = useState(false)
+
+  // Finalize Payouts state
+  const [finalizingPayouts, setFinalizingPayouts] = useState(false)
+  const [finalizeResult, setFinalizeResult] = useState<FinalizeResult | null>(null)
+  const [finalizeError, setFinalizeError] = useState<string | null>(null)
+
+  // Payroll Preview state
+  const [preview, setPreview] = useState<PreviewResult | null>(null)
+  const [previewLoading, setPreviewLoading] = useState(true)
+  const [previewExpanded, setPreviewExpanded] = useState(true)
 
   useEffect(() => {
     async function fetchData() {
@@ -105,6 +165,63 @@ export default function PayrollPage() {
     fetchData()
   }, [])
 
+  // Fetch payroll preview on mount
+  useEffect(() => {
+    async function fetchPreview() {
+      setPreviewLoading(true)
+      try {
+        const result = await callEdgeFunction<PreviewResult>('get-payroll-preview')
+        if (result.error) {
+          console.error('Preview error:', result.error)
+        } else {
+          setPreview(result)
+        }
+      } catch (err) {
+        console.error('Failed to load payroll preview:', err)
+      } finally {
+        setPreviewLoading(false)
+      }
+    }
+    fetchPreview()
+  }, [])
+
+  async function handleRunPayroll() {
+    setRunningPayroll(true)
+    setPayrollResult(null)
+    setPayrollError(null)
+    setShowPayrollConfirm(false)
+    try {
+      const result = await callEdgeFunction<PayrollResult>('process-weekly-payroll')
+      if (result.error) {
+        setPayrollError(result.error)
+      } else {
+        setPayrollResult(result)
+      }
+    } catch (err) {
+      setPayrollError(err instanceof Error ? err.message : 'Unknown error')
+    } finally {
+      setRunningPayroll(false)
+    }
+  }
+
+  async function handleFinalizePayouts() {
+    setFinalizingPayouts(true)
+    setFinalizeResult(null)
+    setFinalizeError(null)
+    try {
+      const result = await callEdgeFunction<FinalizeResult>('finalize-payouts')
+      if (result.error) {
+        setFinalizeError(result.error)
+      } else {
+        setFinalizeResult(result)
+      }
+    } catch (err) {
+      setFinalizeError(err instanceof Error ? err.message : 'Unknown error')
+    } finally {
+      setFinalizingPayouts(false)
+    }
+  }
+
   function getTotal(payout: PayoutRow): number {
     if (payout.status_option?.option_label === 'Open') {
       const key = `${payout.week_id}|${payout.team_member_id}`
@@ -152,6 +269,131 @@ export default function PayrollPage() {
         <Wallet size={24} className="text-purple" />
         <h1 className="text-2xl font-bold text-text-primary">Payroll</h1>
       </div>
+
+      {/* Action Buttons */}
+      <div className="flex flex-wrap items-center gap-3 mb-4">
+        {showPayrollConfirm ? (
+          <div className="flex items-center gap-2 p-3 bg-surface rounded-xl border border-border">
+            <span className="text-xs text-text-secondary">Run payroll processing? This is safe to re-run.</span>
+            <button
+              onClick={handleRunPayroll}
+              className="text-xs font-medium px-3 py-1.5 rounded-lg bg-purple text-white hover:bg-purple/90 transition-colors"
+            >
+              Confirm
+            </button>
+            <button
+              onClick={() => setShowPayrollConfirm(false)}
+              className="text-xs font-medium px-3 py-1.5 rounded-lg text-text-secondary hover:text-text-primary transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => setShowPayrollConfirm(true)}
+            disabled={runningPayroll}
+            className="inline-flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-lg bg-purple text-white hover:bg-purple/90 transition-colors disabled:opacity-50"
+          >
+            {runningPayroll ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />}
+            {runningPayroll ? 'Running...' : 'Run Payroll'}
+          </button>
+        )}
+
+        <button
+          onClick={handleFinalizePayouts}
+          disabled={finalizingPayouts}
+          className="inline-flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-lg border border-border text-text-secondary hover:text-text-primary transition-colors disabled:opacity-50"
+        >
+          {finalizingPayouts ? <Loader2 size={14} className="animate-spin" /> : <CheckCheck size={14} />}
+          {finalizingPayouts ? 'Finalizing...' : 'Finalize Payouts'}
+        </button>
+      </div>
+
+      {/* Payroll Result */}
+      {payrollResult && (
+        <div className="p-3 mb-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl space-y-1">
+          <p className="text-xs font-medium text-emerald-400">Payroll processed successfully</p>
+          <div className="flex flex-wrap gap-4 text-xs text-emerald-300">
+            <span>Contractor lines: {payrollResult.contractor_lines ?? 0}</span>
+            <span>Deduction lines: {payrollResult.deduction_lines ?? 0}</span>
+            <span>Retainer lines: {payrollResult.retainer_lines ?? 0}</span>
+          </div>
+          {payrollResult.errors && payrollResult.errors.length > 0 && (
+            <div className="mt-2 p-2 bg-amber-500/10 border border-amber-500/20 rounded-lg">
+              <p className="text-xs font-medium text-amber-400 flex items-center gap-1 mb-1">
+                <AlertTriangle size={12} /> Warnings
+              </p>
+              {payrollResult.errors.map((err, i) => (
+                <p key={i} className="text-xs text-amber-300">{err}</p>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+      {payrollError && (
+        <div className="p-3 mb-4 bg-red-500/10 border border-red-500/20 rounded-xl">
+          <p className="text-xs text-red-400">{payrollError}</p>
+        </div>
+      )}
+
+      {/* Finalize Result */}
+      {finalizeResult && (
+        <div className="p-3 mb-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl space-y-1">
+          <p className="text-xs font-medium text-emerald-400">Payouts finalized</p>
+          <div className="flex flex-wrap gap-4 text-xs text-emerald-300">
+            <span>Finalized: {finalizeResult.finalized ?? 0}</span>
+            <span>Grand total: {formatCurrency(finalizeResult.grand_total ?? 0)}</span>
+          </div>
+          {finalizeResult.totals_by_type && Object.keys(finalizeResult.totals_by_type).length > 0 && (
+            <div className="flex flex-wrap gap-4 text-xs text-text-secondary mt-1">
+              {Object.entries(finalizeResult.totals_by_type).map(([type, total]) => (
+                <span key={type}>{type}: {formatCurrency(total)}</span>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+      {finalizeError && (
+        <div className="p-3 mb-4 bg-red-500/10 border border-red-500/20 rounded-xl">
+          <p className="text-xs text-red-400">{finalizeError}</p>
+        </div>
+      )}
+
+      {/* Payroll Preview */}
+      {!previewLoading && preview && preview.members && preview.members.length > 0 && (
+        <div className="mb-4 bg-surface rounded-xl border border-border overflow-hidden">
+          <button
+            onClick={() => setPreviewExpanded((v) => !v)}
+            className="w-full flex items-center justify-between p-3 text-left hover:bg-border/20 transition-colors"
+          >
+            <span className="text-sm font-medium text-text-primary">
+              Preview: {preview.week_label ?? 'Current Week'}
+            </span>
+            {previewExpanded ? <ChevronUp size={14} className="text-text-secondary" /> : <ChevronDown size={14} className="text-text-secondary" />}
+          </button>
+          {previewExpanded && (
+            <div className="px-3 pb-3 space-y-3">
+              {preview.members.map((member) => (
+                <div key={member.team_member} className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-text-primary">{member.team_member}</span>
+                    <span className="text-xs font-semibold text-text-primary font-mono">{formatCurrency(member.total)}</span>
+                  </div>
+                  {member.lines.map((line, i) => (
+                    <div key={i} className="flex items-center justify-between pl-3">
+                      <span className="text-xs text-text-secondary">
+                        <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-zinc-500/15 text-zinc-400 mr-1.5">{line.type}</span>
+                        {line.description}
+                      </span>
+                      <span className="text-xs text-text-secondary font-mono">{formatCurrency(line.total)}</span>
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       <p className="text-xs text-text-secondary mb-3">
         {payouts.length} {payouts.length === 1 ? 'payout' : 'payouts'}
