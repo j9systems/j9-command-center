@@ -1,8 +1,98 @@
-import { useEffect, useState } from 'react'
-import { X, Plus, Search } from 'lucide-react'
+import { useEffect, useState, useRef } from 'react'
+import { X, Plus, Search, Clock } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import type { Contact, TeamMember } from '@/types/database'
 import MobileFormOverlay from './MobileFormOverlay'
+
+// Generate time options in 15-minute increments
+function generateTimeOptions(): { value: string; label: string }[] {
+  const options: { value: string; label: string }[] = []
+  for (let h = 0; h < 24; h++) {
+    for (let m = 0; m < 60; m += 15) {
+      const value = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+      const period = h >= 12 ? 'PM' : 'AM'
+      const displayH = h === 0 ? 12 : h > 12 ? h - 12 : h
+      const label = `${displayH}:${String(m).padStart(2, '0')} ${period}`
+      options.push({ value, label })
+    }
+  }
+  return options
+}
+
+const TIME_OPTIONS = generateTimeOptions()
+
+function TimePickerField({
+  value,
+  onChange,
+  label,
+  required,
+  inputClass,
+  labelClass,
+}: {
+  value: string
+  onChange: (val: string) => void
+  label: string
+  required?: boolean
+  inputClass: string
+  labelClass: string
+}) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+  const listRef = useRef<HTMLDivElement>(null)
+
+  const displayLabel = value
+    ? TIME_OPTIONS.find((o) => o.value === value)?.label ?? value
+    : ''
+
+  // Scroll to the selected item when dropdown opens
+  useEffect(() => {
+    if (open && listRef.current && value) {
+      const idx = TIME_OPTIONS.findIndex((o) => o.value === value)
+      if (idx >= 0) {
+        const el = listRef.current.children[idx] as HTMLElement
+        el?.scrollIntoView({ block: 'center' })
+      }
+    }
+  }, [open, value])
+
+  return (
+    <div ref={ref}>
+      <label className={labelClass}>{label} {required && '*'}</label>
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className={`${inputClass} text-left flex items-center gap-2 ${!value ? 'text-text-secondary/50' : ''}`}
+      >
+        <Clock size={14} className="text-text-secondary/50 flex-shrink-0" />
+        <span className="flex-1">{displayLabel || 'Select time'}</span>
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-[15]" onClick={() => setOpen(false)} />
+          <div
+            ref={listRef}
+            className="absolute z-20 mt-1 w-40 max-h-52 overflow-y-auto bg-surface border border-border rounded-lg shadow-lg"
+          >
+            {TIME_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => { onChange(opt.value); setOpen(false) }}
+                className={`w-full text-left px-3 py-2 text-sm transition-colors ${
+                  opt.value === value
+                    ? 'bg-purple-muted text-purple font-medium'
+                    : 'text-text-primary hover:bg-surface-hover'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
 
 interface Attendee {
   email: string
@@ -219,13 +309,25 @@ export default function NewMeetingModal({
             <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={`${inputClass} ${!date ? 'text-text-secondary/50' : ''}`} required />
           </div>
           <div className="grid grid-cols-2 gap-3 md:contents">
-            <div>
-              <label className={labelClass}>Start *</label>
-              <input type="time" value={startTime} onChange={(e) => handleStartTimeChange(e.target.value)} className={`${inputClass} ${!startTime ? 'text-text-secondary/50' : ''}`} required />
+            <div className="relative">
+              <TimePickerField
+                value={startTime}
+                onChange={handleStartTimeChange}
+                label="Start"
+                required
+                inputClass={inputClass}
+                labelClass={labelClass}
+              />
             </div>
-            <div>
-              <label className={labelClass}>End *</label>
-              <input type="time" value={endTime} onChange={(e) => handleEndTimeChange(e.target.value)} className={`${inputClass} ${!endTime ? 'text-text-secondary/50' : ''}`} required />
+            <div className="relative">
+              <TimePickerField
+                value={endTime}
+                onChange={handleEndTimeChange}
+                label="End"
+                required
+                inputClass={inputClass}
+                labelClass={labelClass}
+              />
             </div>
           </div>
         </div>

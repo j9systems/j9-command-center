@@ -2548,7 +2548,7 @@ function MeetingsTab({
                   )}
                   {meeting.description_agenda && (
                     <p className="mt-2 text-xs text-text-secondary line-clamp-2">
-                      {meeting.description_agenda}
+                      {meeting.description_agenda.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()}
                     </p>
                   )}
                 </div>

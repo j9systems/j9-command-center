@@ -181,6 +181,48 @@ export interface MeetingAttendee {
   attendee_group: string | null
 }
 
+export interface Lead {
+  id: string
+  name: string | null
+  email: string | null
+  phone: string | null
+  unsubscribe: string | null
+  partial_submission: string | null
+  submission_date: string | null
+  current_systems: string | null
+  pain_points: string | null
+  industry: string | null
+  company_size: string | null
+  event_url: string | null
+  gmeet_link: string | null
+  source: string | null
+  website: string | null
+  contact_id: string | null
+  appointment_confirmation_notes: string | null
+  cold_call_triage_notes: string | null
+  core_business: string | null
+  notes: string | null
+  pitch_script_notes: string | null
+  billing_contact_name: string | null
+  billing_email: string | null
+  status_justification: string | null
+  business_name: string | null
+  scheduled_callback_date_time: string | null
+  need_to_overwrite_text_content: string | null
+  business_annual_revenue: string | null
+  text_message_content: string | null
+  billing_frequency: string | null
+  what_to_improve_first: string | null
+  other_industry: string | null
+  interest_level: number | null
+  booked_sales_call_date_time: string | null
+  other_pain_points: string | null
+  kill_list: boolean | null
+  intro_draft: string | null
+  follow_up_on: string | null
+  status_id: number | null
+}
+
 export interface Feature {
   id: string
   project_id: string | null

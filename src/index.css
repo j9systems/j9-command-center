@@ -89,6 +89,39 @@ button, select, a, [role="button"], [tabindex="0"] {
   margin: 0.1em 0;
 }
 
+/* Rich text display (read-only rendered HTML from TipTap) */
+.rich-text-display h1 {
+  font-size: 1.5em;
+  font-weight: 700;
+  margin: 0.5em 0 0.25em;
+}
+.rich-text-display h2 {
+  font-size: 1.15em;
+  font-weight: 600;
+  margin: 0.5em 0 0.25em;
+}
+.rich-text-display h3 {
+  font-size: 1.05em;
+  font-weight: 600;
+  margin: 0.5em 0 0.25em;
+}
+.rich-text-display ul, .rich-text-display ol {
+  padding-left: 1.5em;
+  margin: 0.25em 0;
+}
+.rich-text-display ul {
+  list-style: disc;
+}
+.rich-text-display ol {
+  list-style: decimal;
+}
+.rich-text-display li {
+  margin: 0.1em 0;
+}
+.rich-text-display p {
+  margin: 0.25em 0;
+}
+
 /* Scrollbar styling */
 ::-webkit-scrollbar {
   width: 6px;
