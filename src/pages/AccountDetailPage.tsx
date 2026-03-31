@@ -121,15 +121,18 @@ export default function AccountDetailPage() {
   useEffect(() => {
     const el = tabsContainerRef.current
     if (!el) return
-    updateScrollButtons()
+    // Defer initial check to ensure layout is complete
+    requestAnimationFrame(updateScrollButtons)
     el.addEventListener('scroll', updateScrollButtons)
+    window.addEventListener('resize', updateScrollButtons)
     const observer = new ResizeObserver(updateScrollButtons)
     observer.observe(el)
     return () => {
       el.removeEventListener('scroll', updateScrollButtons)
+      window.removeEventListener('resize', updateScrollButtons)
       observer.disconnect()
     }
-  }, [updateScrollButtons])
+  }, [updateScrollButtons, loading])
   const [closedByMember, setClosedByMember] = useState<TeamMember | null>(null)
   const [partnerMember, setPartnerMember] = useState<TeamMember | null>(null)
   const [allTeamMembers, setAllTeamMembers] = useState<TeamMember[]>([])
@@ -689,16 +692,8 @@ export default function AccountDetailPage() {
 
       {/* Tab headers */}
       <div className="bg-surface rounded-t-xl border border-b-0 border-border">
-        <div className="relative flex items-center border-b border-border">
-          {canScrollLeft && (
-            <button
-              onClick={() => tabsContainerRef.current?.scrollBy({ left: -200, behavior: 'smooth' })}
-              className="sticky left-0 z-10 flex items-center justify-center h-full px-1 bg-surface border-r border-border text-text-secondary hover:text-text-primary"
-            >
-              <ChevronLeft size={16} />
-            </button>
-          )}
-          <div ref={tabsContainerRef} className="flex overflow-x-auto scrollbar-hide flex-1">
+        <div className="relative border-b border-border">
+          <div ref={tabsContainerRef} className="flex overflow-x-auto scrollbar-hide">
             {tabs.map((tab) => (
               <button
                 key={tab.key}
@@ -717,10 +712,18 @@ export default function AccountDetailPage() {
               </button>
             ))}
           </div>
+          {canScrollLeft && (
+            <button
+              onClick={() => tabsContainerRef.current?.scrollBy({ left: -200, behavior: 'smooth' })}
+              className="absolute left-0 top-0 bottom-0 z-10 flex items-center px-1.5 bg-surface border-r border-border text-text-secondary hover:text-text-primary"
+            >
+              <ChevronLeft size={16} />
+            </button>
+          )}
           {canScrollRight && (
             <button
               onClick={() => tabsContainerRef.current?.scrollBy({ left: 200, behavior: 'smooth' })}
-              className="sticky right-0 z-10 flex items-center justify-center h-full px-1 bg-surface border-l border-border text-text-secondary hover:text-text-primary"
+              className="absolute right-0 top-0 bottom-0 z-10 flex items-center px-1.5 bg-surface border-l border-border text-text-secondary hover:text-text-primary"
             >
               <ChevronRight size={16} />
             </button>
