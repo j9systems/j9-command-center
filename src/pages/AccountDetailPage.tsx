@@ -1364,7 +1364,7 @@ function TimeLogsTab({
         >
           <option value="">All Statuses</option>
           {statuses.map((s) => (
-            <option key={s.option_key} value={s.option_key}>{s.option_label}</option>
+            <option key={s.option_key ?? s.id} value={s.option_key ?? ''}>{s.option_label}</option>
           ))}
           <option value="unset">Pending</option>
         </select>
