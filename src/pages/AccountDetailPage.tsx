@@ -18,9 +18,6 @@ import {
   Calendar,
   Video,
   MapPin,
-  DollarSign,
-  Briefcase,
-  CreditCard,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import type {
@@ -446,11 +443,6 @@ export default function AccountDetailPage() {
     { key: 'meetings' as const, label: 'Meetings', icon: Calendar },
   ]
 
-  const accountPages = [
-    { label: 'Leads', icon: Briefcase, path: `/accounts/${id}/leads` },
-    { label: 'Billing', icon: CreditCard, path: `/accounts/${id}/billing` },
-    { label: 'Payroll', icon: DollarSign, path: `/accounts/${id}/payroll` },
-  ]
 
   return (
     <div className="p-4 md:p-8 max-w-4xl mx-auto overflow-x-hidden">
@@ -738,21 +730,6 @@ export default function AccountDetailPage() {
         </div>
       </div>
 
-      {/* Page links */}
-      <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-3">
-        {accountPages.map((page) => (
-          <Link
-            key={page.path}
-            to={page.path}
-            className="flex items-center gap-3 bg-surface rounded-xl border border-border p-4 hover:border-purple/30 transition-colors"
-          >
-            <div className="w-9 h-9 rounded-lg bg-purple-muted flex items-center justify-center flex-shrink-0">
-              <page.icon size={18} className="text-purple" />
-            </div>
-            <span className="text-sm font-medium text-text-primary">{page.label}</span>
-          </Link>
-        ))}
-      </div>
     </div>
   )
 }
@@ -1085,6 +1062,7 @@ function TimeLogsTab({
     const dateStr = `${d.getMonth() + 1}/${d.getDate()}/${d.getFullYear()}, 12:00:00 AM`
 
     const newLog = {
+      id: crypto.randomUUID().replace(/-/g, '').slice(0, 20),
       name: formName.trim(),
       hours,
       date: dateStr,
