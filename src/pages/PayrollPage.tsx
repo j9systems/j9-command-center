@@ -87,13 +87,15 @@ export default function PayrollPage() {
         }
       }
 
-      // Sort: Open first, then Paid
+      // Sort: Open first, then by created_date descending (most recent first)
       rows.sort((a, b) => {
         const aLabel = a.status_option?.option_label ?? ''
         const bLabel = b.status_option?.option_label ?? ''
         if (aLabel === 'Open' && bLabel !== 'Open') return -1
         if (aLabel !== 'Open' && bLabel === 'Open') return 1
-        return 0
+        const aDate = a.created_date ?? ''
+        const bDate = b.created_date ?? ''
+        return bDate.localeCompare(aDate)
       })
 
       setPayouts(rows)
