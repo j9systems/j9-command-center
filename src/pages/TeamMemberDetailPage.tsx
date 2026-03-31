@@ -17,26 +17,36 @@ type TeamMemberFull = TeamMember & {
   role_option?: Role | null
   payouts_commission_: number | null
   payouts_contractor_rate: string | null
+  payouts_additional_commission_for_lead_close: number | null
 }
 
 export default function TeamMemberDetailPage() {
   const { teamId } = useParams<{ teamId: string }>()
   const [member, setMember] = useState<TeamMemberFull | null>(null)
+  const [roles, setRoles] = useState<Role[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [commission, setCommission] = useState('')
+  const [salesCommission, setSalesCommission] = useState('')
   const [hourlyRate, setHourlyRate] = useState('')
+  const [roleId, setRoleId] = useState('')
 
   useEffect(() => {
     if (!teamId) return
 
     async function fetchMember() {
       setLoading(true)
-      const { data } = await supabase
-        .from('team')
-        .select('*, roles(id, name)')
-        .eq('id', teamId!)
-        .single()
+      const [{ data }, { data: rolesData }] = await Promise.all([
+        supabase
+          .from('team')
+          .select('*, roles(id, name)')
+          .eq('id', teamId!)
+          .single(),
+        supabase
+          .from('roles')
+          .select('*')
+          .order('name'),
+      ])
 
       if (data) {
         const mapped: TeamMemberFull = {
@@ -45,11 +55,15 @@ export default function TeamMemberDetailPage() {
           roles: undefined,
           payouts_commission_: data.payouts_commission_,
           payouts_contractor_rate: data.payouts_contractor_rate,
+          payouts_additional_commission_for_lead_close: data.payouts_additional_commission_for_lead_close,
         } as TeamMemberFull
         setMember(mapped)
         setCommission(data.payouts_commission_?.toString() ?? '')
+        setSalesCommission(data.payouts_additional_commission_for_lead_close?.toString() ?? '')
         setHourlyRate(data.payouts_contractor_rate ?? '')
+        setRoleId(data.role_id?.toString() ?? '')
       }
+      if (rolesData) setRoles(rolesData as Role[])
       setLoading(false)
     }
 
@@ -65,6 +79,8 @@ export default function TeamMemberDetailPage() {
       .update({
         payouts_commission_: commission ? parseInt(commission) : null,
         payouts_contractor_rate: hourlyRate || null,
+        payouts_additional_commission_for_lead_close: salesCommission ? parseInt(salesCommission) : null,
+        role_id: roleId ? parseInt(roleId) : null,
       })
       .eq('id', teamId)
 
@@ -129,6 +145,19 @@ export default function TeamMemberDetailPage() {
               </span>
             )}
           </div>
+          <div className="mt-2">
+            <label className="block text-xs text-text-secondary mb-1">Role</label>
+            <select
+              value={roleId}
+              onChange={(e) => setRoleId(e.target.value)}
+              className="text-sm bg-black/20 border border-border rounded-lg px-3 py-1.5 text-text-primary focus:outline-none focus:border-purple/50"
+            >
+              <option value="">No role</option>
+              {roles.map((r) => (
+                <option key={r.id} value={r.id}>{r.name}</option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
 
@@ -169,6 +198,16 @@ export default function TeamMemberDetailPage() {
               value={commission}
               onChange={(e) => setCommission(e.target.value)}
               placeholder="e.g. 10"
+              className="w-full text-sm bg-black/20 border border-border rounded-lg px-3 py-2 text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:border-purple/50"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-text-secondary mb-1">Sales Commission for Lead Close (%)</label>
+            <input
+              type="number"
+              value={salesCommission}
+              onChange={(e) => setSalesCommission(e.target.value)}
+              placeholder="e.g. 5"
               className="w-full text-sm bg-black/20 border border-border rounded-lg px-3 py-2 text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:border-purple/50"
             />
           </div>

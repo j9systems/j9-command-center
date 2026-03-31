@@ -3,6 +3,8 @@ import {
   Target,
   Search,
   Phone,
+  PhoneCall,
+  MessageSquare,
   Mail,
   Globe,
   Building2,
@@ -44,6 +46,7 @@ export default function LeadsPage() {
   const [activeTab, setActiveTab] = useState<TabKey>('kill_list')
   const [statusFilter, setStatusFilter] = useState<string>('')
   const [searchQuery, setSearchQuery] = useState('')
+  const [contactModal, setContactModal] = useState<{ phone: string; action: 'call' | 'text' } | null>(null)
 
   useEffect(() => {
     async function fetchData() {
@@ -118,6 +121,25 @@ export default function LeadsPage() {
       day: 'numeric',
       year: 'numeric',
     })
+  }
+
+  function handleContactAction(source: 'sales' | 'personal') {
+    if (!contactModal) return
+    const phone = contactModal.phone.replace(/[^+\d]/g, '')
+    if (source === 'sales') {
+      if (contactModal.action === 'call') {
+        window.open(`openphone://call?number=${encodeURIComponent(phone)}`, '_blank')
+      } else {
+        window.open(`openphone://message?number=${encodeURIComponent(phone)}`, '_blank')
+      }
+    } else {
+      if (contactModal.action === 'call') {
+        window.open(`tel:${phone}`)
+      } else {
+        window.open(`sms:${phone}`)
+      }
+    }
+    setContactModal(null)
   }
 
   if (loading) {
@@ -217,7 +239,7 @@ export default function LeadsPage() {
                       <p className="text-sm font-medium text-text-primary">
                         {lead.name ?? 'Unnamed Lead'}
                       </p>
-                      {lead.kill_list && (
+                      {lead.kill_list && activeTab !== 'kill_list' && (
                         <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-red-500/15 text-red-400">
                           Kill List
                         </span>
@@ -283,12 +305,32 @@ export default function LeadsPage() {
                       )}
                     </div>
                   </div>
-                  {lead.interest_level != null && (
-                    <div className="flex-shrink-0 text-center">
-                      <p className="text-[10px] text-text-secondary uppercase tracking-wider">Interest</p>
-                      <p className="text-sm font-semibold text-text-primary">{lead.interest_level}</p>
-                    </div>
-                  )}
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    {lead.phone && (
+                      <>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setContactModal({ phone: lead.phone!, action: 'call' }) }}
+                          className="p-1.5 rounded-lg text-text-secondary hover:text-emerald-400 hover:bg-emerald-500/10 transition-colors"
+                          title="Call"
+                        >
+                          <PhoneCall size={14} />
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setContactModal({ phone: lead.phone!, action: 'text' }) }}
+                          className="p-1.5 rounded-lg text-text-secondary hover:text-blue-400 hover:bg-blue-500/10 transition-colors"
+                          title="Text"
+                        >
+                          <MessageSquare size={14} />
+                        </button>
+                      </>
+                    )}
+                    {lead.interest_level != null && (
+                      <div className="text-center ml-1">
+                        <p className="text-[10px] text-text-secondary uppercase tracking-wider">Interest</p>
+                        <p className="text-sm font-semibold text-text-primary">{lead.interest_level}</p>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             )
@@ -298,6 +340,41 @@ export default function LeadsPage() {
         <div className="flex flex-col items-center justify-center py-16 text-text-secondary">
           <Target size={36} className="mb-3 opacity-30" />
           <p className="text-sm">No leads found.</p>
+        </div>
+      )}
+
+      {/* Call/Text Modal */}
+      {contactModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setContactModal(null)}>
+          <div className="bg-surface rounded-xl border border-border p-5 w-full max-w-xs shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-semibold text-text-primary">
+                {contactModal.action === 'call' ? 'Call' : 'Text'} {contactModal.phone}
+              </h3>
+              <button onClick={() => setContactModal(null)} className="text-text-secondary hover:text-text-primary">
+                <X size={16} />
+              </button>
+            </div>
+            <p className="text-xs text-text-secondary mb-4">
+              Choose which number to {contactModal.action === 'call' ? 'call' : 'text'} from:
+            </p>
+            <div className="space-y-2">
+              <button
+                onClick={() => handleContactAction('sales')}
+                className="w-full flex items-center gap-3 px-4 py-3 text-sm font-medium bg-purple/10 text-purple border border-purple/20 rounded-lg hover:bg-purple/20 transition-colors"
+              >
+                <Phone size={16} />
+                Sales Number (OpenPhone)
+              </button>
+              <button
+                onClick={() => handleContactAction('personal')}
+                className="w-full flex items-center gap-3 px-4 py-3 text-sm font-medium bg-black/20 text-text-primary border border-border rounded-lg hover:bg-black/30 transition-colors"
+              >
+                <Phone size={16} />
+                Personal Number
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
