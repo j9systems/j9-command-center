@@ -1036,6 +1036,8 @@ function TimeLogsTab({
   const [formHours, setFormHours] = useState('')
   const [formDate, setFormDate] = useState(() => new Date().toISOString().slice(0, 10))
   const [formProjectId, setFormProjectId] = useState('')
+  const [filterTeamMember, setFilterTeamMember] = useState<string>('')
+  const [filterStatus, setFilterStatus] = useState<string>('')
 
   // Resolve the logged-in user's team member record
   useEffect(() => {
@@ -1091,18 +1093,26 @@ function TimeLogsTab({
       assigned_to_id: currentTeamMember.id,
     }
 
-    const { data, error } = await supabase
+    const { data: inserted, error: insertError } = await supabase
       .from('time_logs')
       .insert(newLog)
-      .select('*, team(first_name, last_name, photo), projects(name), options(id, option_key, option_label)')
+      .select('*')
       .single()
 
-    if (data && !error) {
+    if (inserted && !insertError) {
+      // Fetch the full record with joins separately to ensure related data is loaded
+      const { data: fullLog } = await supabase
+        .from('time_logs')
+        .select('*, team(first_name, last_name, photo), projects(name), options(id, option_key, option_label)')
+        .eq('id', inserted.id)
+        .single()
+
+      const source = fullLog ?? inserted
       const entry: LogEntry = {
-        ...data,
-        team_member: data.team as TeamMember | null,
-        project: data.projects as { name: string | null } | null,
-        status_option: data.options as Option | null,
+        ...source,
+        team_member: (fullLog?.team as TeamMember | null) ?? currentTeamMember,
+        project: fullLog?.projects as { name: string | null } | null ?? null,
+        status_option: fullLog?.options as Option | null ?? null,
         team: undefined,
         projects: undefined,
         options: undefined,
@@ -1117,7 +1127,27 @@ function TimeLogsTab({
     setSaving(false)
   }
 
-  const totalHours = timeLogs.reduce((sum, tl) => sum + (tl.hours ?? 0), 0)
+  // Build unique team members list for filter dropdown
+  const teamMemberMap = new Map<string, string>()
+  for (const log of timeLogs) {
+    if (log.team_member && log.assigned_to_id) {
+      const name = [log.team_member.first_name, log.team_member.last_name].filter(Boolean).join(' ')
+      if (name) teamMemberMap.set(log.assigned_to_id, name)
+    }
+  }
+  const uniqueTeamMembers = [...teamMemberMap.entries()].sort((a, b) => a[1].localeCompare(b[1]))
+
+  // Apply filters
+  const filteredLogs = timeLogs.filter((log) => {
+    if (filterTeamMember && log.assigned_to_id !== filterTeamMember) return false
+    if (filterStatus) {
+      const key = log.status_option?.option_key ?? 'unset'
+      if (key !== filterStatus) return false
+    }
+    return true
+  })
+
+  const totalHours = filteredLogs.reduce((sum, tl) => sum + (tl.hours ?? 0), 0)
 
   // Group time logs by week
   const now = new Date()
@@ -1132,7 +1162,7 @@ function TimeLogsTab({
     { label: 'Other', logs: [] },
   ]
 
-  for (const log of timeLogs) {
+  for (const log of filteredLogs) {
     if (!log.date) {
       groups[2].logs.push(log)
       continue
@@ -1161,7 +1191,7 @@ function TimeLogsTab({
   const lastWeekBillable = groups[1].logs
     .filter((l) => billableStatuses.has(l.status_option?.option_key ?? '') || !l.status_option)
     .reduce((sum, l) => sum + (l.hours ?? 0), 0)
-  const unbilledHours = timeLogs
+  const unbilledHours = filteredLogs
     .filter((l) => {
       const key = l.status_option?.option_key
       return key !== 'approved' && key !== 'will_not_bill'
@@ -1174,7 +1204,7 @@ function TimeLogsTab({
 
   // Build a map of week-start -> { status -> hours }
   const weekMap = new Map<string, { weekStart: Date; byStatus: Record<string, number> }>()
-  for (const log of timeLogs) {
+  for (const log of filteredLogs) {
     if (!log.date || !log.hours) continue
     const logDate = new Date(log.date)
     if (isNaN(logDate.getTime())) continue
@@ -1304,13 +1334,47 @@ function TimeLogsTab({
             Total: <span className="text-text-primary font-medium">{totalHours.toFixed(1)}h</span> logged
           </span>
         </div>
-        {currentTeamMember && !showForm && (
+        {currentTeamMember && (
           <button
             onClick={() => setShowForm(true)}
             className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-purple text-white hover:bg-purple-hover transition-colors"
           >
             <Plus size={14} />
             Log Time
+          </button>
+        )}
+      </div>
+
+      {/* Filter controls */}
+      <div className="flex items-center gap-3 mb-4 flex-wrap">
+        <select
+          value={filterTeamMember}
+          onChange={(e) => setFilterTeamMember(e.target.value)}
+          className="text-xs bg-surface border border-border rounded-lg px-2.5 py-1.5 text-text-primary focus:outline-none focus:border-purple/50"
+        >
+          <option value="">All Team Members</option>
+          {uniqueTeamMembers.map(([id, name]) => (
+            <option key={id} value={id}>{name}</option>
+          ))}
+        </select>
+        <select
+          value={filterStatus}
+          onChange={(e) => setFilterStatus(e.target.value)}
+          className="text-xs bg-surface border border-border rounded-lg px-2.5 py-1.5 text-text-primary focus:outline-none focus:border-purple/50"
+        >
+          <option value="">All Statuses</option>
+          {statuses.map((s) => (
+            <option key={s.option_key ?? s.id} value={s.option_key ?? ''}>{s.option_label}</option>
+          ))}
+          <option value="unset">Pending</option>
+        </select>
+        {(filterTeamMember || filterStatus) && (
+          <button
+            onClick={() => { setFilterTeamMember(''); setFilterStatus('') }}
+            className="text-xs text-text-secondary hover:text-text-primary transition-colors flex items-center gap-1"
+          >
+            <X size={12} />
+            Clear
           </button>
         )}
       </div>
@@ -1391,86 +1455,99 @@ function TimeLogsTab({
         </div>
       )}
 
-      {/* New time log form */}
+      {/* New time log modal */}
       {showForm && currentTeamMember && (
-        <MobileFormOverlay title="Log Time" onClose={() => setShowForm(false)}>
-          <form
-            onSubmit={handleCreateLog}
-            className="md:mb-6 p-4 md:bg-black/20 rounded-lg md:border md:border-border/50 space-y-3"
-          >
-            <div>
-              <input
-                type="text"
-                placeholder="What did you work on?"
-                value={formName}
-                onChange={(e) => setFormName(e.target.value)}
-                required
-                className="w-full text-sm bg-surface border border-border rounded-lg px-3 py-2 text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:border-purple/50"
-              />
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={() => setShowForm(false)}
+          />
+          <div className="relative w-full max-w-md mx-4 bg-surface border border-border rounded-xl p-5 shadow-xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-semibold text-text-primary">Log Time</h3>
+              <button
+                onClick={() => setShowForm(false)}
+                className="text-text-secondary hover:text-text-primary transition-colors p-1"
+              >
+                <X size={18} />
+              </button>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <form onSubmit={handleCreateLog} className="space-y-3">
               <div>
-                <label className="text-[10px] text-text-secondary uppercase tracking-wider mb-1 block">Hours</label>
                 <input
-                  type="number"
-                  step="0.25"
-                  min="0.25"
-                  placeholder="0.0"
-                  value={formHours}
-                  onChange={(e) => setFormHours(e.target.value)}
+                  type="text"
+                  placeholder="What did you work on?"
+                  value={formName}
+                  onChange={(e) => setFormName(e.target.value)}
                   required
+                  autoFocus
                   className="w-full text-sm bg-surface border border-border rounded-lg px-3 py-2 text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:border-purple/50"
                 />
               </div>
-              <div>
-                <label className="text-[10px] text-text-secondary uppercase tracking-wider mb-1 block">Date</label>
-                <input
-                  type="date"
-                  value={formDate}
-                  onChange={(e) => setFormDate(e.target.value)}
-                  required
-                  className="w-full text-sm bg-surface border border-border rounded-lg px-3 py-2 text-text-primary focus:outline-none focus:border-purple/50"
-                />
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="text-[10px] text-text-secondary uppercase tracking-wider mb-1 block">Hours</label>
+                  <input
+                    type="number"
+                    step="0.25"
+                    min="0.25"
+                    placeholder="0.0"
+                    value={formHours}
+                    onChange={(e) => setFormHours(e.target.value)}
+                    required
+                    className="w-full text-sm bg-surface border border-border rounded-lg px-3 py-2 text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:border-purple/50"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] text-text-secondary uppercase tracking-wider mb-1 block">Date</label>
+                  <input
+                    type="date"
+                    value={formDate}
+                    onChange={(e) => setFormDate(e.target.value)}
+                    required
+                    className="w-full text-sm bg-surface border border-border rounded-lg px-3 py-2 text-text-primary focus:outline-none focus:border-purple/50"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] text-text-secondary uppercase tracking-wider mb-1 block">Project</label>
+                  <select
+                    value={formProjectId}
+                    onChange={(e) => setFormProjectId(e.target.value)}
+                    className="w-full text-sm bg-surface border border-border rounded-lg px-3 py-2 text-text-primary focus:outline-none focus:border-purple/50"
+                  >
+                    <option value="">No project</option>
+                    {projects.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name ?? 'Unnamed Project'}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
-              <div>
-                <label className="text-[10px] text-text-secondary uppercase tracking-wider mb-1 block">Project</label>
-                <select
-                  value={formProjectId}
-                  onChange={(e) => setFormProjectId(e.target.value)}
-                  className="w-full text-sm bg-surface border border-border rounded-lg px-3 py-2 text-text-primary focus:outline-none focus:border-purple/50"
+              <div className="flex items-center gap-2 pt-2">
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="text-xs font-medium px-4 py-1.5 rounded-lg bg-purple text-white hover:bg-purple-hover transition-colors disabled:opacity-50"
                 >
-                  <option value="">No project</option>
-                  {projects.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name ?? 'Unnamed Project'}
-                    </option>
-                  ))}
-                </select>
+                  {saving ? 'Saving...' : 'Save'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowForm(false)}
+                  className="text-xs font-medium px-4 py-1.5 rounded-lg border border-border text-text-secondary hover:text-text-primary transition-colors"
+                >
+                  Cancel
+                </button>
               </div>
-            </div>
-            <div className="flex items-center gap-2 pt-1">
-              <button
-                type="submit"
-                disabled={saving}
-                className="text-xs font-medium px-4 py-1.5 rounded-lg bg-purple text-white hover:bg-purple-hover transition-colors disabled:opacity-50"
-              >
-                {saving ? 'Saving...' : 'Save'}
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowForm(false)}
-                className="text-xs font-medium px-4 py-1.5 rounded-lg border border-border text-text-secondary hover:text-text-primary transition-colors"
-              >
-                Cancel
-              </button>
-            </div>
-          </form>
-        </MobileFormOverlay>
+            </form>
+          </div>
+        </div>
       )}
 
-      {timeLogs.length === 0 && !showForm ? (
+      {filteredLogs.length === 0 ? (
         <p className="text-sm text-text-secondary text-center py-8">
-          No time logs found for this account.
+          {timeLogs.length === 0 ? 'No time logs found for this account.' : 'No time logs match the selected filters.'}
         </p>
       ) : (
         <div className="space-y-6">
