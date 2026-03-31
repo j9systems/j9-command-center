@@ -21,6 +21,8 @@ import AccountBillingPage from './pages/AccountBillingPage'
 import AccountPayrollPage from './pages/AccountPayrollPage'
 import LeadsPage from './pages/LeadsPage'
 import BillingPage from './pages/BillingPage'
+import BillingInvoiceDetailPage from './pages/BillingInvoiceDetailPage'
+import PaymentDetailPage from './pages/PaymentDetailPage'
 import PayrollPage from './pages/PayrollPage'
 
 export default function App() {
@@ -72,6 +74,8 @@ export default function App() {
         <Route path="/team/:teamId" element={<TeamMemberDetailPage />} />
         <Route path="/leads" element={<LeadsPage />} />
         <Route path="/billing" element={<BillingPage />} />
+        <Route path="/billing/invoices/:invoiceId" element={<BillingInvoiceDetailPage />} />
+        <Route path="/billing/payments/:paymentId" element={<PaymentDetailPage />} />
         <Route path="/payroll" element={<PayrollPage />} />
       </Route>
     </Routes>
