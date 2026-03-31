@@ -56,15 +56,15 @@ export function ActiveTimeLogProvider({ children }: { children: ReactNode }) {
       return
     }
 
-    // Query active time log
-    const today = new Date().toISOString().slice(0, 10)
+    // Query active time log (use local date to match what was inserted)
+    const now = new Date()
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
     const { data: logs } = await supabase
       .from('time_logs')
       .select(`
         *,
-        accounts!time_logs_account_id_fkey(company_name),
-        projects!time_logs_project_id_fkey(name),
-        tasks!time_logs_task_id_fkey(name)
+        projects(name),
+        tasks(name)
       `)
       .eq('assigned_to_id', tid)
       .is('end_date_time', null)
@@ -73,6 +73,17 @@ export function ActiveTimeLogProvider({ children }: { children: ReactNode }) {
 
     if (logs && logs.length > 0) {
       const row = logs[0]
+
+      // Fetch account name separately (no FK constraint for account_id)
+      let accountName: string | null = null
+      if (row.account_id) {
+        const { data: acct } = await supabase
+          .from('accounts')
+          .select('company_name')
+          .eq('id', row.account_id)
+          .maybeSingle()
+        accountName = acct?.company_name ?? null
+      }
 
       // Fetch breaks
       const { data: breaks } = await supabase
@@ -97,7 +108,7 @@ export function ActiveTimeLogProvider({ children }: { children: ReactNode }) {
           end_date_time: row.end_date_time,
         },
         breaks: (breaks ?? []) as TimeLogBreak[],
-        accountName: (row.accounts as any)?.company_name ?? null,
+        accountName,
         projectName: (row.projects as any)?.name ?? null,
         taskName: (row.tasks as any)?.name ?? null,
       })
