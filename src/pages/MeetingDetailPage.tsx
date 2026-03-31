@@ -513,7 +513,7 @@ export default function MeetingDetailPage() {
           />
         ) : meeting.description_agenda ? (
           <div
-            className="text-sm text-text-primary leading-relaxed prose prose-invert prose-sm max-w-none"
+            className="text-sm text-text-primary leading-relaxed rich-text-display max-w-none"
             dangerouslySetInnerHTML={{ __html: meeting.description_agenda }}
           />
         ) : (
@@ -547,7 +547,7 @@ export default function MeetingDetailPage() {
           />
         ) : meeting.meeting_notes ? (
           <div
-            className="text-sm text-text-primary leading-relaxed prose prose-invert prose-sm max-w-none"
+            className="text-sm text-text-primary leading-relaxed rich-text-display max-w-none"
             dangerouslySetInnerHTML={{ __html: meeting.meeting_notes }}
           />
         ) : (

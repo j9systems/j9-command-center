@@ -5,6 +5,8 @@ import {
   CalendarDays,
   ClipboardList,
   Clock,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import type { Task, Meeting, TeamMember, Option } from '@/types/database'
@@ -16,7 +18,7 @@ type TaskWithDetails = Task & {
 }
 
 type MeetingWithAccount = Meeting & {
-  account?: { id: string; company_name: string | null } | null
+  account?: { id: string; company_name: string | null; logo_path?: string | null } | null
 }
 
 const taskStatusColors: Record<string, string> = {
@@ -31,11 +33,14 @@ const priorityColors: Record<string, string> = {
   low: 'text-blue-400',
 }
 
+const TASKS_PER_PAGE = 4
+
 export default function HomePage() {
   const [tasks, setTasks] = useState<TaskWithDetails[]>([])
   const [meetings, setMeetings] = useState<MeetingWithAccount[]>([])
   const [loading, setLoading] = useState(true)
   const [displayName, setDisplayName] = useState('')
+  const [taskPage, setTaskPage] = useState(0)
 
   useEffect(() => {
     async function fetchData() {
@@ -130,7 +135,7 @@ export default function HomePage() {
         if (allMeetingIds.length > 0) {
           const { data: meetingsData } = await supabase
             .from('meetings')
-            .select('*, accounts!meetings_account_id_fkey(id, company_name)')
+            .select('*, accounts!meetings_account_id_fkey(id, company_name, logo_path)')
             .in('row_id', allMeetingIds)
             .gte('meeting_start', now)
             .order('meeting_start', { ascending: true })
@@ -140,7 +145,7 @@ export default function HomePage() {
             setMeetings(
               meetingsData.map((m) => ({
                 ...m,
-                account: m.accounts as unknown as { id: string; company_name: string | null } | null,
+                account: m.accounts as unknown as { id: string; company_name: string | null; logo_path?: string | null } | null,
                 accounts: undefined,
               })) as MeetingWithAccount[]
             )
@@ -194,13 +199,36 @@ export default function HomePage() {
 
       {/* Open Tasks */}
       <div className="bg-surface rounded-xl border border-border p-5 mb-6">
-        <h3 className="text-sm font-semibold text-text-secondary uppercase tracking-wider mb-4 flex items-center gap-2">
-          <ClipboardList size={14} />
-          Your Open Tasks
-        </h3>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-sm font-semibold text-text-secondary uppercase tracking-wider flex items-center gap-2">
+            <ClipboardList size={14} />
+            Your Open Tasks
+          </h3>
+          {tasks.length > TASKS_PER_PAGE && (
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setTaskPage((p) => Math.max(0, p - 1))}
+                disabled={taskPage === 0}
+                className="p-1 rounded hover:bg-surface-hover transition-colors text-text-secondary disabled:opacity-30"
+              >
+                <ChevronLeft size={16} />
+              </button>
+              <span className="text-xs text-text-secondary tabular-nums">
+                {taskPage + 1} / {Math.ceil(tasks.length / TASKS_PER_PAGE)}
+              </span>
+              <button
+                onClick={() => setTaskPage((p) => Math.min(Math.ceil(tasks.length / TASKS_PER_PAGE) - 1, p + 1))}
+                disabled={taskPage >= Math.ceil(tasks.length / TASKS_PER_PAGE) - 1}
+                className="p-1 rounded hover:bg-surface-hover transition-colors text-text-secondary disabled:opacity-30"
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
+          )}
+        </div>
         {tasks.length > 0 ? (
           <div className="space-y-2">
-            {tasks.map((task) => {
+            {tasks.slice(taskPage * TASKS_PER_PAGE, (taskPage + 1) * TASKS_PER_PAGE).map((task) => {
               const statusKey = task.status_option?.option_key?.toLowerCase() ?? ''
               return (
                 <Link
@@ -266,8 +294,12 @@ export default function HomePage() {
                 to={`/accounts/${meeting.account_id}/meetings/${meeting.row_id}`}
                 className="flex items-center gap-3 p-3 bg-black/20 rounded-lg border border-border/50 hover:border-border transition-colors"
               >
-                <div className="w-8 h-8 rounded-lg bg-purple-muted flex items-center justify-center flex-shrink-0">
-                  <CalendarDays size={14} className="text-purple" />
+                <div className="w-8 h-8 rounded-lg bg-purple-muted flex items-center justify-center flex-shrink-0 overflow-hidden">
+                  {meeting.account?.logo_path ? (
+                    <img src={meeting.account.logo_path} alt={meeting.account.company_name ?? ''} className="w-8 h-8 rounded-lg object-contain" />
+                  ) : (
+                    <CalendarDays size={14} className="text-purple" />
+                  )}
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-medium text-text-primary truncate">
