@@ -1,7 +1,10 @@
 import { useState, useRef, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { NavLink, useNavigate } from 'react-router-dom'
 import { Menu, LogOut, X, Calendar } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { navItems, MAX_BOTTOM_NAV_ITEMS } from '@/lib/navItems'
+
+const overflowItems = navItems.slice(MAX_BOTTOM_NAV_ITEMS)
 
 interface UserProfile {
   first_name: string | null
@@ -130,6 +133,29 @@ export default function MobileHeader() {
                   </div>
                 </div>
               </div>
+
+              {/* Overflow nav items */}
+              {overflowItems.length > 0 && (
+                <div className="border-b border-border">
+                  {overflowItems.map(({ to, icon: Icon, label }) => (
+                    <NavLink
+                      key={to}
+                      to={to}
+                      onClick={() => setOpen(false)}
+                      className={({ isActive }) =>
+                        `flex items-center gap-3 px-4 py-3 text-sm font-medium transition-colors w-full ${
+                          isActive
+                            ? 'text-purple bg-purple-muted'
+                            : 'text-text-secondary hover:text-text-primary hover:bg-surface-hover'
+                        }`
+                      }
+                    >
+                      <Icon size={18} />
+                      {label}
+                    </NavLink>
+                  ))}
+                </div>
+              )}
 
               {/* Google Calendar */}
               {calendarConnected !== null && (

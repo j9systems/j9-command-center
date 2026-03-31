@@ -1,0 +1,17 @@
+import { CreditCard } from 'lucide-react'
+
+export default function BillingPage() {
+  return (
+    <div className="p-4 md:p-8">
+      <div className="flex items-center gap-3 mb-6">
+        <CreditCard size={24} className="text-purple" />
+        <h1 className="text-2xl font-bold text-text-primary">Billing</h1>
+      </div>
+      <div className="flex flex-col items-center justify-center py-20 text-text-secondary">
+        <CreditCard size={48} className="mb-4 opacity-30" />
+        <p className="text-lg font-medium">Coming Soon</p>
+        <p className="text-sm mt-1">Billing management will be available here.</p>
+      </div>
+    </div>
+  )
+}

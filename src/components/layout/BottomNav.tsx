@@ -1,18 +1,13 @@
 import { NavLink } from 'react-router-dom'
-import { Home, Building2, Users, UserCog } from 'lucide-react'
+import { navItems, MAX_BOTTOM_NAV_ITEMS } from '@/lib/navItems'
 
-const navItems = [
-  { to: '/', icon: Home, label: 'Home' },
-  { to: '/accounts', icon: Building2, label: 'Accounts' },
-  { to: '/contacts', icon: Users, label: 'Contacts' },
-  { to: '/team', icon: UserCog, label: 'Team' },
-]
+const visibleItems = navItems.slice(0, MAX_BOTTOM_NAV_ITEMS)
 
 export default function BottomNav() {
   return (
     <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 border-t border-border bg-surface pb-[env(safe-area-inset-bottom)] touch-none">
       <div className="flex items-center justify-around">
-        {navItems.map(({ to, icon: Icon, label }) => (
+        {visibleItems.map(({ to, icon: Icon, label }) => (
           <NavLink
             key={to}
             to={to}

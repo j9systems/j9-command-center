@@ -1,14 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
-import { Home, Building2, Users, UserCog, LogOut, Calendar, ChevronUp } from 'lucide-react'
+import { LogOut, Calendar, ChevronUp } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
-
-const navItems = [
-  { to: '/', icon: Home, label: 'Home' },
-  { to: '/accounts', icon: Building2, label: 'Accounts' },
-  { to: '/contacts', icon: Users, label: 'Contacts' },
-  { to: '/team', icon: UserCog, label: 'Team' },
-]
+import { navItems } from '@/lib/navItems'
 
 interface UserProfile {
   first_name: string | null
