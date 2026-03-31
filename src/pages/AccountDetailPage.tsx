@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft,
@@ -22,6 +22,8 @@ import {
   Upload,
   Link as LinkIcon,
   Save,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import type {
@@ -105,6 +107,29 @@ export default function AccountDetailPage() {
   const [meetings, setMeetings] = useState<(Meeting & { attendees: { contact: Contact | null; team_member: TeamMember | null }[] })[]>([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<'projects' | 'tasks' | 'time_logs' | 'invoices' | 'contacts' | 'team' | 'meetings' | 'admin'>('projects')
+  const tabsContainerRef = useRef<HTMLDivElement>(null)
+  const [canScrollLeft, setCanScrollLeft] = useState(false)
+  const [canScrollRight, setCanScrollRight] = useState(false)
+
+  const updateScrollButtons = useCallback(() => {
+    const el = tabsContainerRef.current
+    if (!el) return
+    setCanScrollLeft(el.scrollLeft > 0)
+    setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 1)
+  }, [])
+
+  useEffect(() => {
+    const el = tabsContainerRef.current
+    if (!el) return
+    updateScrollButtons()
+    el.addEventListener('scroll', updateScrollButtons)
+    const observer = new ResizeObserver(updateScrollButtons)
+    observer.observe(el)
+    return () => {
+      el.removeEventListener('scroll', updateScrollButtons)
+      observer.disconnect()
+    }
+  }, [updateScrollButtons])
   const [closedByMember, setClosedByMember] = useState<TeamMember | null>(null)
   const [partnerMember, setPartnerMember] = useState<TeamMember | null>(null)
   const [allTeamMembers, setAllTeamMembers] = useState<TeamMember[]>([])
@@ -664,24 +689,42 @@ export default function AccountDetailPage() {
 
       {/* Tab headers */}
       <div className="bg-surface rounded-t-xl border border-b-0 border-border">
-        <div className="flex border-b border-border overflow-x-auto scrollbar-hide">
-          {tabs.map((tab) => (
+        <div className="relative flex items-center border-b border-border">
+          {canScrollLeft && (
             <button
-              key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
-              className={`flex items-center gap-2 px-4 md:px-5 py-3 text-sm font-medium transition-colors relative whitespace-nowrap flex-shrink-0 ${
-                activeTab === tab.key
-                  ? 'text-purple'
-                  : 'text-text-secondary hover:text-text-primary'
-              }`}
+              onClick={() => tabsContainerRef.current?.scrollBy({ left: -200, behavior: 'smooth' })}
+              className="sticky left-0 z-10 flex items-center justify-center h-full px-1 bg-surface border-r border-border text-text-secondary hover:text-text-primary"
             >
-              <tab.icon size={16} />
-              {tab.label}
-              {activeTab === tab.key && (
-                <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-purple" />
-              )}
+              <ChevronLeft size={16} />
             </button>
-          ))}
+          )}
+          <div ref={tabsContainerRef} className="flex overflow-x-auto scrollbar-hide flex-1">
+            {tabs.map((tab) => (
+              <button
+                key={tab.key}
+                onClick={() => setActiveTab(tab.key)}
+                className={`flex items-center gap-2 px-4 md:px-5 py-3 text-sm font-medium transition-colors relative whitespace-nowrap flex-shrink-0 ${
+                  activeTab === tab.key
+                    ? 'text-purple'
+                    : 'text-text-secondary hover:text-text-primary'
+                }`}
+              >
+                <tab.icon size={16} />
+                {tab.label}
+                {activeTab === tab.key && (
+                  <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-purple" />
+                )}
+              </button>
+            ))}
+          </div>
+          {canScrollRight && (
+            <button
+              onClick={() => tabsContainerRef.current?.scrollBy({ left: 200, behavior: 'smooth' })}
+              className="sticky right-0 z-10 flex items-center justify-center h-full px-1 bg-surface border-l border-border text-text-secondary hover:text-text-primary"
+            >
+              <ChevronRight size={16} />
+            </button>
+          )}
         </div>
       </div>
 
