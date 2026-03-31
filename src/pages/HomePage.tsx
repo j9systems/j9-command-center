@@ -12,11 +12,11 @@ import type { Task, Meeting, TeamMember, Option } from '@/types/database'
 type TaskWithDetails = Task & {
   assigned_to?: TeamMember | null
   status_option?: Option | null
-  account?: { row_id: string; name: string | null } | null
+  account?: { id: string; company_name: string | null } | null
 }
 
 type MeetingWithAccount = Meeting & {
-  account?: { row_id: string; name: string | null } | null
+  account?: { id: string; company_name: string | null } | null
 }
 
 const taskStatusColors: Record<string, string> = {
@@ -72,7 +72,7 @@ export default function HomePage() {
 
         let taskQuery = supabase
           .from('tasks')
-          .select('*, team!fk_tasks_assigned_to_id_internal(id, first_name, last_name, photo), options!fk_tasks_status_id(id, option_key, option_label), accounts!fk_tasks_account_id(row_id, name)')
+          .select('*, team!fk_tasks_assigned_to_id_internal(id, first_name, last_name, photo), options!fk_tasks_status_id(id, option_key, option_label), accounts!fk_tasks_account_id(id, company_name)')
           .eq('assigned_to_id_internal', teamMember.id)
           .order('due', { ascending: true, nullsFirst: false })
           .limit(20)
@@ -89,7 +89,7 @@ export default function HomePage() {
               ...t,
               assigned_to: t.team as unknown as TeamMember | null,
               status_option: t.options as unknown as Option | null,
-              account: t.accounts as unknown as { row_id: string; name: string | null } | null,
+              account: t.accounts as unknown as { id: string; company_name: string | null } | null,
               team: undefined,
               options: undefined,
               accounts: undefined,
@@ -98,36 +98,52 @@ export default function HomePage() {
         }
       }
 
-      // Fetch upcoming meetings where user is an attendee
+      // Fetch upcoming meetings where user is an attendee or organizer
       if (teamMember) {
         const now = new Date().toISOString()
 
+        // Get meetings where user is an attendee
         const { data: attendeeRows } = await supabase
           .from('meeting_attendees')
           .select('meeting_id')
           .eq('internal_attendee_id', teamMember.id)
 
-        if (attendeeRows && attendeeRows.length > 0) {
-          const meetingIds = attendeeRows.map((r) => r.meeting_id).filter(Boolean)
+        const attendeeMeetingIds = (attendeeRows ?? []).map((r) => r.meeting_id).filter(Boolean) as string[]
 
-          if (meetingIds.length > 0) {
-            const { data: meetingsData } = await supabase
-              .from('meetings')
-              .select('*, accounts!fk_meetings_account_id(row_id, name)')
-              .in('row_id', meetingIds)
-              .gte('meeting_start', now)
-              .order('meeting_start', { ascending: true })
-              .limit(10)
+        // Get meetings where user is the organizer
+        const organizerMeetingIds: string[] = []
+        if (session.user.id) {
+          const { data: organizerMeetings } = await supabase
+            .from('meetings')
+            .select('row_id')
+            .eq('organizer_id', session.user.id)
+            .gte('meeting_start', now)
 
-            if (meetingsData) {
-              setMeetings(
-                meetingsData.map((m) => ({
-                  ...m,
-                  account: m.accounts as unknown as { row_id: string; name: string | null } | null,
-                  accounts: undefined,
-                })) as MeetingWithAccount[]
-              )
-            }
+          if (organizerMeetings) {
+            organizerMeetings.forEach((m) => organizerMeetingIds.push(m.row_id))
+          }
+        }
+
+        // Combine and dedupe meeting IDs
+        const allMeetingIds = [...new Set([...attendeeMeetingIds, ...organizerMeetingIds])]
+
+        if (allMeetingIds.length > 0) {
+          const { data: meetingsData } = await supabase
+            .from('meetings')
+            .select('*, accounts!meetings_account_id_fkey(id, company_name)')
+            .in('row_id', allMeetingIds)
+            .gte('meeting_start', now)
+            .order('meeting_start', { ascending: true })
+            .limit(10)
+
+          if (meetingsData) {
+            setMeetings(
+              meetingsData.map((m) => ({
+                ...m,
+                account: m.accounts as unknown as { id: string; company_name: string | null } | null,
+                accounts: undefined,
+              })) as MeetingWithAccount[]
+            )
           }
         }
       }
@@ -207,9 +223,9 @@ export default function HomePage() {
                           {task.status_option.option_label}
                         </span>
                       )}
-                      {task.account?.name && (
+                      {task.account?.company_name && (
                         <span className="text-xs text-text-secondary truncate">
-                          {task.account.name}
+                          {task.account.company_name}
                         </span>
                       )}
                       {task.due && (
@@ -264,9 +280,9 @@ export default function HomePage() {
                         {formatMeetingTime(meeting.meeting_start)}
                       </span>
                     )}
-                    {meeting.account?.name && (
+                    {meeting.account?.company_name && (
                       <span className="text-xs text-text-secondary truncate">
-                        {meeting.account.name}
+                        {meeting.account.company_name}
                       </span>
                     )}
                   </div>

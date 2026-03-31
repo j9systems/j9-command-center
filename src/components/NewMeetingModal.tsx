@@ -48,16 +48,24 @@ export default function NewMeetingModal({
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
 
-  // Auto-populate end time 30 minutes after start time
+  // Track whether user has manually set end time
+  const [endTimeManuallySet, setEndTimeManuallySet] = useState(false)
+
+  // Auto-populate end time 30 minutes after start time (only if end not manually set)
   function handleStartTimeChange(value: string) {
     setStartTime(value)
-    if (value) {
+    if (value && !endTimeManuallySet) {
       const [h, m] = value.split(':').map(Number)
       const totalMinutes = h * 60 + m + 30
       const endH = Math.floor(totalMinutes / 60) % 24
       const endM = totalMinutes % 60
       setEndTime(`${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`)
     }
+  }
+
+  function handleEndTimeChange(value: string) {
+    setEndTime(value)
+    if (value) setEndTimeManuallySet(true)
   }
 
   useEffect(() => {
@@ -208,16 +216,16 @@ export default function NewMeetingModal({
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <div>
             <label className={labelClass}>Date *</label>
-            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inputClass} required />
+            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={`${inputClass} ${!date ? 'text-text-secondary/50' : ''}`} required />
           </div>
           <div className="grid grid-cols-2 gap-3 md:contents">
             <div>
               <label className={labelClass}>Start *</label>
-              <input type="time" value={startTime} onChange={(e) => handleStartTimeChange(e.target.value)} className={inputClass} required />
+              <input type="time" value={startTime} onChange={(e) => handleStartTimeChange(e.target.value)} className={`${inputClass} ${!startTime ? 'text-text-secondary/50' : ''}`} required />
             </div>
             <div>
               <label className={labelClass}>End *</label>
-              <input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} className={inputClass} required />
+              <input type="time" value={endTime} onChange={(e) => handleEndTimeChange(e.target.value)} className={`${inputClass} ${!endTime ? 'text-text-secondary/50' : ''}`} required />
             </div>
           </div>
         </div>

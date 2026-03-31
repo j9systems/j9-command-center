@@ -129,6 +129,30 @@ export default function MeetingDetailPage() {
         team_member: att.team as unknown as TeamMember | null,
       }))
 
+      // Include the meeting organizer in attendees if not already present
+      if (meetingRecord.organizer_id) {
+        const { data: { session: currentSession } } = await supabase.auth.getSession()
+        if (currentSession?.user?.id === meetingRecord.organizer_id) {
+          const { data: organizerTeam } = await supabase
+            .from('team')
+            .select('id, first_name, last_name, email, photo')
+            .eq('email', currentSession.user.email!)
+            .maybeSingle()
+
+          if (organizerTeam) {
+            const alreadyIncluded = attendees.some(
+              (att) => att.team_member?.id === organizerTeam.id
+            )
+            if (!alreadyIncluded) {
+              attendees.unshift({
+                contact: null,
+                team_member: organizerTeam as TeamMember,
+              })
+            }
+          }
+        }
+      }
+
       setMeeting({ ...meetingRecord, attendees })
 
       // Fetch tasks linked to this meeting
