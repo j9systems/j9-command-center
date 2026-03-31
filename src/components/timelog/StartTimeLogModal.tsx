@@ -150,8 +150,10 @@ export default function StartTimeLogModal({ open, onClose, preSelectedAccount }:
       .eq('option_key', 'in_progress')
       .maybeSingle()
 
-    const startDt = startTime ? new Date(startTime).toISOString() : new Date().toISOString()
-    const dateStr = startDt.slice(0, 10)
+    const startDate = startTime ? new Date(startTime) : new Date()
+    const startDt = startDate.toISOString()
+    const pad = (n: number) => String(n).padStart(2, '0')
+    const dateStr = `${startDate.getFullYear()}-${pad(startDate.getMonth() + 1)}-${pad(startDate.getDate())}`
 
     const newId = crypto.randomUUID()
     const { error } = await supabase.from('time_logs').insert({
