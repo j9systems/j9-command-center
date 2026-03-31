@@ -19,6 +19,7 @@ export default function ActiveTimeLogWidget() {
   const [elapsed, setElapsed] = useState(0)
   const [showEndPanel, setShowEndPanel] = useState(false)
   const [endTime, setEndTime] = useState('')
+  const [endDescription, setEndDescription] = useState('')
   const [ending, setEnding] = useState(false)
 
   // Break time override
@@ -77,6 +78,7 @@ export default function ActiveTimeLogWidget() {
 
   function openEndPanel() {
     setEndTime(formatDateTimeLocal(new Date()))
+    setEndDescription(activeLog!.log.name ?? '')
     setShowEndPanel(true)
   }
 
@@ -118,6 +120,7 @@ export default function ActiveTimeLogWidget() {
         end_date_time: endDt,
         hours: netHours,
         status_id: backlogOpt?.id ?? activeLog!.log.status_id,
+        name: endDescription.trim() || activeLog!.log.name,
       })
       .eq('id', activeLog!.log.id)
 
@@ -244,13 +247,25 @@ export default function ActiveTimeLogWidget() {
       {/* End Log Panel */}
       {showEndPanel && (
         <div className="px-4 pb-4 space-y-3 border-t border-border/50 pt-3">
-          <p className="text-xs font-medium text-text-secondary">Confirm End Time</p>
-          <input
-            type="datetime-local"
-            value={endTime}
-            onChange={(e) => setEndTime(e.target.value)}
-            className="w-full px-2 py-1.5 bg-black/30 border border-border rounded-lg text-xs text-text-primary focus:outline-none focus:border-purple transition-colors"
-          />
+          <div>
+            <p className="text-xs font-medium text-text-secondary mb-1">Description</p>
+            <textarea
+              value={endDescription}
+              onChange={(e) => setEndDescription(e.target.value)}
+              rows={2}
+              placeholder="What did you work on?"
+              className="w-full px-2 py-1.5 bg-black/30 border border-border rounded-lg text-xs text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:border-purple transition-colors resize-none"
+            />
+          </div>
+          <div>
+            <p className="text-xs font-medium text-text-secondary mb-1">End Time</p>
+            <input
+              type="datetime-local"
+              value={endTime}
+              onChange={(e) => setEndTime(e.target.value)}
+              className="w-full px-2 py-1.5 bg-black/30 border border-border rounded-lg text-xs text-text-primary focus:outline-none focus:border-purple transition-colors"
+            />
+          </div>
           {endTime && activeLog.log.start_date_time && (
             <p className="text-xs text-text-secondary">
               Net hours:{' '}
