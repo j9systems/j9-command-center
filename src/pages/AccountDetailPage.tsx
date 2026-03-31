@@ -18,6 +18,10 @@ import {
   Calendar,
   Video,
   MapPin,
+  Settings,
+  Upload,
+  Link as LinkIcon,
+  Save,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import type {
@@ -100,7 +104,10 @@ export default function AccountDetailPage() {
   const [accountContacts, setAccountContacts] = useState<(AccountContact & { contact: Contact })[]>([])
   const [meetings, setMeetings] = useState<(Meeting & { attendees: { contact: Contact | null; team_member: TeamMember | null }[] })[]>([])
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<'projects' | 'tasks' | 'time_logs' | 'invoices' | 'contacts' | 'team' | 'meetings'>('projects')
+  const [activeTab, setActiveTab] = useState<'projects' | 'tasks' | 'time_logs' | 'invoices' | 'contacts' | 'team' | 'meetings' | 'admin'>('projects')
+  const [closedByMember, setClosedByMember] = useState<TeamMember | null>(null)
+  const [partnerMember, setPartnerMember] = useState<TeamMember | null>(null)
+  const [allTeamMembers, setAllTeamMembers] = useState<TeamMember[]>([])
   const [refreshKey, setRefreshKey] = useState(0)
 
   useEffect(() => {
@@ -293,6 +300,24 @@ export default function AccountDetailPage() {
         )
       }
 
+      // Fetch all team members for admin tab lookups
+      const { data: allTeamData } = await supabase
+        .from('team')
+        .select('id, first_name, last_name, email, photo, role, role_id, desired_hr_capacity, active, phone, personal_email')
+
+      if (allTeamData) {
+        setAllTeamMembers(allTeamData as TeamMember[])
+
+        if (accountData?.sales_closed_by_override) {
+          const found = allTeamData.find((t) => t.id === accountData.sales_closed_by_override)
+          if (found) setClosedByMember(found as TeamMember)
+        }
+        if (accountData?.partner_id) {
+          const found = allTeamData.find((t) => t.id === accountData.partner_id)
+          if (found) setPartnerMember(found as TeamMember)
+        }
+      }
+
       // Fetch invoices
       const { data: invoicesData } = await supabase
         .from('invoices')
@@ -441,6 +466,7 @@ export default function AccountDetailPage() {
     { key: 'contacts' as const, label: 'Contacts', icon: User },
     { key: 'team' as const, label: 'Team', icon: Users },
     { key: 'meetings' as const, label: 'Meetings', icon: Calendar },
+    { key: 'admin' as const, label: 'Admin', icon: Settings },
   ]
 
 
@@ -725,6 +751,30 @@ export default function AccountDetailPage() {
               accountId={id!}
               accountContacts={accountContacts}
               onRefresh={() => setRefreshKey((k) => k + 1)}
+            />
+          )}
+          {activeTab === 'admin' && (
+            <AdminTab
+              account={account}
+              closedByMember={closedByMember}
+              partnerMember={partnerMember}
+              allTeamMembers={allTeamMembers}
+              onUpdate={(updated) => {
+                setAccount(updated)
+                // Re-resolve closed by and partner
+                if (updated.sales_closed_by_override) {
+                  const found = allTeamMembers.find((t) => t.id === updated.sales_closed_by_override)
+                  setClosedByMember(found ?? null)
+                } else {
+                  setClosedByMember(null)
+                }
+                if (updated.partner_id) {
+                  const found = allTeamMembers.find((t) => t.id === updated.partner_id)
+                  setPartnerMember(found ?? null)
+                } else {
+                  setPartnerMember(null)
+                }
+              }}
             />
           )}
         </div>
@@ -2445,6 +2495,252 @@ function MeetingsTab({
           </div>
         </div>
       ))}
+    </div>
+  )
+}
+
+function AdminTab({
+  account,
+  closedByMember,
+  partnerMember,
+  allTeamMembers,
+  onUpdate,
+}: {
+  account: AccountWithStatus
+  closedByMember: TeamMember | null
+  partnerMember: TeamMember | null
+  allTeamMembers: TeamMember[]
+  onUpdate: (updated: AccountWithStatus) => void
+}) {
+  const [billingType, setBillingType] = useState(account.billing_billing_type_override ?? '')
+  const [quickbooksId, setQuickbooksId] = useState(account.quickbooks_id?.toString() ?? '')
+  const [apEmail, setApEmail] = useState(account.ap_email ?? '')
+  const [logoPath, setLogoPath] = useState(account.logo_path ?? '')
+  const [closedById, setClosedById] = useState(account.sales_closed_by_override ?? '')
+  const [partnerId, setPartnerId] = useState(account.partner_id ?? '')
+  const [logoMode, setLogoMode] = useState<'url' | 'upload'>('url')
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+
+  async function handleSave() {
+    setSaving(true)
+    const { error } = await supabase
+      .from('accounts')
+      .update({
+        sales_closed_by_override: closedById || null,
+        partner_id: partnerId || null,
+        billing_billing_type_override: billingType || null,
+        quickbooks_id: quickbooksId ? parseInt(quickbooksId, 10) : null,
+        logo_path: logoPath || null,
+        ap_email: apEmail || null,
+      })
+      .eq('id', account.id)
+
+    if (!error) {
+      onUpdate({
+        ...account,
+        sales_closed_by_override: closedById || null,
+        partner_id: partnerId || null,
+        billing_billing_type_override: billingType || null,
+        quickbooks_id: quickbooksId ? parseInt(quickbooksId, 10) : null,
+        logo_path: logoPath || null,
+        ap_email: apEmail || null,
+      })
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2000)
+    }
+    setSaving(false)
+  }
+
+  async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    const fileExt = file.name.split('.').pop()
+    const filePath = `logos/${account.id}.${fileExt}`
+
+    const { error } = await supabase.storage
+      .from('assets')
+      .upload(filePath, file, { upsert: true })
+
+    if (!error) {
+      const { data: urlData } = supabase.storage
+        .from('assets')
+        .getPublicUrl(filePath)
+      setLogoPath(urlData.publicUrl)
+    }
+  }
+
+  function TeamMemberDisplay({ member, label }: { member: TeamMember | null; label: string }) {
+    if (!member) {
+      return (
+        <p className="text-sm text-text-secondary italic">No {label.toLowerCase()} assigned</p>
+      )
+    }
+    const name = [member.first_name, member.last_name].filter(Boolean).join(' ')
+    return (
+      <div className="flex items-center gap-3">
+        <div className="w-8 h-8 rounded-full bg-purple-muted flex items-center justify-center flex-shrink-0">
+          {member.photo ? (
+            <img src={member.photo} alt={name} className="w-8 h-8 rounded-full object-cover" />
+          ) : (
+            <User size={14} className="text-purple" />
+          )}
+        </div>
+        <span className="text-sm text-text-primary">{name}</span>
+      </div>
+    )
+  }
+
+  const activeTeam = allTeamMembers.filter((t) => t.active !== 'false')
+
+  return (
+    <div className="space-y-6">
+      {/* Closed By */}
+      <div className="space-y-2">
+        <label className="text-xs font-medium text-text-secondary uppercase tracking-wide">Closed By</label>
+        <TeamMemberDisplay member={closedByMember} label="Closed by" />
+        <select
+          value={closedById}
+          onChange={(e) => setClosedById(e.target.value)}
+          className="w-full bg-black/20 border border-border rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-purple"
+        >
+          <option value="">— None —</option>
+          {activeTeam.map((t) => (
+            <option key={t.id} value={t.id}>
+              {[t.first_name, t.last_name].filter(Boolean).join(' ')}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {/* Partner */}
+      <div className="space-y-2">
+        <label className="text-xs font-medium text-text-secondary uppercase tracking-wide">Partner</label>
+        <TeamMemberDisplay member={partnerMember} label="Partner" />
+        <select
+          value={partnerId}
+          onChange={(e) => setPartnerId(e.target.value)}
+          className="w-full bg-black/20 border border-border rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-purple"
+        >
+          <option value="">— None —</option>
+          {activeTeam.map((t) => (
+            <option key={t.id} value={t.id}>
+              {[t.first_name, t.last_name].filter(Boolean).join(' ')}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {/* Billing Type */}
+      <div className="space-y-2">
+        <label className="text-xs font-medium text-text-secondary uppercase tracking-wide">Billing Type</label>
+        <select
+          value={billingType}
+          onChange={(e) => setBillingType(e.target.value)}
+          className="w-full bg-black/20 border border-border rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-purple"
+        >
+          <option value="">— None —</option>
+          <option value="Hourly">Hourly</option>
+          <option value="Retainer">Retainer</option>
+        </select>
+      </div>
+
+      {/* QuickBooks ID */}
+      <div className="space-y-2">
+        <label className="text-xs font-medium text-text-secondary uppercase tracking-wide">QuickBooks ID</label>
+        <input
+          type="number"
+          value={quickbooksId}
+          onChange={(e) => setQuickbooksId(e.target.value)}
+          placeholder="Enter QuickBooks ID"
+          className="w-full bg-black/20 border border-border rounded-lg px-3 py-2 text-sm text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:border-purple"
+        />
+      </div>
+
+      {/* Logo */}
+      <div className="space-y-2">
+        <label className="text-xs font-medium text-text-secondary uppercase tracking-wide">Logo</label>
+        {logoPath && (
+          <div className="mb-2">
+            <img src={logoPath} alt="Account logo" className="w-16 h-16 rounded-xl object-cover border border-border" />
+          </div>
+        )}
+        <div className="flex gap-2 mb-2">
+          <button
+            onClick={() => setLogoMode('url')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+              logoMode === 'url' ? 'bg-purple text-white' : 'bg-black/20 text-text-secondary hover:text-text-primary border border-border'
+            }`}
+          >
+            <LinkIcon size={12} />
+            URL
+          </button>
+          <button
+            onClick={() => setLogoMode('upload')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+              logoMode === 'upload' ? 'bg-purple text-white' : 'bg-black/20 text-text-secondary hover:text-text-primary border border-border'
+            }`}
+          >
+            <Upload size={12} />
+            Upload
+          </button>
+        </div>
+        {logoMode === 'url' ? (
+          <input
+            type="url"
+            value={logoPath}
+            onChange={(e) => setLogoPath(e.target.value)}
+            placeholder="Paste image URL"
+            className="w-full bg-black/20 border border-border rounded-lg px-3 py-2 text-sm text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:border-purple"
+          />
+        ) : (
+          <input
+            type="file"
+            accept="image/*"
+            onChange={handleFileUpload}
+            className="w-full bg-black/20 border border-border rounded-lg px-3 py-2 text-sm text-text-primary file:mr-3 file:rounded-lg file:border-0 file:bg-purple file:px-3 file:py-1 file:text-xs file:font-medium file:text-white"
+          />
+        )}
+      </div>
+
+      {/* Accounts Payable Email */}
+      <div className="space-y-2">
+        <label className="text-xs font-medium text-text-secondary uppercase tracking-wide">Accounts Payable Email</label>
+        <div className="flex items-center gap-2">
+          <Mail size={16} className="text-text-secondary flex-shrink-0" />
+          <input
+            type="email"
+            value={apEmail}
+            onChange={(e) => setApEmail(e.target.value)}
+            placeholder="ap@company.com"
+            className="w-full bg-black/20 border border-border rounded-lg px-3 py-2 text-sm text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:border-purple"
+          />
+        </div>
+      </div>
+
+      {/* Save button */}
+      <div className="pt-2">
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="flex items-center gap-2 px-4 py-2 bg-purple text-white rounded-lg text-sm font-medium hover:bg-purple/90 transition-colors disabled:opacity-50"
+        >
+          {saving ? (
+            <>Saving...</>
+          ) : saved ? (
+            <>
+              <CheckCircle2 size={16} />
+              Saved
+            </>
+          ) : (
+            <>
+              <Save size={16} />
+              Save Changes
+            </>
+          )}
+        </button>
+      </div>
     </div>
   )
 }
