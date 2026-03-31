@@ -3,8 +3,8 @@ import { Wallet } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 
 interface PayoutRow {
-  id: string
-  created_at: string | null
+  row_id: string
+  created_date: string | null
   team_member_id: string | null
   week_id: string | null
   status_id: number | null
@@ -34,9 +34,13 @@ export default function PayrollPage() {
     async function fetchData() {
       setLoading(true)
 
-      const { data: payoutsData } = await supabase
+      const { data: payoutsData, error: payoutsError } = await supabase
         .from('payouts')
-        .select('id, created_at, team_member_id, week_id, status_id, payout_from_time_logs, team(first_name, last_name, photo), options(option_label)')
+        .select('row_id, created_date, team_member_id, week_id, status_id, payout_from_time_logs, team(first_name, last_name, photo), options(option_label)')
+
+      if (payoutsError) {
+        console.error('Error fetching payouts:', payoutsError)
+      }
 
       if (!payoutsData) {
         setLoading(false)
@@ -44,8 +48,8 @@ export default function PayrollPage() {
       }
 
       const rows: PayoutRow[] = payoutsData.map((p: Record<string, unknown>) => ({
-        id: p.id as string,
-        created_at: p.created_at as string | null,
+        row_id: p.row_id as string,
+        created_date: p.created_date as string | null,
         team_member_id: p.team_member_id as string | null,
         week_id: p.week_id as string | null,
         status_id: p.status_id as number | null,
@@ -63,11 +67,15 @@ export default function PayrollPage() {
         const weekIds = [...new Set(openRows.map((r) => r.week_id).filter(Boolean))] as string[]
         const memberIds = [...new Set(openRows.map((r) => r.team_member_id).filter(Boolean))] as string[]
 
-        const { data: linesData } = await supabase
+        const { data: linesData, error: linesError } = await supabase
           .from('payout_lines')
           .select('week_id, assigned_to_id, total')
           .in('week_id', weekIds)
           .in('assigned_to_id', memberIds)
+
+        if (linesError) {
+          console.error('Error fetching payout_lines:', linesError)
+        }
 
         if (linesData) {
           const totalsMap: Record<string, number> = {}
@@ -171,7 +179,7 @@ export default function PayrollPage() {
 
             return (
               <div
-                key={payout.id}
+                key={payout.row_id}
                 className="flex items-center gap-4 p-4 bg-surface rounded-xl border border-border hover:border-purple/20 transition-colors"
               >
                 {/* Team Member */}
@@ -189,7 +197,7 @@ export default function PayrollPage() {
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-text-primary truncate">{name}</p>
                   <p className="text-xs text-text-secondary mt-0.5">
-                    {formatDate(payout.created_at)}
+                    {formatDate(payout.created_date)}
                   </p>
                 </div>
 
