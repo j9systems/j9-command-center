@@ -7,9 +7,11 @@ import {
   Clock,
   ChevronLeft,
   ChevronRight,
+  Play,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import type { Task, Meeting, TeamMember, Option } from '@/types/database'
+import StartTimeLogModal from '@/components/timelog/StartTimeLogModal'
 
 type TaskWithDetails = Task & {
   assigned_to?: TeamMember | null
@@ -41,6 +43,7 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true)
   const [displayName, setDisplayName] = useState('')
   const [taskPage, setTaskPage] = useState(0)
+  const [showTimerModal, setShowTimerModal] = useState(false)
 
   useEffect(() => {
     async function fetchData() {
@@ -193,9 +196,20 @@ export default function HomePage() {
 
   return (
     <div className="p-4 md:p-8 max-w-4xl mx-auto">
-      <h2 className="text-2xl font-bold mb-6 text-text-primary">
-        {displayName ? `Welcome back, ${displayName}` : 'Welcome back'}
-      </h2>
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="text-2xl font-bold text-text-primary">
+          {displayName ? `Welcome back, ${displayName}` : 'Welcome back'}
+        </h2>
+        <button
+          onClick={() => setShowTimerModal(true)}
+          className="flex items-center gap-2 px-4 py-2.5 bg-purple hover:bg-purple-hover text-white text-sm font-medium rounded-lg transition-colors"
+        >
+          <Play size={14} />
+          Start Timer
+        </button>
+      </div>
+
+      <StartTimeLogModal open={showTimerModal} onClose={() => setShowTimerModal(false)} />
 
       {/* Open Tasks */}
       <div className="bg-surface rounded-xl border border-border p-5 mb-6">
