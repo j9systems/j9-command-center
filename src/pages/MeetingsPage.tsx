@@ -48,10 +48,6 @@ function formatTime(dateStr: string): string {
   return new Date(dateStr).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
 }
 
-function formatDateHeading(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
-}
-
 export default function MeetingsPage() {
   const navigate = useNavigate()
   const [currentDate, setCurrentDate] = useState(new Date())
