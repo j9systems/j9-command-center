@@ -125,6 +125,7 @@ export default function AccountDetailPage() {
   const [activeTab, setActiveTab] = useState<'projects' | 'tasks' | 'time_logs' | 'invoices' | 'contacts' | 'team' | 'meetings' | 'admin'>('projects')
   const [showTimerModal, setShowTimerModal] = useState(false)
   const tabsContainerRef = useRef<HTMLDivElement>(null)
+  const tabsSectionRef = useRef<HTMLDivElement>(null)
   const [canScrollLeft, setCanScrollLeft] = useState(false)
   const [canScrollRight, setCanScrollRight] = useState(false)
 
@@ -150,6 +151,17 @@ export default function AccountDetailPage() {
       observer.disconnect()
     }
   }, [updateScrollButtons, loading])
+
+  function handleSummaryCardClick(tab: typeof activeTab) {
+    setActiveTab(tab)
+    // On mobile, scroll to the tabs section
+    if (window.innerWidth < 768 && tabsSectionRef.current) {
+      setTimeout(() => {
+        tabsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }, 50)
+    }
+  }
+
   const [closedByMember, setClosedByMember] = useState<TeamMember | null>(null)
   const [partnerMember, setPartnerMember] = useState<TeamMember | null>(null)
   const [allTeamMembers, setAllTeamMembers] = useState<TeamMember[]>([])
@@ -629,7 +641,7 @@ export default function AccountDetailPage() {
             {/* Open Tasks */}
             <div
               className="bg-surface rounded-xl border border-border p-5 cursor-pointer hover:border-purple/30 transition-colors"
-              onClick={() => setActiveTab('tasks')}
+              onClick={() => handleSummaryCardClick('tasks')}
             >
               <div className="flex items-center gap-3 mb-2">
                 <div className="w-9 h-9 rounded-lg bg-amber-500/15 flex items-center justify-center flex-shrink-0">
@@ -658,7 +670,7 @@ export default function AccountDetailPage() {
             {/* Active Projects */}
             <div
               className="bg-surface rounded-xl border border-border p-5 cursor-pointer hover:border-purple/30 transition-colors"
-              onClick={() => setActiveTab('projects')}
+              onClick={() => handleSummaryCardClick('projects')}
             >
               <div className="flex items-center gap-3 mb-2">
                 <div className="w-9 h-9 rounded-lg bg-emerald-500/15 flex items-center justify-center flex-shrink-0">
@@ -687,7 +699,7 @@ export default function AccountDetailPage() {
             {/* Next Meeting */}
             <div
               className="bg-surface rounded-xl border border-border p-5 cursor-pointer hover:border-purple/30 transition-colors"
-              onClick={() => setActiveTab('meetings')}
+              onClick={() => handleSummaryCardClick('meetings')}
             >
               <div className="flex items-center gap-3 mb-2">
                 <div className="w-9 h-9 rounded-lg bg-purple-500/15 flex items-center justify-center flex-shrink-0">
@@ -740,7 +752,7 @@ export default function AccountDetailPage() {
       <GanttChart projects={projects} accountId={id!} />
 
       {/* Tab headers */}
-      <div className="bg-surface rounded-t-xl border border-b-0 border-border overflow-hidden">
+      <div ref={tabsSectionRef} className="bg-surface rounded-t-xl border border-b-0 border-border overflow-hidden">
         <div className="relative border-b border-border">
           <div ref={tabsContainerRef} className="flex overflow-x-auto scrollbar-hide">
             {tabs.map((tab) => (
