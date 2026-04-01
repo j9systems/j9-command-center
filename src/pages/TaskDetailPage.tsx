@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, Link, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft,
   CalendarDays,
@@ -9,6 +9,7 @@ import {
   X,
   Save,
   CheckCircle2,
+  Trash2,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import type { Task, TeamMember, Option } from '@/types/database'
@@ -23,6 +24,7 @@ type TaskWithAssignee = Task & { assigned_to?: TeamMember | null; status_option?
 
 export default function TaskDetailPage() {
   const { id: accountId, taskId } = useParams<{ id: string; taskId: string }>()
+  const navigate = useNavigate()
   const [task, setTask] = useState<TaskWithAssignee | null>(null)
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
   const [taskStatuses, setTaskStatuses] = useState<Option[]>([])
@@ -30,6 +32,8 @@ export default function TaskDetailPage() {
   const [editing, setEditing] = useState(false)
   const [saving, setSaving] = useState(false)
   const [completing, setCompleting] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   // Edit form state
   const [editName, setEditName] = useState('')
@@ -161,6 +165,19 @@ export default function TaskDetailPage() {
     setCompleting(false)
   }
 
+  async function handleDeleteTask() {
+    if (!taskId) return
+    setDeleting(true)
+    const { error } = await supabase
+      .from('tasks')
+      .delete()
+      .eq('row_id', taskId)
+    if (!error) {
+      navigate(`/accounts/${accountId}`)
+    }
+    setDeleting(false)
+  }
+
   if (loading) {
     return (
       <div className="p-4 md:p-8 max-w-4xl mx-auto">
@@ -261,6 +278,33 @@ export default function TaskDetailPage() {
                 <Pencil size={12} />
                 Edit
               </button>
+            )}
+            {!editing && !showDeleteConfirm && (
+              <button
+                onClick={() => setShowDeleteConfirm(true)}
+                className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-border text-text-secondary hover:text-red-400 hover:border-red-500/30 transition-colors"
+              >
+                <Trash2 size={12} />
+                Delete
+              </button>
+            )}
+            {showDeleteConfirm && (
+              <div className="flex items-center gap-2 p-2 bg-red-500/10 border border-red-500/20 rounded-lg">
+                <span className="text-xs text-red-400">Delete this task?</span>
+                <button
+                  onClick={handleDeleteTask}
+                  disabled={deleting}
+                  className="text-xs font-medium px-2.5 py-1 rounded-lg bg-red-500/15 text-red-400 hover:bg-red-500/25 transition-colors disabled:opacity-50"
+                >
+                  {deleting ? 'Deleting...' : 'Confirm'}
+                </button>
+                <button
+                  onClick={() => setShowDeleteConfirm(false)}
+                  className="text-xs font-medium px-2.5 py-1 rounded-lg text-text-secondary hover:text-text-primary transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
             )}
           </div>
         </div>

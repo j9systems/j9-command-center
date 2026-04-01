@@ -6,6 +6,7 @@ import {
   FolderKanban,
   Pencil,
   Plus,
+  Save,
   X,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
@@ -43,6 +44,9 @@ export default function ProjectDetailPage() {
   const [editStart, setEditStart] = useState('')
   const [editEnd, setEditEnd] = useState('')
   const [savingDates, setSavingDates] = useState(false)
+  const [editingDescription, setEditingDescription] = useState(false)
+  const [editDescription, setEditDescription] = useState('')
+  const [savingDescription, setSavingDescription] = useState(false)
 
   useEffect(() => {
     if (!projectId) return
@@ -165,6 +169,25 @@ export default function ProjectDetailPage() {
     setSavingDates(false)
   }
 
+  function startEditingDescription() {
+    setEditDescription(project?.description ?? '')
+    setEditingDescription(true)
+  }
+
+  async function handleSaveDescription() {
+    if (!projectId || !project) return
+    setSavingDescription(true)
+    const { error } = await supabase
+      .from('projects')
+      .update({ description: editDescription.trim() || null })
+      .eq('id', projectId)
+    if (!error) {
+      setProject({ ...project, description: editDescription.trim() || null })
+      setEditingDescription(false)
+    }
+    setSavingDescription(false)
+  }
+
   if (loading) {
     return (
       <div className="p-4 md:p-8 max-w-4xl mx-auto">
@@ -269,6 +292,62 @@ export default function ProjectDetailPage() {
               </div>
             )}
           </div>
+        </div>
+      </div>
+
+      {/* Project Overview */}
+      <div className="bg-surface rounded-xl border border-border overflow-hidden mb-6">
+        <div className="flex items-center justify-between px-5 py-3 border-b border-border">
+          <h2 className="text-sm font-semibold text-text-secondary uppercase tracking-wider">
+            Overview
+          </h2>
+          {!editingDescription && (
+            <button
+              onClick={startEditingDescription}
+              className="inline-flex items-center gap-1.5 text-xs font-medium text-purple hover:text-purple-hover transition-colors"
+            >
+              <Pencil size={12} />
+              Edit
+            </button>
+          )}
+        </div>
+        <div className="p-5">
+          {editingDescription ? (
+            <div className="space-y-3">
+              <textarea
+                value={editDescription}
+                onChange={(e) => setEditDescription(e.target.value)}
+                rows={6}
+                placeholder="Add a project description..."
+                className="w-full text-sm bg-black/30 border border-border rounded-lg px-3 py-2 text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:border-purple/50 resize-y leading-relaxed"
+              />
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleSaveDescription}
+                  disabled={savingDescription}
+                  className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-purple text-white hover:bg-purple-hover transition-colors disabled:opacity-50"
+                >
+                  <Save size={12} />
+                  {savingDescription ? 'Saving...' : 'Save'}
+                </button>
+                <button
+                  onClick={() => setEditingDescription(false)}
+                  className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-border text-text-secondary hover:text-text-primary transition-colors"
+                >
+                  <X size={12} />
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : project.description ? (
+            <p className="text-sm text-text-primary whitespace-pre-wrap leading-relaxed">
+              {project.description}
+            </p>
+          ) : (
+            <p className="text-sm text-text-secondary">
+              No description yet. Click "Edit" to add one.
+            </p>
+          )}
         </div>
       </div>
 

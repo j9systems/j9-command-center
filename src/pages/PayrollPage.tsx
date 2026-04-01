@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Wallet, Play, CheckCheck, Loader2, AlertTriangle, ChevronDown, ChevronUp } from 'lucide-react'
+import { Wallet, Play, CheckCheck, Loader2, AlertTriangle, ChevronDown, ChevronUp, Trash2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 
 interface PayrollResult {
@@ -84,6 +84,10 @@ export default function PayrollPage() {
   const [finalizingPayouts, setFinalizingPayouts] = useState(false)
   const [finalizeResult, setFinalizeResult] = useState<FinalizeResult | null>(null)
   const [finalizeError, setFinalizeError] = useState<string | null>(null)
+
+  // Delete payout state
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
 
   // Payroll Preview state
   const [preview, setPreview] = useState<PreviewResult | null>(null)
@@ -220,6 +224,28 @@ export default function PayrollPage() {
     } finally {
       setFinalizingPayouts(false)
     }
+  }
+
+  async function handleDeletePayout(rowId: string) {
+    setDeletingId(rowId)
+    // Delete related payout_lines first
+    const payout = payouts.find((p) => p.row_id === rowId)
+    if (payout?.week_id && payout?.team_member_id) {
+      await supabase
+        .from('payout_lines')
+        .delete()
+        .eq('week_id', payout.week_id)
+        .eq('assigned_to_id', payout.team_member_id)
+    }
+    const { error } = await supabase
+      .from('payouts')
+      .delete()
+      .eq('row_id', rowId)
+    if (!error) {
+      setPayouts((prev) => prev.filter((p) => p.row_id !== rowId))
+    }
+    setDeletingId(null)
+    setConfirmDeleteId(null)
   }
 
   function getTotal(payout: PayoutRow): number {
@@ -464,6 +490,37 @@ export default function PayrollPage() {
                     {formatCurrency(total)}
                   </span>
                 </div>
+
+                {/* Delete button for open payouts */}
+                {isOpen && (
+                  <div className="flex-shrink-0">
+                    {confirmDeleteId === payout.row_id ? (
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => handleDeletePayout(payout.row_id)}
+                          disabled={deletingId === payout.row_id}
+                          className="text-[10px] font-medium px-2 py-1 rounded-lg bg-red-500/15 text-red-400 hover:bg-red-500/25 transition-colors disabled:opacity-50"
+                        >
+                          {deletingId === payout.row_id ? '...' : 'Confirm'}
+                        </button>
+                        <button
+                          onClick={() => setConfirmDeleteId(null)}
+                          className="text-[10px] font-medium px-2 py-1 rounded-lg text-text-secondary hover:text-text-primary transition-colors"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setConfirmDeleteId(payout.row_id)}
+                        className="p-1.5 rounded-lg text-text-secondary hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                        title="Delete payout"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             )
           })}

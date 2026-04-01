@@ -792,6 +792,7 @@ export default function AccountDetailPage() {
               accountId={id!}
               taskStatuses={taskStatuses}
               projects={projects}
+              teamMembers={allTeamMembers}
               onMarkComplete={async (taskId) => {
                 const completeOption = taskStatuses.find((s) => s.option_key === 'complete')
                 if (!completeOption) return
@@ -1721,6 +1722,7 @@ function TasksTab({
   accountId,
   taskStatuses,
   projects,
+  teamMembers,
   onMarkComplete,
   onTaskCreated,
 }: {
@@ -1728,6 +1730,7 @@ function TasksTab({
   accountId: string
   taskStatuses: Option[]
   projects: (Project & { project_manager?: TeamMember | null; logged_hours: number })[]
+  teamMembers: TeamMember[]
   onMarkComplete: (taskId: string) => Promise<void>
   onTaskCreated: (task: Task & { assigned_to?: TeamMember | null; status_option?: Option | null }) => void
 }) {
@@ -1737,6 +1740,7 @@ function TasksTab({
   const [newName, setNewName] = useState('')
   const [newDue, setNewDue] = useState('')
   const [newProjectId, setNewProjectId] = useState('')
+  const [newAssigneeId, setNewAssigneeId] = useState('')
   const [saving, setSaving] = useState(false)
 
   async function handleCreateTask() {
@@ -1753,6 +1757,7 @@ function TasksTab({
         project_id: newProjectId || null,
         due: newDue || null,
         status_id: backlogStatus?.id ?? null,
+        assigned_to_id_internal: newAssigneeId || null,
       })
       .select('*, team!fk_tasks_assigned_to_id_internal(id, first_name, last_name, photo), options!fk_tasks_status_id(id, option_key, option_label)')
       .single()
@@ -1768,6 +1773,7 @@ function TasksTab({
       setNewName('')
       setNewDue('')
       setNewProjectId('')
+      setNewAssigneeId('')
       setShowForm(false)
     }
     setSaving(false)
@@ -1883,7 +1889,7 @@ function TasksTab({
               onChange={(e) => setNewName(e.target.value)}
               className="w-full text-sm bg-surface border border-border rounded-lg px-3 py-2 text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:border-purple/50"
             />
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
                 <label className="text-[10px] text-text-secondary uppercase tracking-wider mb-1 block">Due Date</label>
                 <input
@@ -1903,6 +1909,21 @@ function TasksTab({
                   <option value="">None</option>
                   {projects.map((p) => (
                     <option key={p.id} value={p.id}>{p.name ?? 'Untitled'}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-[10px] text-text-secondary uppercase tracking-wider mb-1 block">Assignee</label>
+                <select
+                  value={newAssigneeId}
+                  onChange={(e) => setNewAssigneeId(e.target.value)}
+                  className="w-full text-sm bg-surface border border-border rounded-lg px-3 py-2 text-text-primary focus:outline-none focus:border-purple/50"
+                >
+                  <option value="">Unassigned</option>
+                  {teamMembers.filter((t) => t.active === 'true' || t.active === '3').map((tm) => (
+                    <option key={tm.id} value={tm.id}>
+                      {[tm.first_name, tm.last_name].filter(Boolean).join(' ')}
+                    </option>
                   ))}
                 </select>
               </div>

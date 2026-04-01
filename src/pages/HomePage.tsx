@@ -44,6 +44,7 @@ export default function HomePage() {
   const [displayName, setDisplayName] = useState('')
   const [taskPage, setTaskPage] = useState(0)
   const [showTimerModal, setShowTimerModal] = useState(false)
+  const [completingTaskId, setCompletingTaskId] = useState<string | null>(null)
 
   useEffect(() => {
     async function fetchData() {
@@ -162,6 +163,31 @@ export default function HomePage() {
     fetchData()
   }, [])
 
+  async function handleMarkTaskComplete(e: React.MouseEvent, taskId: string) {
+    e.preventDefault()
+    e.stopPropagation()
+    setCompletingTaskId(taskId)
+
+    const { data: completeOption } = await supabase
+      .from('options')
+      .select('id')
+      .eq('category', 'task_status')
+      .eq('option_key', 'complete')
+      .maybeSingle()
+
+    if (completeOption) {
+      const { error } = await supabase
+        .from('tasks')
+        .update({ status_id: completeOption.id })
+        .eq('row_id', taskId)
+
+      if (!error) {
+        setTasks((prev) => prev.filter((t) => t.row_id !== taskId))
+      }
+    }
+    setCompletingTaskId(null)
+  }
+
   function formatDate(dateStr: string | null): string {
     if (!dateStr) return ''
     const d = new Date(dateStr)
@@ -250,7 +276,14 @@ export default function HomePage() {
                   to={`/accounts/${task.account_id}/tasks/${task.row_id}`}
                   className="flex items-center gap-3 p-3 bg-black/20 rounded-lg border border-border/50 hover:border-border transition-colors"
                 >
-                  <CheckCircle2 size={16} className="text-text-secondary flex-shrink-0" />
+                  <button
+                    onClick={(e) => handleMarkTaskComplete(e, task.row_id)}
+                    disabled={completingTaskId === task.row_id}
+                    className="flex-shrink-0 text-text-secondary hover:text-emerald-400 transition-colors disabled:opacity-50"
+                    title="Mark complete"
+                  >
+                    <CheckCircle2 size={16} />
+                  </button>
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium text-text-primary truncate">
                       {task.name ?? 'Untitled Task'}
