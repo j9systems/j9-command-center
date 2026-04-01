@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import {
   CheckCircle2,
@@ -153,11 +153,9 @@ export default function HomePage() {
   const displayName = queryData?.displayName ?? ''
   const meetings = queryData?.meetings ?? []
 
-  // Sync tasks from query into mutable local state (for optimistic complete)
-  const queryTasks = queryData?.tasks
-  if (queryTasks && tasks.length === 0 && queryTasks.length > 0) {
-    setTasks(queryTasks)
-  }
+  useEffect(() => {
+    if (queryData?.tasks) setTasks(queryData.tasks)
+  }, [queryData])
 
   async function handleMarkTaskComplete(e: React.MouseEvent, taskId: string) {
     e.preventDefault()

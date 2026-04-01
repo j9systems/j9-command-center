@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft,
@@ -69,7 +69,7 @@ export default function ProjectDetailPage() {
   const [editDescription, setEditDescription] = useState('')
   const [savingDescription, setSavingDescription] = useState(false)
 
-  const { data: queryData, isLoading: loading } = useQuery({
+  const { data: queryData, isLoading } = useQuery({
     queryKey: ['project', projectId],
     queryFn: async () => {
       const { data: projectData } = await supabase
@@ -121,6 +121,13 @@ export default function ProjectDetailPage() {
     },
     enabled: !!projectId,
   })
+
+  useEffect(() => {
+    if (!queryData) return
+    if (queryData.project) setProject(queryData.project)
+  }, [queryData])
+
+  const loading = isLoading || (!!queryData && !project && !!queryData.project)
 
   const featureStatuses = queryData?.featureStatuses ?? []
 

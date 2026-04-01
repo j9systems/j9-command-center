@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft,
@@ -96,7 +96,7 @@ export default function MeetingDetailPage() {
     setSavingNotes(false)
   }
 
-  const { data: queryData, isLoading: loading } = useQuery({
+  const { data: queryData, isLoading } = useQuery({
     queryKey: ['meeting', meetingId],
     queryFn: async () => {
       // Fetch meeting
@@ -146,7 +146,8 @@ export default function MeetingDetailPage() {
         }
       }
 
-      setMeeting({ ...meetingRecord, attendees })
+      const meetingWithAttendees: MeetingWithAttendees = { ...meetingRecord, attendees }
+      setMeeting(meetingWithAttendees)
 
       // Fetch tasks linked to this meeting
       const { data: tasksData } = await supabase
@@ -155,16 +156,16 @@ export default function MeetingDetailPage() {
         .eq('from_meeting_id', meetingId!)
         .order('created', { ascending: false })
 
+      let mappedTasks: TaskWithAssignee[] = []
       if (tasksData) {
-        setTasks(
-          tasksData.map((t) => ({
-            ...t,
-            assigned_to: t.team as unknown as TeamMember | null,
-            status_option: t.options as unknown as Option | null,
-            team: undefined,
-            options: undefined,
-          })) as TaskWithAssignee[]
-        )
+        mappedTasks = tasksData.map((t) => ({
+          ...t,
+          assigned_to: t.team as unknown as TeamMember | null,
+          status_option: t.options as unknown as Option | null,
+          team: undefined,
+          options: undefined,
+        })) as TaskWithAssignee[]
+        setTasks(mappedTasks)
       }
 
       // Fetch task statuses
@@ -198,10 +199,18 @@ export default function MeetingDetailPage() {
         if (allTeam) assignableMembers = allTeam as TeamMember[]
       }
 
-      return { taskStatuses, assignableMembers }
+      return { meeting: meetingWithAttendees, tasks: mappedTasks, taskStatuses, assignableMembers }
     },
     enabled: !!meetingId,
   })
+
+  useEffect(() => {
+    if (!queryData) return
+    if (queryData.meeting) setMeeting(queryData.meeting)
+    if (queryData.tasks) setTasks(queryData.tasks)
+  }, [queryData])
+
+  const loading = isLoading || (!!queryData && !meeting && !!queryData.meeting)
 
   const taskStatuses = queryData?.taskStatuses ?? []
   const assignableMembers = queryData?.assignableMembers ?? []

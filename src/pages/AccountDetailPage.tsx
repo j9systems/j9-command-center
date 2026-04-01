@@ -134,7 +134,7 @@ export default function AccountDetailPage() {
   const [billingTypeOptions, setBillingTypeOptions] = useState<Option[]>([])
   const [refreshKey, setRefreshKey] = useState(0)
 
-  const { isLoading: loading } = useQuery({
+  const { data: queryData, isLoading } = useQuery({
     queryKey: ['account', id, refreshKey],
     queryFn: async () => {
       // Fetch account
@@ -144,14 +144,16 @@ export default function AccountDetailPage() {
         .eq('id', id!)
         .single()
 
+      let mappedAccount: AccountWithStatus | null = null
       if (accountData) {
         const opt = accountData.options as { option_key: string; option_label: string } | null
-        setAccount({
+        mappedAccount = {
           ...accountData,
           status_label: opt?.option_label ?? null,
           status_key: opt?.option_key ?? null,
           options: undefined,
-        } as AccountWithStatus)
+        } as AccountWithStatus
+        setAccount(mappedAccount)
       }
 
       // Fetch all account contacts
@@ -160,14 +162,15 @@ export default function AccountDetailPage() {
         .select('*, contacts(*)')
         .eq('account_id', id!)
 
+      let mappedContacts: (AccountContact & { contact: Contact })[] | null = null
       if (contactLinks) {
-        const mapped = contactLinks
+        mappedContacts = contactLinks
           .filter((cl) => cl.contacts)
           .map((cl) => {
             const { contacts, ...rest } = cl as AccountContact & { contacts: Contact }
             return { ...rest, contact: contacts }
           })
-        setAccountContacts(mapped)
+        setAccountContacts(mappedContacts)
       }
 
       // Fetch projects first (needed for task lookup)
@@ -222,15 +225,14 @@ export default function AccountDetailPage() {
         return a.due.localeCompare(b.due)
       })
 
-      setTasks(
-        uniqueTasks.map((t) => ({
-          ...t,
-          assigned_to: t.team as TeamMember | null,
-          status_option: t.options as Option | null,
-          team: undefined,
-          options: undefined,
-        })) as (Task & { assigned_to?: TeamMember | null; status_option?: Option | null })[]
-      )
+      const mappedTasks = uniqueTasks.map((t) => ({
+        ...t,
+        assigned_to: t.team as TeamMember | null,
+        status_option: t.options as Option | null,
+        team: undefined,
+        options: undefined,
+      })) as (Task & { assigned_to?: TeamMember | null; status_option?: Option | null })[]
+      setTasks(mappedTasks)
 
       // Fetch time log hours grouped by project
       const { data: projectHoursData } = await supabase
@@ -247,15 +249,15 @@ export default function AccountDetailPage() {
         }
       }
 
+      let mappedProjects: (Project & { project_manager?: TeamMember | null; logged_hours: number })[] | null = null
       if (projectsData) {
-        setProjects(
-          projectsData.map((p) => ({
-            ...p,
-            project_manager: p.team as TeamMember | null,
-            logged_hours: hoursByProject[p.id] ?? 0,
-            team: undefined,
-          })) as (Project & { project_manager?: TeamMember | null; logged_hours: number })[]
-        )
+        mappedProjects = projectsData.map((p) => ({
+          ...p,
+          project_manager: p.team as TeamMember | null,
+          logged_hours: hoursByProject[p.id] ?? 0,
+          team: undefined,
+        })) as (Project & { project_manager?: TeamMember | null; logged_hours: number })[]
+        setProjects(mappedProjects)
       }
 
       // Fetch timelog status options
@@ -264,8 +266,10 @@ export default function AccountDetailPage() {
         .select('*')
         .eq('category', 'timelog_status')
 
+      let mappedTimeLogStatuses: Option[] | null = null
       if (statusOptions) {
-        setTimeLogStatuses(statusOptions as Option[])
+        mappedTimeLogStatuses = statusOptions as Option[]
+        setTimeLogStatuses(mappedTimeLogStatuses)
       }
 
       // Fetch task status options
@@ -274,8 +278,10 @@ export default function AccountDetailPage() {
         .select('*')
         .eq('category', 'task_status')
 
+      let mappedTaskStatuses: Option[] | null = null
       if (taskStatusOptions) {
-        setTaskStatuses(taskStatusOptions as Option[])
+        mappedTaskStatuses = taskStatusOptions as Option[]
+        setTaskStatuses(mappedTaskStatuses)
       }
 
       // Fetch billing type options
@@ -285,8 +291,10 @@ export default function AccountDetailPage() {
         .eq('category', 'billing_type')
         .order('option_label')
 
+      let mappedBillingTypeOptions: Option[] | null = null
       if (billingTypeOpts) {
-        setBillingTypeOptions(billingTypeOpts as Option[])
+        mappedBillingTypeOptions = billingTypeOpts as Option[]
+        setBillingTypeOptions(mappedBillingTypeOptions)
       }
 
       // Fetch time logs with status option
@@ -297,18 +305,18 @@ export default function AccountDetailPage() {
         .order('date', { ascending: false })
         .limit(50)
 
+      let mappedTimeLogs: (TimeLog & { team_member?: TeamMember | null; project?: { name: string | null } | null; status_option?: Option | null })[] | null = null
       if (timeLogsData) {
-        setTimeLogs(
-          timeLogsData.map((tl) => ({
-            ...tl,
-            team_member: tl.team as TeamMember | null,
-            project: tl.projects as { name: string | null } | null,
-            status_option: tl.options as Option | null,
-            team: undefined,
-            projects: undefined,
-            options: undefined,
-          })) as (TimeLog & { team_member?: TeamMember | null; project?: { name: string | null } | null; status_option?: Option | null })[]
-        )
+        mappedTimeLogs = timeLogsData.map((tl) => ({
+          ...tl,
+          team_member: tl.team as TeamMember | null,
+          project: tl.projects as { name: string | null } | null,
+          status_option: tl.options as Option | null,
+          team: undefined,
+          projects: undefined,
+          options: undefined,
+        })) as (TimeLog & { team_member?: TeamMember | null; project?: { name: string | null } | null; status_option?: Option | null })[]
+        setTimeLogs(mappedTimeLogs)
       }
 
       // Fetch account team members with roles
@@ -317,23 +325,23 @@ export default function AccountDetailPage() {
         .select('id, expected_weekly_hrs, rate_override, commission_override, role_id, team(id, first_name, last_name, email, photo, payouts_contractor_rate, payouts_commission_), account_roles!account_team_role_id_fkey(id, name)')
         .eq('account_id', id!)
 
+      let mappedAccountTeamMembers: AccountTeamMember[] | null = null
       if (accountTeamData) {
-        setAccountTeamMembers(
-          accountTeamData.map((at) => {
-            const teamData = at.team as unknown as Record<string, unknown> | null
-            return {
-              id: at.id,
-              team_member: teamData as unknown as TeamMember | null,
-              role: at.account_roles as unknown as AccountRole | null,
-              role_id: (at as Record<string, unknown>).role_id as number | null,
-              expected_weekly_hrs: at.expected_weekly_hrs,
-              rate_override: (at as Record<string, unknown>).rate_override as string | null,
-              commission_override: (at as Record<string, unknown>).commission_override as string | null,
-              default_rate: teamData?.payouts_contractor_rate as string | null ?? null,
-              default_commission: teamData?.payouts_commission_ as number | null ?? null,
-            }
-          })
-        )
+        mappedAccountTeamMembers = accountTeamData.map((at) => {
+          const teamData = at.team as unknown as Record<string, unknown> | null
+          return {
+            id: at.id,
+            team_member: teamData as unknown as TeamMember | null,
+            role: at.account_roles as unknown as AccountRole | null,
+            role_id: (at as Record<string, unknown>).role_id as number | null,
+            expected_weekly_hrs: at.expected_weekly_hrs,
+            rate_override: (at as Record<string, unknown>).rate_override as string | null,
+            commission_override: (at as Record<string, unknown>).commission_override as string | null,
+            default_rate: teamData?.payouts_contractor_rate as string | null ?? null,
+            default_commission: teamData?.payouts_commission_ as number | null ?? null,
+          }
+        })
+        setAccountTeamMembers(mappedAccountTeamMembers)
       }
 
       // Fetch account roles for add team member form
@@ -342,8 +350,10 @@ export default function AccountDetailPage() {
         .select('*')
         .order('name')
 
+      let mappedAccountRoles: AccountRole[] | null = null
       if (accountRolesData) {
-        setAccountRoles(accountRolesData as AccountRole[])
+        mappedAccountRoles = accountRolesData as AccountRole[]
+        setAccountRoles(mappedAccountRoles)
       }
 
       // Fetch all team members for admin tab lookups
@@ -351,16 +361,26 @@ export default function AccountDetailPage() {
         .from('team')
         .select('id, first_name, last_name, email, photo, role, role_id, desired_hr_capacity, active, phone, personal_email')
 
+      let mappedAllTeamMembers: TeamMember[] | null = null
+      let mappedClosedByMember: TeamMember | null = null
+      let mappedPartnerMember: TeamMember | null = null
       if (allTeamData) {
-        setAllTeamMembers(allTeamData as TeamMember[])
+        mappedAllTeamMembers = allTeamData as TeamMember[]
+        setAllTeamMembers(mappedAllTeamMembers)
 
         if (accountData?.sales_closed_by_override) {
           const found = allTeamData.find((t) => t.id === accountData.sales_closed_by_override)
-          if (found) setClosedByMember(found as TeamMember)
+          if (found) {
+            mappedClosedByMember = found as TeamMember
+            setClosedByMember(mappedClosedByMember)
+          }
         }
         if (accountData?.partner_id) {
           const found = allTeamData.find((t) => t.id === accountData.partner_id)
-          if (found) setPartnerMember(found as TeamMember)
+          if (found) {
+            mappedPartnerMember = found as TeamMember
+            setPartnerMember(mappedPartnerMember)
+          }
         }
       }
 
@@ -371,16 +391,16 @@ export default function AccountDetailPage() {
         .eq('account_id', id!)
         .order('created_date', { ascending: false })
 
+      let mappedInvoices: (Invoice & { project?: { name: string | null } | null; status_option?: Option | null })[] | null = null
       if (invoicesData) {
-        setInvoices(
-          invoicesData.map((inv) => ({
-            ...inv,
-            project: inv.projects as { name: string | null } | null,
-            status_option: inv.options as Option | null,
-            projects: undefined,
-            options: undefined,
-          })) as (Invoice & { project?: { name: string | null } | null; status_option?: Option | null })[]
-        )
+        mappedInvoices = invoicesData.map((inv) => ({
+          ...inv,
+          project: inv.projects as { name: string | null } | null,
+          status_option: inv.options as Option | null,
+          projects: undefined,
+          options: undefined,
+        })) as (Invoice & { project?: { name: string | null } | null; status_option?: Option | null })[]
+        setInvoices(mappedInvoices)
       }
 
       // Fetch meetings
@@ -423,6 +443,7 @@ export default function AccountDetailPage() {
       // Sort by meeting_start descending
       allMeetings.sort((a, b) => (b.meeting_start ?? '').localeCompare(a.meeting_start ?? ''))
 
+      let mappedMeetings: (Meeting & { attendees: { contact: Contact | null; team_member: TeamMember | null }[] })[] = []
       if (allMeetings.length > 0) {
         const meetingIds = allMeetings.map((m) => m.row_id)
 
@@ -442,20 +463,56 @@ export default function AccountDetailPage() {
           })
         }
 
-        setMeetings(
-          allMeetings.map((m) => ({
-            ...m,
-            attendees: attendeesByMeeting[m.row_id] ?? [],
-          }))
-        )
+        mappedMeetings = allMeetings.map((m) => ({
+          ...m,
+          attendees: attendeesByMeeting[m.row_id] ?? [],
+        }))
+        setMeetings(mappedMeetings)
       } else {
-        setMeetings([])
+        setMeetings(mappedMeetings)
       }
 
-      return true
+      return {
+        account: mappedAccount,
+        accountContacts: mappedContacts,
+        tasks: mappedTasks,
+        projects: mappedProjects,
+        timeLogs: mappedTimeLogs,
+        timeLogStatuses: mappedTimeLogStatuses,
+        taskStatuses: mappedTaskStatuses,
+        billingTypeOptions: mappedBillingTypeOptions,
+        accountTeamMembers: mappedAccountTeamMembers,
+        accountRoles: mappedAccountRoles,
+        allTeamMembers: mappedAllTeamMembers,
+        closedByMember: mappedClosedByMember,
+        partnerMember: mappedPartnerMember,
+        invoices: mappedInvoices,
+        meetings: mappedMeetings,
+      }
     },
     enabled: !!id,
   })
+
+  useEffect(() => {
+    if (!queryData) return
+    if (queryData.account) setAccount(queryData.account)
+    if (queryData.accountContacts) setAccountContacts(queryData.accountContacts)
+    if (queryData.tasks) setTasks(queryData.tasks)
+    if (queryData.projects) setProjects(queryData.projects)
+    if (queryData.timeLogs) setTimeLogs(queryData.timeLogs)
+    if (queryData.timeLogStatuses) setTimeLogStatuses(queryData.timeLogStatuses)
+    if (queryData.taskStatuses) setTaskStatuses(queryData.taskStatuses)
+    if (queryData.billingTypeOptions) setBillingTypeOptions(queryData.billingTypeOptions)
+    if (queryData.accountTeamMembers) setAccountTeamMembers(queryData.accountTeamMembers)
+    if (queryData.accountRoles) setAccountRoles(queryData.accountRoles)
+    if (queryData.allTeamMembers) setAllTeamMembers(queryData.allTeamMembers)
+    if (queryData.closedByMember) setClosedByMember(queryData.closedByMember)
+    if (queryData.partnerMember) setPartnerMember(queryData.partnerMember)
+    if (queryData.invoices) setInvoices(queryData.invoices)
+    if (queryData.meetings) setMeetings(queryData.meetings)
+  }, [queryData])
+
+  const loading = isLoading || (!!queryData && !account && !!queryData.account)
 
   const updateScrollButtons = useCallback(() => {
     const el = tabsContainerRef.current

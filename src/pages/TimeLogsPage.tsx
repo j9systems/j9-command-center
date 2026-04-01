@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import {
   Timer,
@@ -109,6 +109,7 @@ export default function TimeLogsPage() {
       setTimeLogs(logs)
 
       return {
+        timeLogs: logs,
         statuses: (statusRes.data as Option[]) ?? [],
         teamMembers: (teamRes.data as TeamMember[]) ?? [],
         accounts: (accountsRes.data as { id: string; company_name: string | null }[]) ?? [],
@@ -117,6 +118,11 @@ export default function TimeLogsPage() {
       }
     },
   })
+
+  useEffect(() => {
+    if (!queryData?.timeLogs) return
+    setTimeLogs(queryData.timeLogs)
+  }, [queryData])
 
   const statuses = queryData?.statuses ?? []
   const teamMembers = queryData?.teamMembers ?? []

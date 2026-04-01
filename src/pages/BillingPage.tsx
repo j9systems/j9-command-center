@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import {
   CreditCard,
@@ -127,18 +127,14 @@ export default function BillingPage() {
     },
   })
 
+  useEffect(() => {
+    if (!queryData) return
+    if (queryData.invoices) setInvoices(queryData.invoices)
+    if (queryData.payments) setPayments(queryData.payments)
+  }, [queryData])
+
   const statusOptions = queryData?.statusOptions ?? []
   const accounts = queryData?.accounts ?? []
-
-  // Sync query data into mutable local state (for optimistic mutation updates)
-  const queryInvoices = queryData?.invoices
-  const queryPayments = queryData?.payments
-  if (queryInvoices && invoices.length === 0 && queryInvoices.length > 0) {
-    setInvoices(queryInvoices)
-  }
-  if (queryPayments && payments.length === 0 && queryPayments.length > 0) {
-    setPayments(queryPayments)
-  }
 
   function getFilteredInvoices(): InvoiceWithDetails[] {
     let filtered = invoices

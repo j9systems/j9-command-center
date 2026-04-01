@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { ArrowLeft, User, Save, Mail, Phone } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
@@ -30,7 +30,7 @@ export default function TeamMemberDetailPage() {
   const [hourlyRate, setHourlyRate] = useState('')
   const [roleId, setRoleId] = useState('')
 
-  const { data: queryData, isLoading: loading } = useQuery({
+  const { data: queryData, isLoading } = useQuery({
     queryKey: ['team-member', teamId],
     queryFn: async () => {
       const [{ data }, { data: rolesData }] = await Promise.all([
@@ -45,8 +45,9 @@ export default function TeamMemberDetailPage() {
           .order('name'),
       ])
 
+      let mapped: TeamMemberFull | null = null
       if (data) {
-        const mapped: TeamMemberFull = {
+        mapped = {
           ...data,
           role_option: data.roles as unknown as Role | null,
           roles: undefined,
@@ -61,10 +62,28 @@ export default function TeamMemberDetailPage() {
         setRoleId(data.role_id?.toString() ?? '')
       }
 
-      return { roles: (rolesData as Role[]) ?? [] }
+      return {
+        member: mapped,
+        commission: data?.payouts_commission_?.toString() ?? '',
+        salesCommission: data?.payouts_additional_commission_for_lead_close?.toString() ?? '',
+        hourlyRate: data?.payouts_contractor_rate ?? '',
+        roleId: data?.role_id?.toString() ?? '',
+        roles: (rolesData as Role[]) ?? [],
+      }
     },
     enabled: !!teamId,
   })
+
+  useEffect(() => {
+    if (!queryData?.member) return
+    setMember(queryData.member)
+    setCommission(queryData.commission)
+    setSalesCommission(queryData.salesCommission)
+    setHourlyRate(queryData.hourlyRate)
+    setRoleId(queryData.roleId)
+  }, [queryData])
+
+  const loading = isLoading || (!!queryData && !member && !!queryData.member)
 
   const roles = queryData?.roles ?? []
 
