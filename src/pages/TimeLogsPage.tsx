@@ -44,7 +44,7 @@ export default function TimeLogsPage() {
       const [logsRes, statusRes, teamRes, accountsRes] = await Promise.all([
         supabase
           .from('time_logs')
-          .select('*, team(id, first_name, last_name, photo), options(id, option_key, option_label), accounts(id, company_name), projects(name)')
+          .select('*, team(id, first_name, last_name, photo), options(id, option_key, option_label), projects(name)')
           .order('date', { ascending: false })
           .limit(500),
         supabase.from('options').select('*').eq('category', 'timelog_status'),
@@ -52,17 +52,24 @@ export default function TimeLogsPage() {
         supabase.from('accounts').select('id, company_name').order('company_name'),
       ])
 
+      // Build account lookup map (no FK from time_logs to accounts)
+      const accountMap: Record<string, { id: string; company_name: string | null }> = {}
+      if (accountsRes.data) {
+        for (const a of accountsRes.data) {
+          accountMap[a.id] = a as { id: string; company_name: string | null }
+        }
+      }
+
       if (logsRes.data) {
         setTimeLogs(
           logsRes.data.map((l) => ({
             ...l,
             team_member: l.team as unknown as TeamMember | null,
             status_option: l.options as unknown as Option | null,
-            account: l.accounts as unknown as { id: string; company_name: string | null } | null,
+            account: l.account_id ? accountMap[l.account_id] ?? null : null,
             project: l.projects as unknown as { name: string | null } | null,
             team: undefined,
             options: undefined,
-            accounts: undefined,
             projects: undefined,
           })) as TimeLogWithDetails[]
         )
