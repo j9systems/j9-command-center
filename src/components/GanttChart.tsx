@@ -170,10 +170,10 @@ export default function GanttChart({
   const [projectsWithFeatures, setProjectsWithFeatures] = useState<ProjectWithFeatures[]>([])
   const [loading, setLoading] = useState(true)
 
-  // Tooltip
+  // Tooltip (uses viewport coordinates for fixed positioning)
   const [tooltip, setTooltip] = useState<{
-    mouseX: number
-    mouseY: number
+    clientX: number
+    clientY: number
     row: GanttRow
   } | null>(null)
 
@@ -542,15 +542,11 @@ export default function GanttChart({
   /* Tooltip handlers */
   function handleBarMouseEnter(e: React.MouseEvent, row: GanttRow) {
     if (dragRef.current) return
-    const rect = containerRef.current?.getBoundingClientRect()
-    if (!rect) return
-    setTooltip({ mouseX: e.clientX - rect.left, mouseY: e.clientY - rect.top, row })
+    setTooltip({ clientX: e.clientX, clientY: e.clientY, row })
   }
   function handleBarMouseMove(e: React.MouseEvent) {
     if (!tooltip || dragRef.current) return
-    const rect = containerRef.current?.getBoundingClientRect()
-    if (!rect) return
-    setTooltip((prev) => prev ? { ...prev, mouseX: e.clientX - rect.left, mouseY: e.clientY - rect.top } : null)
+    setTooltip((prev) => prev ? { ...prev, clientX: e.clientX, clientY: e.clientY } : null)
   }
   function handleBarMouseLeave() {
     if (!dragRef.current) setTooltip(null)
@@ -831,21 +827,19 @@ export default function GanttChart({
       </div>
       )}
 
-      {/* Tooltip — positioned at mouse cursor */}
+      {/* Tooltip — fixed position at mouse cursor */}
       {tooltip && (() => {
         const tooltipWidth = 200
-        const containerW = containerRef.current?.offsetWidth ?? 400
-        // Position tooltip to the right of cursor, but clamp to container
-        let leftPos = tooltip.mouseX + 12
-        if (leftPos + tooltipWidth > containerW - 8) {
-          leftPos = tooltip.mouseX - tooltipWidth - 12
+        // Position to the right of cursor; flip left if it would overflow viewport
+        let leftPos = tooltip.clientX + 12
+        if (leftPos + tooltipWidth > window.innerWidth - 8) {
+          leftPos = tooltip.clientX - tooltipWidth - 12
         }
-        leftPos = Math.max(8, leftPos)
-        // Position tooltip above cursor
-        const topPos = tooltip.mouseY - 80
+        // Position above cursor
+        const topPos = tooltip.clientY - 80
         return (
           <div
-            className="absolute z-50 pointer-events-none bg-black/90 border border-border rounded-lg px-3 py-2 shadow-lg"
+            className="fixed z-50 pointer-events-none bg-black/90 border border-border rounded-lg px-3 py-2 shadow-lg"
             style={{
               left: leftPos,
               top: Math.max(4, topPos),

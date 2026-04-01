@@ -35,8 +35,7 @@ export default function TasksPage() {
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
   const [accounts, setAccounts] = useState<{ id: string; company_name: string | null }[]>([])
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
-  const [isAdmin, setIsAdmin] = useState(false)
-  const [showAll, setShowAll] = useState(false)
+  const [activeTab, setActiveTab] = useState<'open' | 'all'>('open')
 
   // Filters
   const [filterStatus, setFilterStatus] = useState('')
@@ -59,7 +58,6 @@ export default function TasksPage() {
 
         if (teamData) {
           setCurrentUserId(teamData.id)
-          if (teamData.role === 'admin') setIsAdmin(true)
         }
       }
 
@@ -99,8 +97,12 @@ export default function TasksPage() {
   }, [])
 
   const filtered = tasks.filter((t) => {
-    // Filter by assignment unless showing all
-    if (!showAll && currentUserId && t.assigned_to_id_internal !== currentUserId) return false
+    // Open tab: show non-complete tasks assigned to the current user
+    if (activeTab === 'open') {
+      const statusKey = t.status_option?.option_key?.toLowerCase() ?? ''
+      if (statusKey === 'complete') return false
+      if (currentUserId && t.assigned_to_id_internal !== currentUserId) return false
+    }
     if (filterStatus && t.status_option?.id?.toString() !== filterStatus) return false
     if (filterAssignee && t.assigned_to_id_internal !== filterAssignee) return false
     if (filterClient && t.account_id !== filterClient) return false
@@ -145,31 +147,35 @@ export default function TasksPage() {
         <h1 className="text-2xl font-bold text-text-primary">Tasks</h1>
       </div>
 
-      {/* Admin toggle */}
-      {isAdmin && (
-        <div className="flex items-center gap-3 mb-4">
-          <button
-            onClick={() => setShowAll(false)}
-            className={`text-xs font-medium px-3 py-1.5 rounded-lg transition-colors ${
-              !showAll
-                ? 'bg-purple text-white'
-                : 'border border-border text-text-secondary hover:text-text-primary'
-            }`}
-          >
-            My Tasks
-          </button>
-          <button
-            onClick={() => setShowAll(true)}
-            className={`text-xs font-medium px-3 py-1.5 rounded-lg transition-colors ${
-              showAll
-                ? 'bg-purple text-white'
-                : 'border border-border text-text-secondary hover:text-text-primary'
-            }`}
-          >
-            All Tasks
-          </button>
-        </div>
-      )}
+      {/* Tabs */}
+      <div className="flex border-b border-border mb-4">
+        <button
+          onClick={() => setActiveTab('open')}
+          className={`px-4 py-2.5 text-sm font-medium transition-colors relative ${
+            activeTab === 'open'
+              ? 'text-purple'
+              : 'text-text-secondary hover:text-text-primary'
+          }`}
+        >
+          Open
+          {activeTab === 'open' && (
+            <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-purple rounded-full" />
+          )}
+        </button>
+        <button
+          onClick={() => setActiveTab('all')}
+          className={`px-4 py-2.5 text-sm font-medium transition-colors relative ${
+            activeTab === 'all'
+              ? 'text-purple'
+              : 'text-text-secondary hover:text-text-primary'
+          }`}
+        >
+          All
+          {activeTab === 'all' && (
+            <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-purple rounded-full" />
+          )}
+        </button>
+      </div>
 
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-3 mb-4">
