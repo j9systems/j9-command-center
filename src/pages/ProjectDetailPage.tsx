@@ -6,17 +6,38 @@ import {
   FolderKanban,
   Pencil,
   Plus,
-  Save,
   X,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import MobileFormOverlay from '@/components/MobileFormOverlay'
+import RichTextEditor from '@/components/RichTextEditor'
 import type {
   Project,
   Feature,
   Option,
   TeamMember,
 } from '@/types/database'
+
+const PROJECT_STATUSES = ['active', 'on_hold', 'completed', 'cancelled'] as const
+
+const projectStatusColors: Record<string, string> = {
+  active: 'bg-emerald-500/15 text-emerald-400',
+  completed: 'bg-blue-500/15 text-blue-400',
+  on_hold: 'bg-amber-500/15 text-amber-400',
+  cancelled: 'bg-red-500/15 text-red-400',
+}
+
+function getProjectStatusColor(status: string | null): string {
+  if (!status) return 'bg-zinc-500/15 text-zinc-400'
+  return projectStatusColors[status.toLowerCase()] ?? 'bg-purple-muted text-purple'
+}
+
+function formatStatusLabel(status: string): string {
+  return status
+    .split('_')
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ')
+}
 
 const featureStatusColors: Record<string, string> = {
   backlog: 'bg-zinc-500/15 text-zinc-400',
@@ -47,6 +68,9 @@ export default function ProjectDetailPage() {
   const [editingDescription, setEditingDescription] = useState(false)
   const [editDescription, setEditDescription] = useState('')
   const [savingDescription, setSavingDescription] = useState(false)
+  const [editingStatus, setEditingStatus] = useState(false)
+  const [editStatus, setEditStatus] = useState('')
+  const [savingStatus, setSavingStatus] = useState(false)
 
   useEffect(() => {
     if (!projectId) return
@@ -174,18 +198,39 @@ export default function ProjectDetailPage() {
     setEditingDescription(true)
   }
 
-  async function handleSaveDescription() {
+  async function handleSaveDescription(html: string) {
     if (!projectId || !project) return
     setSavingDescription(true)
+    const trimmed = html.trim()
+    const isEmpty = !trimmed || trimmed === '<p></p>'
     const { error } = await supabase
       .from('projects')
-      .update({ description: editDescription.trim() || null })
+      .update({ description: isEmpty ? null : trimmed })
       .eq('id', projectId)
     if (!error) {
-      setProject({ ...project, description: editDescription.trim() || null })
+      setProject({ ...project, description: isEmpty ? null : trimmed })
       setEditingDescription(false)
     }
     setSavingDescription(false)
+  }
+
+  function startEditingStatus() {
+    setEditStatus(project?.status ?? '')
+    setEditingStatus(true)
+  }
+
+  async function handleSaveStatus() {
+    if (!projectId || !project) return
+    setSavingStatus(true)
+    const { error } = await supabase
+      .from('projects')
+      .update({ status: editStatus || null })
+      .eq('id', projectId)
+    if (!error) {
+      setProject({ ...project, status: editStatus || null })
+      setEditingStatus(false)
+    }
+    setSavingStatus(false)
   }
 
   if (loading) {
@@ -243,6 +288,49 @@ export default function ProjectDetailPage() {
                   .filter(Boolean)
                   .join(' ')}
               </span>
+            )}
+            {!editingStatus ? (
+              <span className="flex items-center gap-1">
+                <span
+                  className={`text-xs font-medium px-2.5 py-0.5 rounded-full ${getProjectStatusColor(project.status)}`}
+                >
+                  {project.status ? formatStatusLabel(project.status) : 'No Status'}
+                </span>
+                <button
+                  onClick={startEditingStatus}
+                  className="text-text-secondary hover:text-purple transition-colors"
+                >
+                  <Pencil size={12} />
+                </button>
+              </span>
+            ) : (
+              <div className="flex items-center gap-2">
+                <select
+                  value={editStatus}
+                  onChange={(e) => setEditStatus(e.target.value)}
+                  className="text-xs bg-surface border border-border rounded px-2 py-1 text-text-primary focus:outline-none focus:border-purple/50"
+                >
+                  <option value="">No Status</option>
+                  {PROJECT_STATUSES.map((s) => (
+                    <option key={s} value={s}>
+                      {formatStatusLabel(s)}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  onClick={handleSaveStatus}
+                  disabled={savingStatus}
+                  className="text-[11px] font-medium px-2.5 py-1 rounded bg-purple text-white hover:bg-purple-hover transition-colors disabled:opacity-50"
+                >
+                  {savingStatus ? '...' : 'Save'}
+                </button>
+                <button
+                  onClick={() => setEditingStatus(false)}
+                  className="text-text-secondary hover:text-text-primary transition-colors"
+                >
+                  <X size={14} />
+                </button>
+              </div>
             )}
             {!editingDates ? (
               <span className="text-sm text-text-secondary flex items-center gap-1">
@@ -313,36 +401,17 @@ export default function ProjectDetailPage() {
         </div>
         <div className="p-5">
           {editingDescription ? (
-            <div className="space-y-3">
-              <textarea
-                value={editDescription}
-                onChange={(e) => setEditDescription(e.target.value)}
-                rows={6}
-                placeholder="Add a project description..."
-                className="w-full text-sm bg-black/30 border border-border rounded-lg px-3 py-2 text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:border-purple/50 resize-y leading-relaxed"
-              />
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={handleSaveDescription}
-                  disabled={savingDescription}
-                  className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-purple text-white hover:bg-purple-hover transition-colors disabled:opacity-50"
-                >
-                  <Save size={12} />
-                  {savingDescription ? 'Saving...' : 'Save'}
-                </button>
-                <button
-                  onClick={() => setEditingDescription(false)}
-                  className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-border text-text-secondary hover:text-text-primary transition-colors"
-                >
-                  <X size={12} />
-                  Cancel
-                </button>
-              </div>
-            </div>
+            <RichTextEditor
+              content={editDescription}
+              onSave={handleSaveDescription}
+              onCancel={() => setEditingDescription(false)}
+              saving={savingDescription}
+            />
           ) : project.description ? (
-            <p className="text-sm text-text-primary whitespace-pre-wrap leading-relaxed">
-              {project.description}
-            </p>
+            <div
+              className="text-sm text-text-primary leading-relaxed rich-text-display"
+              dangerouslySetInnerHTML={{ __html: project.description }}
+            />
           ) : (
             <p className="text-sm text-text-secondary">
               No description yet. Click "Edit" to add one.
