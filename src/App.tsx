@@ -29,6 +29,7 @@ import PayrollPage from './pages/PayrollPage'
 import TasksPage from './pages/TasksPage'
 import TimeLogsPage from './pages/TimeLogsPage'
 import SOPsPage from './pages/SOPsPage'
+import MeetingsPage from './pages/MeetingsPage'
 
 export default function App() {
   const [session, setSession] = useState<Session | null>(null)
@@ -86,6 +87,7 @@ export default function App() {
           <Route path="/payroll" element={<PayrollPage />} />
           <Route path="/tasks" element={<TasksPage />} />
           <Route path="/time-logs" element={<TimeLogsPage />} />
+          <Route path="/meetings" element={<MeetingsPage />} />
           <Route path="/sops" element={<SOPsPage />} />
         </Route>
       </Routes>

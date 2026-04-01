@@ -1,4 +1,4 @@
-import { Home, Building2, Users, UserCog, Target, CreditCard, Wallet, ClipboardList, Timer, BookOpen } from 'lucide-react'
+import { Home, Building2, Users, UserCog, Target, CreditCard, Wallet, ClipboardList, Timer, BookOpen, CalendarDays } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
 export interface NavItem {
@@ -13,6 +13,7 @@ export const navItems: NavItem[] = [
   { to: '/contacts', icon: Users, label: 'Contacts' },
   { to: '/team', icon: UserCog, label: 'Team' },
   { to: '/leads', icon: Target, label: 'Leads' },
+  { to: '/meetings', icon: CalendarDays, label: 'Meetings' },
   { to: '/tasks', icon: ClipboardList, label: 'Tasks' },
   { to: '/time-logs', icon: Timer, label: 'Time Logs' },
   { to: '/billing', icon: CreditCard, label: 'Billing' },
