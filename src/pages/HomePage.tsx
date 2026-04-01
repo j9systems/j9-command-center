@@ -276,14 +276,6 @@ export default function HomePage() {
                   to={`/accounts/${task.account_id}/tasks/${task.row_id}`}
                   className="flex items-center gap-3 p-3 bg-black/20 rounded-lg border border-border/50 hover:border-border transition-colors"
                 >
-                  <button
-                    onClick={(e) => handleMarkTaskComplete(e, task.row_id)}
-                    disabled={completingTaskId === task.row_id}
-                    className="flex-shrink-0 text-text-secondary hover:text-emerald-400 transition-colors disabled:opacity-50"
-                    title="Mark complete"
-                  >
-                    <CheckCircle2 size={16} />
-                  </button>
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium text-text-primary truncate">
                       {task.name ?? 'Untitled Task'}
@@ -316,6 +308,15 @@ export default function HomePage() {
                       )}
                     </div>
                   </div>
+                  <button
+                    onClick={(e) => handleMarkTaskComplete(e, task.row_id)}
+                    disabled={completingTaskId === task.row_id}
+                    className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 transition-colors disabled:opacity-50"
+                    title="Mark complete"
+                  >
+                    <CheckCircle2 size={14} />
+                    <span className="hidden sm:inline">{completingTaskId === task.row_id ? '...' : 'Complete'}</span>
+                  </button>
                 </Link>
               )
             })}
