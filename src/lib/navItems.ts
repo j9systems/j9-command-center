@@ -1,4 +1,4 @@
-import { Home, Building2, Users, UserCog, Target, CreditCard, Wallet, ClipboardList, Timer } from 'lucide-react'
+import { Home, Building2, Users, UserCog, Target, CreditCard, Wallet, ClipboardList, Timer, BookOpen } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
 export interface NavItem {
@@ -17,6 +17,7 @@ export const navItems: NavItem[] = [
   { to: '/time-logs', icon: Timer, label: 'Time Logs' },
   { to: '/billing', icon: CreditCard, label: 'Billing' },
   { to: '/payroll', icon: Wallet, label: 'Payroll' },
+  { to: '/sops', icon: BookOpen, label: 'SOPs' },
 ]
 
 export const MAX_BOTTOM_NAV_ITEMS = 5
