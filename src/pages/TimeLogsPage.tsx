@@ -12,6 +12,7 @@ import {
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import type { TimeLog, TeamMember, Option } from '@/types/database'
+import { useCurrentRole } from '@/hooks/useCurrentRole'
 
 type TimeLogWithDetails = TimeLog & {
   team_member?: TeamMember | null
@@ -36,6 +37,8 @@ const STATUS_IDS = {
 }
 
 export default function TimeLogsPage() {
+  const role = useCurrentRole()
+  const canViewAll = role === 'Admin' || role === 'Sales'
   const [timeLogs, setTimeLogs] = useState<TimeLogWithDetails[]>([])
   const [activeTab, setActiveTab] = useState<'mine' | 'all'>('mine')
   const [updatingLogId, setUpdatingLogId] = useState<string | null>(null)
@@ -221,19 +224,21 @@ export default function TimeLogsPage() {
             <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-purple rounded-full" />
           )}
         </button>
-        <button
-          onClick={() => setActiveTab('all')}
-          className={`px-4 py-2.5 text-sm font-medium transition-colors relative ${
-            activeTab === 'all'
-              ? 'text-purple'
-              : 'text-text-secondary hover:text-text-primary'
-          }`}
-        >
-          All Time Logs
-          {activeTab === 'all' && (
-            <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-purple rounded-full" />
-          )}
-        </button>
+        {canViewAll && (
+          <button
+            onClick={() => setActiveTab('all')}
+            className={`px-4 py-2.5 text-sm font-medium transition-colors relative ${
+              activeTab === 'all'
+                ? 'text-purple'
+                : 'text-text-secondary hover:text-text-primary'
+            }`}
+          >
+            All Time Logs
+            {activeTab === 'all' && (
+              <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-purple rounded-full" />
+            )}
+          </button>
+        )}
       </div>
 
       {/* Filters */}

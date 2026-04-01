@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase'
 import type { AccountWithStatus, Option } from '@/types/database'
 import AccountCard from '@/components/accounts/AccountCard'
 import MobileFormOverlay from '@/components/MobileFormOverlay'
+import { useCurrentRole } from '@/hooks/useCurrentRole'
 
 export default function AccountsPage() {
   const navigate = useNavigate()
@@ -17,7 +18,8 @@ export default function AccountsPage() {
   const [statusOptions, setStatusOptions] = useState<Option[]>([])
   const [newName, setNewName] = useState('')
   const [newStatusId, setNewStatusId] = useState('')
-  const [isAdmin, setIsAdmin] = useState(false)
+  const role = useCurrentRole()
+  const canViewAll = role === 'Admin' || role === 'Sales'
   const [showAll, setShowAll] = useState(false)
 
   useEffect(() => {
@@ -31,13 +33,9 @@ export default function AccountsPage() {
       // Get current user's team record to find their ID and role
       const { data: teamData } = await supabase
         .from('team')
-        .select('id, role')
+        .select('id')
         .eq('email', session.user.email!)
         .maybeSingle()
-
-      if (teamData?.role === 'admin') {
-        setIsAdmin(true)
-      }
 
       // Get accounts assigned to this user
       if (teamData?.id) {
@@ -203,8 +201,8 @@ export default function AccountsPage() {
         </MobileFormOverlay>
       )}
 
-      {/* Admin toggle */}
-      {isAdmin && (
+      {/* All accounts toggle - Admin and Sales only */}
+      {canViewAll && (
         <div className="flex items-center gap-3 mb-4">
           <button
             onClick={() => setShowAll(false)}

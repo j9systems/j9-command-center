@@ -2,7 +2,8 @@ import { useState, useEffect, useRef } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { LogOut, Calendar, ChevronUp } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
-import { navItems } from '@/lib/navItems'
+import { getVisibleNavItems } from '@/lib/navItems'
+import { useCurrentRole } from '@/hooks/useCurrentRole'
 
 interface UserProfile {
   first_name: string | null
@@ -13,6 +14,8 @@ interface UserProfile {
 
 export default function Sidebar() {
   const navigate = useNavigate()
+  const role = useCurrentRole()
+  const visibleNavItems = getVisibleNavItems(role)
   const [calendarConnected, setCalendarConnected] = useState<boolean | null>(null)
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
@@ -96,7 +99,7 @@ export default function Sidebar() {
         />
       </div>
       <nav className="flex-1 p-3 flex flex-col gap-1 overflow-y-auto min-h-0">
-        {navItems.map(({ to, icon: Icon, label }) => (
+        {visibleNavItems.map(({ to, icon: Icon, label }) => (
           <NavLink
             key={to}
             to={to}
