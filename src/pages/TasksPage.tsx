@@ -34,6 +34,9 @@ export default function TasksPage() {
   const [taskStatuses, setTaskStatuses] = useState<Option[]>([])
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
   const [accounts, setAccounts] = useState<{ id: string; company_name: string | null }[]>([])
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [showAll, setShowAll] = useState(false)
 
   // Filters
   const [filterStatus, setFilterStatus] = useState('')
@@ -44,6 +47,21 @@ export default function TasksPage() {
   useEffect(() => {
     async function fetchData() {
       setLoading(true)
+
+      // Get current user's team member ID and role
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session?.user) {
+        const { data: teamData } = await supabase
+          .from('team')
+          .select('id, role')
+          .eq('email', session.user.email!)
+          .maybeSingle()
+
+        if (teamData) {
+          setCurrentUserId(teamData.id)
+          if (teamData.role === 'admin') setIsAdmin(true)
+        }
+      }
 
       const [tasksRes, statusRes, teamRes, accountsRes] = await Promise.all([
         supabase
@@ -81,6 +99,8 @@ export default function TasksPage() {
   }, [])
 
   const filtered = tasks.filter((t) => {
+    // Filter by assignment unless showing all
+    if (!showAll && currentUserId && t.assigned_to_id_internal !== currentUserId) return false
     if (filterStatus && t.status_option?.id?.toString() !== filterStatus) return false
     if (filterAssignee && t.assigned_to_id_internal !== filterAssignee) return false
     if (filterClient && t.account_id !== filterClient) return false
@@ -124,6 +144,32 @@ export default function TasksPage() {
         <ClipboardList size={24} className="text-purple" />
         <h1 className="text-2xl font-bold text-text-primary">Tasks</h1>
       </div>
+
+      {/* Admin toggle */}
+      {isAdmin && (
+        <div className="flex items-center gap-3 mb-4">
+          <button
+            onClick={() => setShowAll(false)}
+            className={`text-xs font-medium px-3 py-1.5 rounded-lg transition-colors ${
+              !showAll
+                ? 'bg-purple text-white'
+                : 'border border-border text-text-secondary hover:text-text-primary'
+            }`}
+          >
+            My Tasks
+          </button>
+          <button
+            onClick={() => setShowAll(true)}
+            className={`text-xs font-medium px-3 py-1.5 rounded-lg transition-colors ${
+              showAll
+                ? 'bg-purple text-white'
+                : 'border border-border text-text-secondary hover:text-text-primary'
+            }`}
+          >
+            All Tasks
+          </button>
+        </div>
+      )}
 
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-3 mb-4">

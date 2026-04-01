@@ -32,11 +32,13 @@ export default function FeatureDetailPage() {
   const [followsFeature, setFollowsFeature] = useState<FeatureWithStatus | null>(null)
   const [precedesFeature, setPrecedesFeature] = useState<FeatureWithStatus | null>(null)
   const [loading, setLoading] = useState(true)
+  const [featureStatuses, setFeatureStatuses] = useState<Option[]>([])
   const [savingDep, setSavingDep] = useState<'follows' | 'precedes' | null>(null)
-  const [editingDates, setEditingDates] = useState(false)
+  const [editingDetails, setEditingDetails] = useState(false)
   const [editStart, setEditStart] = useState('')
   const [editEnd, setEditEnd] = useState('')
-  const [savingDates, setSavingDates] = useState(false)
+  const [editStatusId, setEditStatusId] = useState<number | null>(null)
+  const [savingDetails, setSavingDetails] = useState(false)
 
   useEffect(() => {
     if (!featureId || !projectId) return
@@ -90,22 +92,32 @@ export default function FeatureDetailPage() {
         }
       }
 
-      // Load sibling features for dependency dropdowns
-      const { data: siblingsData } = await supabase
-        .from('features')
-        .select('*, options(id, option_key, option_label)')
-        .eq('project_id', projectId!)
-        .neq('id', featureId!)
-        .order('name')
+      // Load sibling features and status options
+      const [siblingsRes, statusRes] = await Promise.all([
+        supabase
+          .from('features')
+          .select('*, options(id, option_key, option_label)')
+          .eq('project_id', projectId!)
+          .neq('id', featureId!)
+          .order('name'),
+        supabase
+          .from('options')
+          .select('*')
+          .eq('category', 'feature_status'),
+      ])
 
-      if (siblingsData) {
+      if (siblingsRes.data) {
         setSiblingFeatures(
-          siblingsData.map((f) => ({
+          siblingsRes.data.map((f) => ({
             ...f,
             status_option: f.options as unknown as Option | null,
             options: undefined,
           })) as FeatureWithStatus[]
         )
+      }
+
+      if (statusRes.data) {
+        setFeatureStatuses(statusRes.data as Option[])
       }
 
       setLoading(false)
@@ -141,27 +153,39 @@ export default function FeatureDetailPage() {
     setSavingDep(null)
   }
 
-  function startEditingDates() {
+  function startEditingDetails() {
     setEditStart(feature?.start_date ?? '')
     setEditEnd(feature?.end_date ?? '')
-    setEditingDates(true)
+    setEditStatusId(feature?.status_id ?? null)
+    setEditingDetails(true)
   }
 
-  async function handleSaveDates() {
+  async function handleSaveDetails() {
     if (!featureId || !feature) return
-    setSavingDates(true)
+    setSavingDetails(true)
     const { error } = await supabase
       .from('features')
       .update({
         start_date: editStart || null,
         end_date: editEnd || null,
+        status_id: editStatusId || null,
       })
       .eq('id', featureId)
     if (!error) {
-      setFeature({ ...feature, start_date: editStart || null, end_date: editEnd || null })
-      setEditingDates(false)
+      // Find the updated status option for display
+      const newStatusOption = editStatusId
+        ? featureStatuses.find((s) => s.id === editStatusId) ?? null
+        : null
+      setFeature({
+        ...feature,
+        start_date: editStart || null,
+        end_date: editEnd || null,
+        status_id: editStatusId || null,
+        status_option: newStatusOption,
+      })
+      setEditingDetails(false)
     }
-    setSavingDates(false)
+    setSavingDetails(false)
   }
 
   if (loading) {
@@ -226,25 +250,39 @@ export default function FeatureDetailPage() {
             )}
           </div>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1">
-            {!editingDates ? (
-              <span className="text-sm text-text-secondary flex items-center gap-1">
-                <CalendarDays size={12} />
-                {feature.start_date
-                  ? new Date(feature.start_date).toLocaleDateString()
-                  : 'TBD'}
-                {' - '}
-                {feature.end_date
-                  ? new Date(feature.end_date).toLocaleDateString()
-                  : 'TBD'}
+            {!editingDetails ? (
+              <>
+                <span className="text-sm text-text-secondary flex items-center gap-1">
+                  <CalendarDays size={12} />
+                  {feature.start_date
+                    ? new Date(feature.start_date).toLocaleDateString()
+                    : 'TBD'}
+                  {' - '}
+                  {feature.end_date
+                    ? new Date(feature.end_date).toLocaleDateString()
+                    : 'TBD'}
+                </span>
                 <button
-                  onClick={startEditingDates}
-                  className="ml-1 text-text-secondary hover:text-purple transition-colors"
+                  onClick={startEditingDetails}
+                  className="text-text-secondary hover:text-purple transition-colors"
                 >
                   <Pencil size={12} />
                 </button>
-              </span>
+              </>
             ) : (
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <select
+                  value={editStatusId?.toString() ?? ''}
+                  onChange={(e) => setEditStatusId(e.target.value ? Number(e.target.value) : null)}
+                  className="text-xs bg-surface border border-border rounded px-2 py-1 text-text-primary focus:outline-none focus:border-purple/50"
+                >
+                  <option value="">No Status</option>
+                  {featureStatuses.map((s) => (
+                    <option key={s.id} value={s.id.toString()}>
+                      {s.option_label}
+                    </option>
+                  ))}
+                </select>
                 <input
                   type="date"
                   value={editStart}
@@ -259,14 +297,14 @@ export default function FeatureDetailPage() {
                   className="text-xs bg-surface border border-border rounded px-2 py-1 text-text-primary focus:outline-none focus:border-purple/50"
                 />
                 <button
-                  onClick={handleSaveDates}
-                  disabled={savingDates}
+                  onClick={handleSaveDetails}
+                  disabled={savingDetails}
                   className="text-[11px] font-medium px-2.5 py-1 rounded bg-purple text-white hover:bg-purple-hover transition-colors disabled:opacity-50"
                 >
-                  {savingDates ? '...' : 'Save'}
+                  {savingDetails ? '...' : 'Save'}
                 </button>
                 <button
-                  onClick={() => setEditingDates(false)}
+                  onClick={() => setEditingDetails(false)}
                   className="text-text-secondary hover:text-text-primary transition-colors"
                 >
                   <X size={14} />

@@ -9,6 +9,7 @@ import MobileFormOverlay from '@/components/MobileFormOverlay'
 export default function AccountsPage() {
   const navigate = useNavigate()
   const [accounts, setAccounts] = useState<AccountWithStatus[]>([])
+  const [assignedAccountIds, setAssignedAccountIds] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [showForm, setShowForm] = useState(false)
@@ -16,9 +17,40 @@ export default function AccountsPage() {
   const [statusOptions, setStatusOptions] = useState<Option[]>([])
   const [newName, setNewName] = useState('')
   const [newStatusId, setNewStatusId] = useState('')
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [showAll, setShowAll] = useState(false)
 
   useEffect(() => {
     async function fetchAccounts() {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.user) {
+        setLoading(false)
+        return
+      }
+
+      // Get current user's team record to find their ID and role
+      const { data: teamData } = await supabase
+        .from('team')
+        .select('id, role')
+        .eq('email', session.user.email!)
+        .maybeSingle()
+
+      if (teamData?.role === 'admin') {
+        setIsAdmin(true)
+      }
+
+      // Get accounts assigned to this user
+      if (teamData?.id) {
+        const { data: accountTeamData } = await supabase
+          .from('account_team')
+          .select('account_id')
+          .eq('team_member_id', teamData.id)
+
+        if (accountTeamData) {
+          setAssignedAccountIds(new Set(accountTeamData.map((at) => at.account_id).filter(Boolean) as string[]))
+        }
+      }
+
       const { data, error } = await supabase
         .from('accounts')
         .select('*, options!fk_accounts_status(option_key, option_label)')
@@ -92,6 +124,8 @@ export default function AccountsPage() {
   }
 
   const filtered = accounts.filter((a) => {
+    // Filter by team assignment unless showing all
+    if (!showAll && !assignedAccountIds.has(a.id)) return false
     if (!search) return true
     const q = search.toLowerCase()
     return (
@@ -167,6 +201,32 @@ export default function AccountsPage() {
             </div>
           </form>
         </MobileFormOverlay>
+      )}
+
+      {/* Admin toggle */}
+      {isAdmin && (
+        <div className="flex items-center gap-3 mb-4">
+          <button
+            onClick={() => setShowAll(false)}
+            className={`text-xs font-medium px-3 py-1.5 rounded-lg transition-colors ${
+              !showAll
+                ? 'bg-purple text-white'
+                : 'border border-border text-text-secondary hover:text-text-primary'
+            }`}
+          >
+            My Accounts
+          </button>
+          <button
+            onClick={() => setShowAll(true)}
+            className={`text-xs font-medium px-3 py-1.5 rounded-lg transition-colors ${
+              showAll
+                ? 'bg-purple text-white'
+                : 'border border-border text-text-secondary hover:text-text-primary'
+            }`}
+          >
+            All Accounts
+          </button>
+        </div>
       )}
 
       {/* Search bar */}

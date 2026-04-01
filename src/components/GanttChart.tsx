@@ -172,9 +172,8 @@ export default function GanttChart({
 
   // Tooltip
   const [tooltip, setTooltip] = useState<{
-    barX: number
-    barW: number
-    rowIndex: number
+    mouseX: number
+    mouseY: number
     row: GanttRow
   } | null>(null)
 
@@ -541,9 +540,17 @@ export default function GanttChart({
   }
 
   /* Tooltip handlers */
-  function handleBarMouseEnter(_e: React.MouseEvent, row: GanttRow, rowIndex: number, barX: number, barW: number) {
+  function handleBarMouseEnter(e: React.MouseEvent, row: GanttRow) {
     if (dragRef.current) return
-    setTooltip({ barX, barW, rowIndex, row })
+    const rect = containerRef.current?.getBoundingClientRect()
+    if (!rect) return
+    setTooltip({ mouseX: e.clientX - rect.left, mouseY: e.clientY - rect.top, row })
+  }
+  function handleBarMouseMove(e: React.MouseEvent) {
+    if (!tooltip || dragRef.current) return
+    const rect = containerRef.current?.getBoundingClientRect()
+    if (!rect) return
+    setTooltip((prev) => prev ? { ...prev, mouseX: e.clientX - rect.left, mouseY: e.clientY - rect.top } : null)
   }
   function handleBarMouseLeave() {
     if (!dragRef.current) setTooltip(null)
@@ -744,7 +751,8 @@ export default function GanttChart({
                     opacity={isProject ? 0.6 : 0.85}
                     className="cursor-pointer"
                     onClick={() => !didDragRef.current && handleBarClick(row)}
-                    onMouseEnter={(e) => handleBarMouseEnter(e, row, i, pos.x, pos.w)}
+                    onMouseEnter={(e) => handleBarMouseEnter(e, row)}
+                    onMouseMove={handleBarMouseMove}
                     onMouseLeave={handleBarMouseLeave}
                   />
 
@@ -810,7 +818,8 @@ export default function GanttChart({
                         handleMouseDown(e, row.id, 'move', row.start!, row.end!)
                       }
                       onClick={() => !didDragRef.current && handleBarClick(row)}
-                      onMouseEnter={(e) => handleBarMouseEnter(e, row, i, pos.x, pos.w)}
+                      onMouseEnter={(e) => handleBarMouseEnter(e, row)}
+                      onMouseMove={handleBarMouseMove}
                       onMouseLeave={handleBarMouseLeave}
                     />
                   )}
@@ -822,30 +831,24 @@ export default function GanttChart({
       </div>
       )}
 
-      {/* Tooltip — positioned directly above the hovered bar */}
+      {/* Tooltip — positioned at mouse cursor */}
       {tooltip && (() => {
-        // The SVG area is offset by labelWidth from the container left edge,
-        // plus container padding (p-3 on mobile = 12px, p-5 on desktop = 20px)
-        const containerPad = isMobile ? 12 : 20
         const tooltipWidth = 200
-        // Center the tooltip over the bar; clamp to container bounds
-        const barCenterX = labelWidth + tooltip.barX + tooltip.barW / 2
-        const leftPos = Math.max(
-          8,
-          Math.min(barCenterX - tooltipWidth / 2, (containerRef.current?.offsetWidth ?? 400) - tooltipWidth - 8)
-        )
-        // Position above the bar: account for header area (~48px nav + 16px gap) + row position
-        // The SVG starts after the header (h3 + controls ≈ 48px with mb-4)
-        // We use the row's top position within the chart, offset by the labels column area
-        const headerHeight = 48
-        const barTopY = containerPad + headerHeight + tooltip.rowIndex * ROW_HEIGHT
-        const tooltipHeight = 70
+        const containerW = containerRef.current?.offsetWidth ?? 400
+        // Position tooltip to the right of cursor, but clamp to container
+        let leftPos = tooltip.mouseX + 12
+        if (leftPos + tooltipWidth > containerW - 8) {
+          leftPos = tooltip.mouseX - tooltipWidth - 12
+        }
+        leftPos = Math.max(8, leftPos)
+        // Position tooltip above cursor
+        const topPos = tooltip.mouseY - 80
         return (
           <div
             className="absolute z-50 pointer-events-none bg-black/90 border border-border rounded-lg px-3 py-2 shadow-lg"
             style={{
               left: leftPos,
-              top: barTopY - tooltipHeight,
+              top: Math.max(4, topPos),
               width: tooltipWidth,
             }}
           >
