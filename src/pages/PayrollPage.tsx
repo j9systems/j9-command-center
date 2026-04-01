@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Wallet, Play, CheckCheck, Loader2, AlertTriangle, ChevronDown, ChevronUp, Trash2 } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
@@ -92,7 +92,7 @@ export default function PayrollPage() {
   // Payroll Preview state
   const [previewExpanded, setPreviewExpanded] = useState(true)
 
-  const { isLoading: loading } = useQuery({
+  const { data: queryData, isLoading: loading } = useQuery({
     queryKey: ['payroll'],
     queryFn: async () => {
       const { data: payoutsData, error: payoutsError } = await supabase
@@ -160,6 +160,12 @@ export default function PayrollPage() {
       return { payouts: rows, openTotals: totalsMap }
     },
   })
+
+  useEffect(() => {
+    if (!queryData) return
+    setPayouts(queryData.payouts)
+    setOpenTotals(queryData.openTotals)
+  }, [queryData])
 
   const { data: preview, isLoading: previewLoading } = useQuery({
     queryKey: ['payroll-preview'],

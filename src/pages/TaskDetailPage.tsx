@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft,
@@ -41,7 +41,7 @@ export default function TaskDetailPage() {
   const [editAssignedTo, setEditAssignedTo] = useState('')
   const [editPriority, setEditPriority] = useState('')
 
-  const { data: queryData, isLoading: loading } = useQuery({
+  const { data: queryData, isLoading } = useQuery({
     queryKey: ['task', taskId],
     queryFn: async () => {
       const { data: taskData } = await supabase
@@ -50,15 +50,16 @@ export default function TaskDetailPage() {
         .eq('row_id', taskId!)
         .single()
 
+      let mappedTask: TaskWithAssignee | null = null
       if (taskData) {
-        const mapped: TaskWithAssignee = {
+        mappedTask = {
           ...taskData,
           assigned_to: taskData.team as TeamMember | null,
           status_option: taskData.options as Option | null,
           team: undefined,
           options: undefined,
         } as TaskWithAssignee
-        setTask(mapped)
+        setTask(mappedTask)
       }
 
       const { data: teamData } = await supabase
@@ -73,12 +74,20 @@ export default function TaskDetailPage() {
         .eq('category', 'task_status')
 
       return {
+        task: mappedTask,
         teamMembers: (teamData as TeamMember[]) ?? [],
         taskStatuses: (statusOptions as Option[]) ?? [],
       }
     },
     enabled: !!taskId,
   })
+
+  useEffect(() => {
+    if (!queryData?.task) return
+    setTask(queryData.task)
+  }, [queryData])
+
+  const loading = isLoading || (!!queryData && !task && !!queryData.task)
 
   const teamMembers = queryData?.teamMembers ?? []
   const taskStatuses = queryData?.taskStatuses ?? []

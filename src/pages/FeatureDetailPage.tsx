@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import {
   ArrowLeft,
@@ -38,7 +38,7 @@ export default function FeatureDetailPage() {
   const [editStatusId, setEditStatusId] = useState<number | null>(null)
   const [savingDetails, setSavingDetails] = useState(false)
 
-  const { data: queryData, isLoading: loading } = useQuery({
+  const { data: queryData, isLoading } = useQuery({
     queryKey: ['feature', featureId, projectId],
     queryFn: async () => {
       if (!featureId || !projectId) return null
@@ -123,6 +123,15 @@ export default function FeatureDetailPage() {
     },
     enabled: !!featureId && !!projectId,
   })
+
+  useEffect(() => {
+    if (!queryData) return
+    if (queryData.feature) setFeature(queryData.feature)
+    setFollowsFeature(queryData.followsFeature ?? null)
+    setPrecedesFeature(queryData.precedesFeature ?? null)
+  }, [queryData])
+
+  const loading = isLoading || (!!queryData && !feature && !!queryData.feature)
 
   const siblingFeatures = queryData?.siblingFeatures ?? []
   const featureStatuses = queryData?.featureStatuses ?? []
