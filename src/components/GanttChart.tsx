@@ -172,8 +172,9 @@ export default function GanttChart({
 
   // Tooltip
   const [tooltip, setTooltip] = useState<{
-    x: number
-    y: number
+    barX: number
+    barW: number
+    rowIndex: number
     row: GanttRow
   } | null>(null)
 
@@ -540,11 +541,9 @@ export default function GanttChart({
   }
 
   /* Tooltip handlers */
-  function handleBarMouseEnter(e: React.MouseEvent, row: GanttRow) {
+  function handleBarMouseEnter(_e: React.MouseEvent, row: GanttRow, rowIndex: number, barX: number, barW: number) {
     if (dragRef.current) return
-    const rect = containerRef.current?.getBoundingClientRect()
-    if (!rect) return
-    setTooltip({ x: e.clientX - rect.left, y: e.clientY - rect.top - 8, row })
+    setTooltip({ barX, barW, rowIndex, row })
   }
   function handleBarMouseLeave() {
     if (!dragRef.current) setTooltip(null)
@@ -745,7 +744,7 @@ export default function GanttChart({
                     opacity={isProject ? 0.6 : 0.85}
                     className="cursor-pointer"
                     onClick={() => !didDragRef.current && handleBarClick(row)}
-                    onMouseEnter={(e) => handleBarMouseEnter(e, row)}
+                    onMouseEnter={(e) => handleBarMouseEnter(e, row, i, pos.x, pos.w)}
                     onMouseLeave={handleBarMouseLeave}
                   />
 
@@ -811,7 +810,7 @@ export default function GanttChart({
                         handleMouseDown(e, row.id, 'move', row.start!, row.end!)
                       }
                       onClick={() => !didDragRef.current && handleBarClick(row)}
-                      onMouseEnter={(e) => handleBarMouseEnter(e, row)}
+                      onMouseEnter={(e) => handleBarMouseEnter(e, row, i, pos.x, pos.w)}
                       onMouseLeave={handleBarMouseLeave}
                     />
                   )}
@@ -823,31 +822,50 @@ export default function GanttChart({
       </div>
       )}
 
-      {/* Tooltip */}
-      {tooltip && (
-        <div
-          className="absolute z-50 pointer-events-none bg-black/90 border border-border rounded-lg px-3 py-2 shadow-lg"
-          style={{
-            left: Math.min(tooltip.x, (containerRef.current?.offsetWidth ?? 400) - 220),
-            top: tooltip.y - 70,
-          }}
-        >
-          <p className="text-xs font-semibold text-text-primary mb-1">{tooltip.row.name}</p>
-          <div className="flex items-center gap-2 mb-1">
-            <span
-              className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${statusBadgeClass(tooltip.row.status)}`}
-            >
-              {tooltip.row.status?.replace(/_/g, ' ') ?? 'Unknown'}
-            </span>
-            <span className="text-[10px] text-text-secondary capitalize">{tooltip.row.type}</span>
+      {/* Tooltip — positioned directly above the hovered bar */}
+      {tooltip && (() => {
+        // The SVG area is offset by labelWidth from the container left edge,
+        // plus container padding (p-3 on mobile = 12px, p-5 on desktop = 20px)
+        const containerPad = isMobile ? 12 : 20
+        const tooltipWidth = 200
+        // Center the tooltip over the bar; clamp to container bounds
+        const barCenterX = labelWidth + tooltip.barX + tooltip.barW / 2
+        const leftPos = Math.max(
+          8,
+          Math.min(barCenterX - tooltipWidth / 2, (containerRef.current?.offsetWidth ?? 400) - tooltipWidth - 8)
+        )
+        // Position above the bar: account for header area (~48px nav + 16px gap) + row position
+        // The SVG starts after the header (h3 + controls ≈ 48px with mb-4)
+        // We use the row's top position within the chart, offset by the labels column area
+        const headerHeight = 48
+        const barTopY = containerPad + headerHeight + tooltip.rowIndex * ROW_HEIGHT
+        const tooltipHeight = 70
+        return (
+          <div
+            className="absolute z-50 pointer-events-none bg-black/90 border border-border rounded-lg px-3 py-2 shadow-lg"
+            style={{
+              left: leftPos,
+              top: barTopY - tooltipHeight,
+              width: tooltipWidth,
+            }}
+          >
+            <p className="text-xs font-semibold text-text-primary mb-1">{tooltip.row.name}</p>
+            <div className="flex items-center gap-2 mb-1">
+              <span
+                className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${statusBadgeClass(tooltip.row.status)}`}
+              >
+                {tooltip.row.status?.replace(/_/g, ' ') ?? 'Unknown'}
+              </span>
+              <span className="text-[10px] text-text-secondary capitalize">{tooltip.row.type}</span>
+            </div>
+            {tooltip.row.start && tooltip.row.end && (
+              <p className="text-[10px] text-text-secondary">
+                {fmtDisplay(tooltip.row.start)} – {fmtDisplay(tooltip.row.end)}
+              </p>
+            )}
           </div>
-          {tooltip.row.start && tooltip.row.end && (
-            <p className="text-[10px] text-text-secondary">
-              {fmtDisplay(tooltip.row.start)} – {fmtDisplay(tooltip.row.end)}
-            </p>
-          )}
-        </div>
-      )}
+        )
+      })()}
     </div>
   )
 }
