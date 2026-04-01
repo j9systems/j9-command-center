@@ -44,7 +44,7 @@ export default function TimeLogsPage() {
       const [logsRes, statusRes, teamRes, accountsRes] = await Promise.all([
         supabase
           .from('time_logs')
-          .select(`*, team!time_logs_Assigned To ID_fkey(id, first_name, last_name, photo), options!time_logs_status_id_fkey(id, option_key, option_label), projects!time_logs_Project ID_fkey(name)`)
+          .select('*, team(id, first_name, last_name, photo), options(id, option_key, option_label), projects(name)')
           .order('date', { ascending: false })
           .limit(500),
         supabase.from('options').select('*').eq('category', 'timelog_status'),
