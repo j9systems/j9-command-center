@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft,
@@ -11,6 +11,7 @@ import {
   CheckCircle2,
   Trash2,
 } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import type { Task, TeamMember, Option } from '@/types/database'
 
@@ -26,9 +27,6 @@ export default function TaskDetailPage() {
   const { id: accountId, taskId } = useParams<{ id: string; taskId: string }>()
   const navigate = useNavigate()
   const [task, setTask] = useState<TaskWithAssignee | null>(null)
-  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
-  const [taskStatuses, setTaskStatuses] = useState<Option[]>([])
-  const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState(false)
   const [saving, setSaving] = useState(false)
   const [completing, setCompleting] = useState(false)
@@ -43,12 +41,9 @@ export default function TaskDetailPage() {
   const [editAssignedTo, setEditAssignedTo] = useState('')
   const [editPriority, setEditPriority] = useState('')
 
-  useEffect(() => {
-    if (!taskId) return
-
-    async function fetchData() {
-      setLoading(true)
-
+  const { data: queryData, isLoading: loading } = useQuery({
+    queryKey: ['task', taskId],
+    queryFn: async () => {
       const { data: taskData } = await supabase
         .from('tasks')
         .select('*, team!fk_tasks_assigned_to_id_internal(id, first_name, last_name, photo), options!fk_tasks_status_id(id, option_key, option_label)')
@@ -66,32 +61,27 @@ export default function TaskDetailPage() {
         setTask(mapped)
       }
 
-      // Fetch team members for assignment dropdown
       const { data: teamData } = await supabase
         .from('team')
         .select('id, first_name, last_name, photo')
         .eq('active', 'true')
         .order('first_name')
 
-      if (teamData) {
-        setTeamMembers(teamData as TeamMember[])
-      }
-
-      // Fetch task status options
       const { data: statusOptions } = await supabase
         .from('options')
         .select('*')
         .eq('category', 'task_status')
 
-      if (statusOptions) {
-        setTaskStatuses(statusOptions as Option[])
+      return {
+        teamMembers: (teamData as TeamMember[]) ?? [],
+        taskStatuses: (statusOptions as Option[]) ?? [],
       }
+    },
+    enabled: !!taskId,
+  })
 
-      setLoading(false)
-    }
-
-    fetchData()
-  }, [taskId])
+  const teamMembers = queryData?.teamMembers ?? []
+  const taskStatuses = queryData?.taskStatuses ?? []
 
   function startEditing() {
     if (!task) return

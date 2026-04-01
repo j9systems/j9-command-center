@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   ClipboardList,
@@ -7,6 +7,7 @@ import {
   Search,
   X,
 } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import type { Task, TeamMember, Option } from '@/types/database'
 
@@ -29,12 +30,6 @@ const priorityColors: Record<string, string> = {
 }
 
 export default function TasksPage() {
-  const [tasks, setTasks] = useState<TaskWithDetails[]>([])
-  const [loading, setLoading] = useState(true)
-  const [taskStatuses, setTaskStatuses] = useState<Option[]>([])
-  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
-  const [accounts, setAccounts] = useState<{ id: string; company_name: string | null }[]>([])
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<'open' | 'all'>('open')
 
   // Filters
@@ -43,11 +38,11 @@ export default function TasksPage() {
   const [filterClient, setFilterClient] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
 
-  useEffect(() => {
-    async function fetchData() {
-      setLoading(true)
+  const { data: queryData, isLoading: loading } = useQuery({
+    queryKey: ['tasks'],
+    queryFn: async () => {
+      let currentUserId: string | null = null
 
-      // Get current user's team member ID and role
       const { data: { session } } = await supabase.auth.getSession()
       if (session?.user) {
         const { data: teamData } = await supabase
@@ -57,7 +52,7 @@ export default function TasksPage() {
           .maybeSingle()
 
         if (teamData) {
-          setCurrentUserId(teamData.id)
+          currentUserId = teamData.id
         }
       }
 
@@ -72,9 +67,8 @@ export default function TasksPage() {
         supabase.from('accounts').select('id, company_name').order('company_name'),
       ])
 
-      if (tasksRes.data) {
-        setTasks(
-          tasksRes.data.map((t) => ({
+      const tasks: TaskWithDetails[] = tasksRes.data
+        ? tasksRes.data.map((t) => ({
             ...t,
             assigned_to: t.team as unknown as TeamMember | null,
             status_option: t.options as unknown as Option | null,
@@ -83,18 +77,23 @@ export default function TasksPage() {
             options: undefined,
             accounts: undefined,
           })) as TaskWithDetails[]
-        )
+        : []
+
+      return {
+        tasks,
+        taskStatuses: (statusRes.data as Option[]) ?? [],
+        teamMembers: (teamRes.data as TeamMember[]) ?? [],
+        accounts: (accountsRes.data as { id: string; company_name: string | null }[]) ?? [],
+        currentUserId,
       }
+    },
+  })
 
-      if (statusRes.data) setTaskStatuses(statusRes.data as Option[])
-      if (teamRes.data) setTeamMembers(teamRes.data as TeamMember[])
-      if (accountsRes.data) setAccounts(accountsRes.data as { id: string; company_name: string | null }[])
-
-      setLoading(false)
-    }
-
-    fetchData()
-  }, [])
+  const tasks = queryData?.tasks ?? []
+  const taskStatuses = queryData?.taskStatuses ?? []
+  const teamMembers = queryData?.teamMembers ?? []
+  const accounts = queryData?.accounts ?? []
+  const currentUserId = queryData?.currentUserId ?? null
 
   const filtered = tasks.filter((t) => {
     // Open tab: show non-complete tasks assigned to the current user

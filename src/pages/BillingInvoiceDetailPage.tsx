@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import {
   ArrowLeft,
@@ -9,6 +8,7 @@ import {
   Clock,
   Building2,
 } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import type { Invoice, InvoiceLineItem, Option } from '@/types/database'
 
@@ -28,16 +28,10 @@ type InvoiceWithDetails = Invoice & {
 
 export default function BillingInvoiceDetailPage() {
   const { invoiceId } = useParams<{ invoiceId: string }>()
-  const [invoice, setInvoice] = useState<InvoiceWithDetails | null>(null)
-  const [lineItems, setLineItems] = useState<InvoiceLineItem[]>([])
-  const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    if (!invoiceId) return
-
-    async function fetchData() {
-      setLoading(true)
-
+  const { data: queryData, isLoading: loading } = useQuery({
+    queryKey: ['billing-invoice', invoiceId],
+    queryFn: async () => {
       const [{ data: invoiceData }, { data: lineItemsData }] = await Promise.all([
         supabase
           .from('invoices')
@@ -51,27 +45,28 @@ export default function BillingInvoiceDetailPage() {
           .order('date', { ascending: true }),
       ])
 
-      if (invoiceData) {
-        setInvoice({
-          ...invoiceData,
-          account: invoiceData.accounts as { id: string; company_name: string | null } | null,
-          project: invoiceData.projects as { name: string | null } | null,
-          status_option: invoiceData.options as unknown as Option | null,
-          accounts: undefined,
-          projects: undefined,
-          options: undefined,
-        } as InvoiceWithDetails)
+      const invoice: InvoiceWithDetails | null = invoiceData
+        ? {
+            ...invoiceData,
+            account: invoiceData.accounts as { id: string; company_name: string | null } | null,
+            project: invoiceData.projects as { name: string | null } | null,
+            status_option: invoiceData.options as unknown as Option | null,
+            accounts: undefined,
+            projects: undefined,
+            options: undefined,
+          } as InvoiceWithDetails
+        : null
+
+      return {
+        invoice,
+        lineItems: (lineItemsData as InvoiceLineItem[]) ?? [],
       }
+    },
+    enabled: !!invoiceId,
+  })
 
-      if (lineItemsData) {
-        setLineItems(lineItemsData as InvoiceLineItem[])
-      }
-
-      setLoading(false)
-    }
-
-    fetchData()
-  }, [invoiceId])
+  const invoice = queryData?.invoice ?? null
+  const lineItems = queryData?.lineItems ?? []
 
   if (loading) {
     return (

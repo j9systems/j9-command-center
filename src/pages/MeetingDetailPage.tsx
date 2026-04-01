@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft,
@@ -17,6 +17,7 @@ import {
   X,
   Pencil,
 } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import type { Meeting, Contact, TeamMember, Task, Option } from '@/types/database'
 import RichTextEditor from '@/components/RichTextEditor'
@@ -47,9 +48,6 @@ export default function MeetingDetailPage() {
   const navigate = useNavigate()
   const [meeting, setMeeting] = useState<MeetingWithAttendees | null>(null)
   const [tasks, setTasks] = useState<TaskWithAssignee[]>([])
-  const [taskStatuses, setTaskStatuses] = useState<Option[]>([])
-  const [assignableMembers, setAssignableMembers] = useState<TeamMember[]>([])
-  const [loading, setLoading] = useState(true)
 
   // New task form
   const [showNewTask, setShowNewTask] = useState(false)
@@ -98,12 +96,9 @@ export default function MeetingDetailPage() {
     setSavingNotes(false)
   }
 
-  useEffect(() => {
-    if (!meetingId) return
-
-    async function fetchData() {
-      setLoading(true)
-
+  const { data: queryData, isLoading: loading } = useQuery({
+    queryKey: ['meeting', meetingId],
+    queryFn: async () => {
       // Fetch meeting
       const { data: meetingData } = await supabase
         .from('meetings')
@@ -112,8 +107,7 @@ export default function MeetingDetailPage() {
         .single()
 
       if (!meetingData) {
-        setLoading(false)
-        return
+        return { taskStatuses: [] as Option[], assignableMembers: [] as TeamMember[] }
       }
 
       const meetingRecord = meetingData as Meeting
@@ -129,7 +123,6 @@ export default function MeetingDetailPage() {
         team_member: att.team as unknown as TeamMember | null,
       }))
 
-      // Include the meeting organizer in attendees if not already present
       if (meetingRecord.organizer_id) {
         const { data: { session: currentSession } } = await supabase.auth.getSession()
         if (currentSession?.user?.id === meetingRecord.organizer_id) {
@@ -180,10 +173,10 @@ export default function MeetingDetailPage() {
         .select('*')
         .eq('category', 'task_status')
 
-      if (statusOptions) setTaskStatuses(statusOptions as Option[])
+      const taskStatuses = (statusOptions as Option[]) ?? []
 
       // Determine assignable team members
-      // If meeting is account-specific, only show team members related to that account
+      let assignableMembers: TeamMember[] = []
       if (meetingRecord.account_id) {
         const { data: accountTeamData } = await supabase
           .from('account_team')
@@ -191,27 +184,27 @@ export default function MeetingDetailPage() {
           .eq('account_id', meetingRecord.account_id)
 
         if (accountTeamData) {
-          const members = accountTeamData
+          assignableMembers = accountTeamData
             .map((at) => at.team as unknown as TeamMember | null)
             .filter((m): m is TeamMember => m !== null)
-          setAssignableMembers(members)
         }
       } else {
-        // Not account-specific: show all active team members
         const { data: allTeam } = await supabase
           .from('team')
           .select('id, first_name, last_name, email, photo')
           .eq('active', 'true')
           .order('first_name')
 
-        if (allTeam) setAssignableMembers(allTeam as TeamMember[])
+        if (allTeam) assignableMembers = allTeam as TeamMember[]
       }
 
-      setLoading(false)
-    }
+      return { taskStatuses, assignableMembers }
+    },
+    enabled: !!meetingId,
+  })
 
-    fetchData()
-  }, [meetingId])
+  const taskStatuses = queryData?.taskStatuses ?? []
+  const assignableMembers = queryData?.assignableMembers ?? []
 
   async function handleCreateTask() {
     if (!meetingId || !newTaskName.trim()) return

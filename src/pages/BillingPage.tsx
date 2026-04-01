@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   CreditCard,
@@ -13,6 +13,7 @@ import {
   Trash2,
   CheckCircle,
 } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import type { Invoice, Payment, Option, Account } from '@/types/database'
 
@@ -46,9 +47,6 @@ export default function BillingPage() {
   const [activeTab, setActiveTab] = useState<TabKey>('invoices')
   const [invoices, setInvoices] = useState<InvoiceWithDetails[]>([])
   const [payments, setPayments] = useState<PaymentWithAccount[]>([])
-  const [statusOptions, setStatusOptions] = useState<Option[]>([])
-  const [accounts, setAccounts] = useState<Account[]>([])
-  const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState<string>('')
   const [clientFilter, setClientFilter] = useState<string>('')
   const [showNewPayment, setShowNewPayment] = useState(false)
@@ -58,10 +56,9 @@ export default function BillingPage() {
   const [newPaymentIsRetainer, setNewPaymentIsRetainer] = useState(false)
   const [savingPayment, setSavingPayment] = useState(false)
 
-  useEffect(() => {
-    async function fetchData() {
-      setLoading(true)
-
+  const { data: queryData, isLoading: loading } = useQuery({
+    queryKey: ['billing'],
+    queryFn: async () => {
       const [
         { data: invoicesData },
         { data: paymentsData },
@@ -100,9 +97,8 @@ export default function BillingPage() {
         }
       }
 
-      if (invoicesData) {
-        setInvoices(
-          invoicesData.map((inv) => ({
+      const mappedInvoices: InvoiceWithDetails[] = invoicesData
+        ? invoicesData.map((inv) => ({
             ...inv,
             account: inv.accounts as { id: string; company_name: string | null } | null,
             project: inv.projects as { name: string | null } | null,
@@ -111,27 +107,38 @@ export default function BillingPage() {
             projects: undefined,
             options: undefined,
           })) as InvoiceWithDetails[]
-        )
-      }
+        : []
 
-      if (paymentsData) {
-        setPayments(
-          paymentsData.map((p) => ({
+      const mappedPayments: PaymentWithAccount[] = paymentsData
+        ? paymentsData.map((p) => ({
             ...p,
             account: p.accounts as { id: string; company_name: string | null } | null,
             accounts: undefined,
             retainer_quarters: quartersByPayment[p.row_id] || undefined,
           })) as PaymentWithAccount[]
-        )
+        : []
+
+      return {
+        invoices: mappedInvoices,
+        payments: mappedPayments,
+        statusOptions: (statusOpts as Option[]) ?? [],
+        accounts: (accountsData as Account[]) ?? [],
       }
+    },
+  })
 
-      if (statusOpts) setStatusOptions(statusOpts as Option[])
-      if (accountsData) setAccounts(accountsData as Account[])
-      setLoading(false)
-    }
+  const statusOptions = queryData?.statusOptions ?? []
+  const accounts = queryData?.accounts ?? []
 
-    fetchData()
-  }, [])
+  // Sync query data into mutable local state (for optimistic mutation updates)
+  const queryInvoices = queryData?.invoices
+  const queryPayments = queryData?.payments
+  if (queryInvoices && invoices.length === 0 && queryInvoices.length > 0) {
+    setInvoices(queryInvoices)
+  }
+  if (queryPayments && payments.length === 0 && queryPayments.length > 0) {
+    setPayments(queryPayments)
+  }
 
   function getFilteredInvoices(): InvoiceWithDetails[] {
     let filtered = invoices

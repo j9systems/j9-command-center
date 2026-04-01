@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { User } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import type { TeamMember, Role } from '@/types/database'
 
@@ -15,33 +15,24 @@ const roleColors: Record<string, string> = {
 
 export default function TeamPage() {
   const navigate = useNavigate()
-  const [members, setMembers] = useState<(TeamMember & { role_option?: Role | null })[]>([])
-  const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    async function fetchData() {
-      setLoading(true)
-
+  const { data: members = [], isLoading: loading } = useQuery({
+    queryKey: ['team'],
+    queryFn: async () => {
       const { data: teamData } = await supabase
         .from('team')
         .select('*, roles(id, name)')
         .order('first_name')
 
-      if (teamData) {
-        setMembers(
-          teamData.map((m) => ({
-            ...m,
-            role_option: m.roles as unknown as Role | null,
-            roles: undefined,
-          })) as (TeamMember & { role_option?: Role | null })[]
-        )
-      }
+      if (!teamData) return []
 
-      setLoading(false)
-    }
-
-    fetchData()
-  }, [])
+      return teamData.map((m) => ({
+        ...m,
+        role_option: m.roles as unknown as Role | null,
+        roles: undefined,
+      })) as (TeamMember & { role_option?: Role | null })[]
+    },
+  })
 
   if (loading) {
     return (

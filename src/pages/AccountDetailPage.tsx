@@ -27,6 +27,7 @@ import {
   Trash2,
   Play,
 } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import type {
   AccountWithStatus,
@@ -121,59 +122,21 @@ export default function AccountDetailPage() {
   const [invoices, setInvoices] = useState<(Invoice & { project?: { name: string | null } | null; status_option?: Option | null })[]>([])
   const [accountContacts, setAccountContacts] = useState<(AccountContact & { contact: Contact })[]>([])
   const [meetings, setMeetings] = useState<(Meeting & { attendees: { contact: Contact | null; team_member: TeamMember | null }[] })[]>([])
-  const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<'projects' | 'tasks' | 'time_logs' | 'invoices' | 'contacts' | 'team' | 'meetings' | 'admin'>('projects')
   const [showTimerModal, setShowTimerModal] = useState(false)
   const tabsContainerRef = useRef<HTMLDivElement>(null)
   const tabsSectionRef = useRef<HTMLDivElement>(null)
   const [canScrollLeft, setCanScrollLeft] = useState(false)
   const [canScrollRight, setCanScrollRight] = useState(false)
-
-  const updateScrollButtons = useCallback(() => {
-    const el = tabsContainerRef.current
-    if (!el) return
-    setCanScrollLeft(el.scrollLeft > 0)
-    setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 1)
-  }, [])
-
-  useEffect(() => {
-    const el = tabsContainerRef.current
-    if (!el) return
-    // Defer initial check to ensure layout is complete
-    requestAnimationFrame(updateScrollButtons)
-    el.addEventListener('scroll', updateScrollButtons)
-    window.addEventListener('resize', updateScrollButtons)
-    const observer = new ResizeObserver(updateScrollButtons)
-    observer.observe(el)
-    return () => {
-      el.removeEventListener('scroll', updateScrollButtons)
-      window.removeEventListener('resize', updateScrollButtons)
-      observer.disconnect()
-    }
-  }, [updateScrollButtons, loading])
-
-  function handleSummaryCardClick(tab: typeof activeTab) {
-    setActiveTab(tab)
-    // On mobile, scroll to the tabs section
-    if (window.innerWidth < 768 && tabsSectionRef.current) {
-      setTimeout(() => {
-        tabsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-      }, 50)
-    }
-  }
-
   const [closedByMember, setClosedByMember] = useState<TeamMember | null>(null)
   const [partnerMember, setPartnerMember] = useState<TeamMember | null>(null)
   const [allTeamMembers, setAllTeamMembers] = useState<TeamMember[]>([])
   const [billingTypeOptions, setBillingTypeOptions] = useState<Option[]>([])
   const [refreshKey, setRefreshKey] = useState(0)
 
-  useEffect(() => {
-    if (!id) return
-
-    async function fetchData() {
-      setLoading(true)
-
+  const { isLoading: loading } = useQuery({
+    queryKey: ['account', id, refreshKey],
+    queryFn: async () => {
       // Fetch account
       const { data: accountData } = await supabase
         .from('accounts')
@@ -218,7 +181,6 @@ export default function AccountDetailPage() {
       // Fetch all tasks related to this account (directly or via project)
       const taskSelect = '*, team!fk_tasks_assigned_to_id_internal(id, first_name, last_name, photo), options!fk_tasks_status_id(id, option_key, option_label)'
 
-      // First try: tasks linked directly to this account
       const { data: directTasks, error: directErr } = await supabase
         .from('tasks')
         .select(taskSelect)
@@ -229,7 +191,6 @@ export default function AccountDetailPage() {
         console.error('Error fetching direct tasks:', directErr)
       }
 
-      // Second try: tasks linked via projects
       let projectTasks: typeof directTasks = []
       if (projectIds.length > 0) {
         const { data: ptData, error: ptErr } = await supabase
@@ -247,7 +208,6 @@ export default function AccountDetailPage() {
       const allTasksRaw = [...(directTasks ?? []), ...projectTasks]
       console.log('Tasks fetched:', { directCount: directTasks?.length ?? 0, projectCount: projectTasks.length, accountId: id })
 
-      // Deduplicate by row_id
       const seenTaskIds = new Set<string>()
       const uniqueTasks = allTasksRaw.filter((t) => {
         if (seenTaskIds.has(t.row_id)) return false
@@ -255,7 +215,6 @@ export default function AccountDetailPage() {
         return true
       })
 
-      // Sort by due date ascending
       uniqueTasks.sort((a, b) => {
         if (!a.due && !b.due) return 0
         if (!a.due) return 1
@@ -424,12 +383,9 @@ export default function AccountDetailPage() {
         )
       }
 
-      // Fetch meetings for this account using two-part query:
-      // 1. Meetings directly linked via account_id
-      // 2. Meetings where raw_attendees contains any contact email linked to this account
+      // Fetch meetings
       const meetingSelect = 'row_id, name, meeting_start, meeting_end, duration, description_agenda, meeting_notes, gmeet_link, meeting_link, location, status, meeting_type, account_id, raw_attendees'
 
-      // Query A: meetings directly linked to this account
       const { data: directMeetings } = await supabase
         .from('meetings')
         .select(meetingSelect)
@@ -437,15 +393,12 @@ export default function AccountDetailPage() {
         .neq('status', 'cancelled')
         .order('meeting_start', { ascending: false })
 
-      // Get contact emails for this account
       const contactEmails = (contactLinks ?? [])
         .filter((cl) => cl.contacts && cl.contacts.email)
         .map((cl) => (cl.contacts as Contact).email!.toLowerCase())
 
-      // Query B: meetings where raw_attendees contains any of these contact emails
       let attendeeMeetings: typeof directMeetings = []
       if (contactEmails.length > 0) {
-        // Query each contact email using jsonb containment
         const emailPromises = contactEmails.map((email) =>
           supabase
             .from('meetings')
@@ -459,7 +412,6 @@ export default function AccountDetailPage() {
         attendeeMeetings = allEmailMeetings
       }
 
-      // Merge and deduplicate
       const allMeetingsMap = new Map<string, Meeting>()
       for (const m of [...(directMeetings ?? []), ...(attendeeMeetings ?? [])]) {
         if (!allMeetingsMap.has(m.row_id)) {
@@ -500,11 +452,41 @@ export default function AccountDetailPage() {
         setMeetings([])
       }
 
-      setLoading(false)
-    }
+      return true
+    },
+    enabled: !!id,
+  })
 
-    fetchData()
-  }, [id, refreshKey])
+  const updateScrollButtons = useCallback(() => {
+    const el = tabsContainerRef.current
+    if (!el) return
+    setCanScrollLeft(el.scrollLeft > 0)
+    setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 1)
+  }, [])
+
+  useEffect(() => {
+    const el = tabsContainerRef.current
+    if (!el) return
+    requestAnimationFrame(updateScrollButtons)
+    el.addEventListener('scroll', updateScrollButtons)
+    window.addEventListener('resize', updateScrollButtons)
+    const observer = new ResizeObserver(updateScrollButtons)
+    observer.observe(el)
+    return () => {
+      el.removeEventListener('scroll', updateScrollButtons)
+      window.removeEventListener('resize', updateScrollButtons)
+      observer.disconnect()
+    }
+  }, [updateScrollButtons, loading])
+
+  function handleSummaryCardClick(tab: typeof activeTab) {
+    setActiveTab(tab)
+    if (window.innerWidth < 768 && tabsSectionRef.current) {
+      setTimeout(() => {
+        tabsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }, 50)
+    }
+  }
 
   if (loading) {
     return (

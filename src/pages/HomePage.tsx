@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   CheckCircle2,
@@ -9,6 +9,7 @@ import {
   ChevronRight,
   Play,
 } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import type { Task, Meeting, TeamMember, Option } from '@/types/database'
 import StartTimeLogModal from '@/components/timelog/StartTimeLogModal'
@@ -39,21 +40,16 @@ const TASKS_PER_PAGE = 4
 
 export default function HomePage() {
   const [tasks, setTasks] = useState<TaskWithDetails[]>([])
-  const [meetings, setMeetings] = useState<MeetingWithAccount[]>([])
-  const [loading, setLoading] = useState(true)
-  const [displayName, setDisplayName] = useState('')
   const [taskPage, setTaskPage] = useState(0)
   const [showTimerModal, setShowTimerModal] = useState(false)
   const [completingTaskId, setCompletingTaskId] = useState<string | null>(null)
 
-  useEffect(() => {
-    async function fetchData() {
-      setLoading(true)
-
+  const { data: queryData, isLoading: loading } = useQuery({
+    queryKey: ['home'],
+    queryFn: async () => {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session?.user) {
-        setLoading(false)
-        return
+        return { displayName: '', tasks: [] as TaskWithDetails[], meetings: [] as MeetingWithAccount[] }
       }
 
       // Get team member record for current user
@@ -63,15 +59,15 @@ export default function HomePage() {
         .eq('email', session.user.email!)
         .maybeSingle()
 
-      if (teamMember) {
-        setDisplayName(
-          [teamMember.first_name, teamMember.last_name].filter(Boolean).join(' ') || teamMember.email || ''
-        )
-      }
+      const displayName = teamMember
+        ? [teamMember.first_name, teamMember.last_name].filter(Boolean).join(' ') || teamMember.email || ''
+        : ''
+
+      let fetchedTasks: TaskWithDetails[] = []
+      let fetchedMeetings: MeetingWithAccount[] = []
 
       // Fetch open tasks assigned to the user
       if (teamMember) {
-        // First get the 'complete' status id to exclude it
         const { data: completeOption } = await supabase
           .from('options')
           .select('id')
@@ -93,17 +89,15 @@ export default function HomePage() {
         const { data: tasksData } = await taskQuery
 
         if (tasksData) {
-          setTasks(
-            tasksData.map((t) => ({
-              ...t,
-              assigned_to: t.team as unknown as TeamMember | null,
-              status_option: t.options as unknown as Option | null,
-              account: t.accounts as unknown as { id: string; company_name: string | null } | null,
-              team: undefined,
-              options: undefined,
-              accounts: undefined,
-            })) as TaskWithDetails[]
-          )
+          fetchedTasks = tasksData.map((t) => ({
+            ...t,
+            assigned_to: t.team as unknown as TeamMember | null,
+            status_option: t.options as unknown as Option | null,
+            account: t.accounts as unknown as { id: string; company_name: string | null } | null,
+            team: undefined,
+            options: undefined,
+            accounts: undefined,
+          })) as TaskWithDetails[]
         }
       }
 
@@ -111,7 +105,6 @@ export default function HomePage() {
       if (teamMember) {
         const now = new Date().toISOString()
 
-        // Get meetings where user is an attendee
         const { data: attendeeRows } = await supabase
           .from('meeting_attendees')
           .select('meeting_id')
@@ -119,7 +112,6 @@ export default function HomePage() {
 
         const attendeeMeetingIds = (attendeeRows ?? []).map((r) => r.meeting_id).filter(Boolean) as string[]
 
-        // Get meetings where user is the organizer
         const organizerMeetingIds: string[] = []
         if (session.user.id) {
           const { data: organizerMeetings } = await supabase
@@ -133,7 +125,6 @@ export default function HomePage() {
           }
         }
 
-        // Combine and dedupe meeting IDs
         const allMeetingIds = [...new Set([...attendeeMeetingIds, ...organizerMeetingIds])]
 
         if (allMeetingIds.length > 0) {
@@ -146,22 +137,27 @@ export default function HomePage() {
             .limit(10)
 
           if (meetingsData) {
-            setMeetings(
-              meetingsData.map((m) => ({
-                ...m,
-                account: m.accounts as unknown as { id: string; company_name: string | null; logo_path?: string | null } | null,
-                accounts: undefined,
-              })) as MeetingWithAccount[]
-            )
+            fetchedMeetings = meetingsData.map((m) => ({
+              ...m,
+              account: m.accounts as unknown as { id: string; company_name: string | null; logo_path?: string | null } | null,
+              accounts: undefined,
+            })) as MeetingWithAccount[]
           }
         }
       }
 
-      setLoading(false)
-    }
+      return { displayName, tasks: fetchedTasks, meetings: fetchedMeetings }
+    },
+  })
 
-    fetchData()
-  }, [])
+  const displayName = queryData?.displayName ?? ''
+  const meetings = queryData?.meetings ?? []
+
+  // Sync tasks from query into mutable local state (for optimistic complete)
+  const queryTasks = queryData?.tasks
+  if (queryTasks && tasks.length === 0 && queryTasks.length > 0) {
+    setTasks(queryTasks)
+  }
 
   async function handleMarkTaskComplete(e: React.MouseEvent, taskId: string) {
     e.preventDefault()

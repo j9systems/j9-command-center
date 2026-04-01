@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft,
@@ -8,6 +8,7 @@ import {
   Plus,
   X,
 } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import MobileFormOverlay from '@/components/MobileFormOverlay'
 import RichTextEditor from '@/components/RichTextEditor'
@@ -50,8 +51,6 @@ export default function ProjectDetailPage() {
   const navigate = useNavigate()
   const [project, setProject] = useState<(Project & { project_manager?: TeamMember | null }) | null>(null)
   const [features, setFeatures] = useState<(Feature & { status_option?: Option | null })[]>([])
-  const [featureStatuses, setFeatureStatuses] = useState<Option[]>([])
-  const [loading, setLoading] = useState(true)
   const [showAddForm, setShowAddForm] = useState(false)
   const [saving, setSaving] = useState(false)
   const [newFeature, setNewFeature] = useState({
@@ -70,34 +69,33 @@ export default function ProjectDetailPage() {
   const [editDescription, setEditDescription] = useState('')
   const [savingDescription, setSavingDescription] = useState(false)
 
-  useEffect(() => {
-    if (!projectId) return
-
-    async function fetchData() {
-      setLoading(true)
-
+  const { data: queryData, isLoading: loading } = useQuery({
+    queryKey: ['project', projectId],
+    queryFn: async () => {
       const { data: projectData } = await supabase
         .from('projects')
         .select('*, team(first_name, last_name)')
         .eq('id', projectId!)
         .single()
 
-      if (projectData) {
-        setProject({
-          ...projectData,
-          project_manager: projectData.team as unknown as TeamMember | null,
-          team: undefined,
-        } as Project & { project_manager?: TeamMember | null })
-      }
+      const mappedProject = projectData
+        ? {
+            ...projectData,
+            project_manager: projectData.team as unknown as TeamMember | null,
+            team: undefined,
+          } as Project & { project_manager?: TeamMember | null }
+        : null
+
+      setProject(mappedProject)
 
       const { data: statusOptions } = await supabase
         .from('options')
         .select('*')
         .eq('category', 'feature_status')
 
-      if (statusOptions) {
-        setFeatureStatuses(statusOptions as Option[])
-        const backlog = statusOptions.find((s) => s.option_key === 'backlog')
+      const featureStatuses = (statusOptions as Option[]) ?? []
+      if (featureStatuses.length > 0) {
+        const backlog = featureStatuses.find((s) => s.option_key === 'backlog')
         if (backlog) {
           setNewFeature((prev) => ({ ...prev, status_id: backlog.id }))
         }
@@ -119,11 +117,12 @@ export default function ProjectDetailPage() {
         )
       }
 
-      setLoading(false)
-    }
+      return { project: mappedProject, featureStatuses }
+    },
+    enabled: !!projectId,
+  })
 
-    fetchData()
-  }, [projectId])
+  const featureStatuses = queryData?.featureStatuses ?? []
 
   async function handleAddFeature() {
     if (!newFeature.name.trim() || !projectId) return

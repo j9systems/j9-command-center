@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   Timer,
@@ -9,6 +9,7 @@ import {
   Check,
   Ban,
 } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import type { TimeLog, TeamMember, Option } from '@/types/database'
 
@@ -36,12 +37,6 @@ const STATUS_IDS = {
 
 export default function TimeLogsPage() {
   const [timeLogs, setTimeLogs] = useState<TimeLogWithDetails[]>([])
-  const [loading, setLoading] = useState(true)
-  const [statuses, setStatuses] = useState<Option[]>([])
-  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
-  const [accounts, setAccounts] = useState<{ id: string; company_name: string | null }[]>([])
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
-  const [managedAccountIds, setManagedAccountIds] = useState<Set<string>>(new Set())
   const [activeTab, setActiveTab] = useState<'mine' | 'all'>('mine')
   const [updatingLogId, setUpdatingLogId] = useState<string | null>(null)
 
@@ -51,11 +46,12 @@ export default function TimeLogsPage() {
   const [filterClient, setFilterClient] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
 
-  useEffect(() => {
-    async function fetchData() {
-      setLoading(true)
+  const { data: queryData, isLoading: loading } = useQuery({
+    queryKey: ['time-logs'],
+    queryFn: async () => {
+      let currentUserId: string | null = null
+      let managedAccountIds = new Set<string>()
 
-      // Get current user's team member ID
       const { data: { session } } = await supabase.auth.getSession()
       if (session?.user) {
         const { data: teamData } = await supabase
@@ -65,9 +61,8 @@ export default function TimeLogsPage() {
           .maybeSingle()
 
         if (teamData) {
-          setCurrentUserId(teamData.id)
+          currentUserId = teamData.id
 
-          // Get accounts where user is Account Manager (role_id = 1)
           const { data: managedData } = await supabase
             .from('account_team')
             .select('account_id')
@@ -75,7 +70,7 @@ export default function TimeLogsPage() {
             .eq('role_id', 1)
 
           if (managedData) {
-            setManagedAccountIds(new Set(managedData.map((at) => at.account_id).filter(Boolean) as string[]))
+            managedAccountIds = new Set(managedData.map((at) => at.account_id).filter(Boolean) as string[])
           }
         }
       }
@@ -91,7 +86,6 @@ export default function TimeLogsPage() {
         supabase.from('accounts').select('id, company_name').order('company_name'),
       ])
 
-      // Build account lookup map (no FK from time_logs to accounts)
       const accountMap: Record<string, { id: string; company_name: string | null }> = {}
       if (accountsRes.data) {
         for (const a of accountsRes.data) {
@@ -99,9 +93,8 @@ export default function TimeLogsPage() {
         }
       }
 
-      if (logsRes.data) {
-        setTimeLogs(
-          logsRes.data.map((l) => ({
+      const logs: TimeLogWithDetails[] = logsRes.data
+        ? logsRes.data.map((l) => ({
             ...l,
             team_member: l.team as unknown as TeamMember | null,
             status_option: l.options as unknown as Option | null,
@@ -111,18 +104,25 @@ export default function TimeLogsPage() {
             options: undefined,
             projects: undefined,
           })) as TimeLogWithDetails[]
-        )
+        : []
+
+      setTimeLogs(logs)
+
+      return {
+        statuses: (statusRes.data as Option[]) ?? [],
+        teamMembers: (teamRes.data as TeamMember[]) ?? [],
+        accounts: (accountsRes.data as { id: string; company_name: string | null }[]) ?? [],
+        currentUserId,
+        managedAccountIds,
       }
+    },
+  })
 
-      if (statusRes.data) setStatuses(statusRes.data as Option[])
-      if (teamRes.data) setTeamMembers(teamRes.data as TeamMember[])
-      if (accountsRes.data) setAccounts(accountsRes.data as { id: string; company_name: string | null }[])
-
-      setLoading(false)
-    }
-
-    fetchData()
-  }, [])
+  const statuses = queryData?.statuses ?? []
+  const teamMembers = queryData?.teamMembers ?? []
+  const accounts = queryData?.accounts ?? []
+  const currentUserId = queryData?.currentUserId ?? null
+  const managedAccountIds = queryData?.managedAccountIds ?? new Set<string>()
 
   async function handleStatusChange(logId: string, newStatusId: number, newStatusKey: string, newStatusLabel: string) {
     setUpdatingLogId(logId)

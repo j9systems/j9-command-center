@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import {
   ArrowLeft,
@@ -8,6 +7,7 @@ import {
   ExternalLink,
   Clock,
 } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import type { Invoice, InvoiceLineItem, Option } from '@/types/database'
 
@@ -26,31 +26,25 @@ type InvoiceWithDetails = Invoice & {
 
 export default function InvoiceDetailPage() {
   const { id: accountId, invoiceId } = useParams<{ id: string; invoiceId: string }>()
-  const [invoice, setInvoice] = useState<InvoiceWithDetails | null>(null)
-  const [lineItems, setLineItems] = useState<InvoiceLineItem[]>([])
-  const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    if (!invoiceId) return
-
-    async function fetchData() {
-      setLoading(true)
-
+  const { data: queryData, isLoading: loading } = useQuery({
+    queryKey: ['invoice', invoiceId],
+    queryFn: async () => {
       const { data: invoiceData } = await supabase
         .from('invoices')
         .select('*, projects(name), options(id, option_key, option_label)')
         .eq('row_id', invoiceId!)
         .single()
 
-      if (invoiceData) {
-        setInvoice({
-          ...invoiceData,
-          project: invoiceData.projects as { name: string | null } | null,
-          status_option: invoiceData.options as Option | null,
-          projects: undefined,
-          options: undefined,
-        } as InvoiceWithDetails)
-      }
+      const invoice: InvoiceWithDetails | null = invoiceData
+        ? {
+            ...invoiceData,
+            project: invoiceData.projects as { name: string | null } | null,
+            status_option: invoiceData.options as Option | null,
+            projects: undefined,
+            options: undefined,
+          } as InvoiceWithDetails
+        : null
 
       const { data: lineItemsData } = await supabase
         .from('invoice_line_items')
@@ -58,15 +52,16 @@ export default function InvoiceDetailPage() {
         .eq('invoice_id', invoiceId!)
         .order('date', { ascending: true })
 
-      if (lineItemsData) {
-        setLineItems(lineItemsData as InvoiceLineItem[])
+      return {
+        invoice,
+        lineItems: (lineItemsData as InvoiceLineItem[]) ?? [],
       }
+    },
+    enabled: !!invoiceId,
+  })
 
-      setLoading(false)
-    }
-
-    fetchData()
-  }, [invoiceId])
+  const invoice = queryData?.invoice ?? null
+  const lineItems = queryData?.lineItems ?? []
 
   if (loading) {
     return (
