@@ -44,8 +44,13 @@ function isSameDay(a: Date, b: Date): boolean {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
 }
 
+function parseDate(dateStr: string): Date {
+  // Handle formats like "July 28, 2025 at 9:00 AM" by stripping "at"
+  return new Date(dateStr.replace(/\bat\b/g, ''))
+}
+
 function formatTime(dateStr: string): string {
-  return new Date(dateStr).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
+  return parseDate(dateStr).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
 }
 
 export default function MeetingsPage() {
@@ -91,7 +96,8 @@ export default function MeetingsPage() {
     const map = new Map<string, MeetingWithAccount[]>()
     for (const m of meetings) {
       if (!m.meeting_start) continue
-      const d = new Date(m.meeting_start)
+      const d = parseDate(m.meeting_start)
+      if (isNaN(d.getTime())) continue
       const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`
       if (!map.has(key)) map.set(key, [])
       map.get(key)!.push(m)
@@ -103,7 +109,8 @@ export default function MeetingsPage() {
   const monthMeetings = useMemo(() => {
     return meetings.filter((m) => {
       if (!m.meeting_start) return false
-      const d = new Date(m.meeting_start)
+      const d = parseDate(m.meeting_start)
+      if (isNaN(d.getTime())) return false
       return d.getFullYear() === year && d.getMonth() === month
     })
   }, [meetings, year, month])
@@ -113,7 +120,7 @@ export default function MeetingsPage() {
     const groups: { date: string; meetings: MeetingWithAccount[] }[] = []
     const seen = new Map<string, MeetingWithAccount[]>()
     for (const m of monthMeetings) {
-      const dateKey = new Date(m.meeting_start!).toDateString()
+      const dateKey = parseDate(m.meeting_start!).toDateString()
       if (!seen.has(dateKey)) {
         seen.set(dateKey, [])
       }
@@ -140,6 +147,8 @@ export default function MeetingsPage() {
   function handleMeetingClick(meeting: MeetingWithAccount) {
     if (meeting.account_id) {
       navigate(`/accounts/${meeting.account_id}/meetings/${meeting.row_id}`)
+    } else {
+      navigate(`/meetings/${meeting.row_id}`)
     }
   }
 
@@ -240,7 +249,7 @@ export default function MeetingsPage() {
                       onClick={() => handleMeetingClick(m)}
                       className={`w-full text-left text-[10px] leading-tight px-1.5 py-1 rounded truncate border transition-colors hover:opacity-80 ${
                         meetingStatusColors[m.status ?? ''] ?? 'bg-purple-muted text-purple border-purple/30'
-                      } ${m.account_id ? 'cursor-pointer' : 'cursor-default'}`}
+                      } cursor-pointer`}
                       title={`${m.name ?? 'Untitled'}${m.meeting_start ? ' - ' + formatTime(m.meeting_start) : ''}`}
                     >
                       {m.meeting_start && (
@@ -291,9 +300,7 @@ export default function MeetingsPage() {
                       <button
                         key={m.row_id}
                         onClick={() => handleMeetingClick(m)}
-                        className={`w-full text-left p-4 bg-surface rounded-xl border border-border hover:border-purple/20 transition-colors ${
-                          m.account_id ? 'cursor-pointer' : 'cursor-default'
-                        }`}
+                        className="w-full text-left p-4 bg-surface rounded-xl border border-border hover:border-purple/20 transition-colors cursor-pointer"
                       >
                         <div className="flex items-start gap-3">
                           <div className="flex-shrink-0 mt-0.5">

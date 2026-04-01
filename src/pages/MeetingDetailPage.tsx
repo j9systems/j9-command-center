@@ -44,7 +44,7 @@ type TaskWithAssignee = Task & {
 }
 
 export default function MeetingDetailPage() {
-  const { id: accountId, meetingId } = useParams<{ id: string; meetingId: string }>()
+  const { id: accountId, meetingId } = useParams<{ id?: string; meetingId: string }>()
   const navigate = useNavigate()
   const [meeting, setMeeting] = useState<MeetingWithAttendees | null>(null)
   const [tasks, setTasks] = useState<TaskWithAssignee[]>([])
@@ -306,15 +306,18 @@ export default function MeetingDetailPage() {
     )
   }
 
+  const backLink = accountId ? `/accounts/${accountId}` : '/meetings'
+  const backLabel = accountId ? 'Back to Account' : 'Back to Meetings'
+
   if (!meeting) {
     return (
       <div className="p-4 md:p-8 max-w-4xl mx-auto">
         <Link
-          to={`/accounts/${accountId}`}
+          to={backLink}
           className="inline-flex items-center gap-1.5 text-sm text-text-secondary hover:text-text-primary transition-colors mb-6"
         >
           <ArrowLeft size={16} />
-          Back to Account
+          {backLabel}
         </Link>
         <div className="text-center py-16">
           <p className="text-text-secondary text-sm">Meeting not found.</p>
@@ -328,11 +331,11 @@ export default function MeetingDetailPage() {
   return (
     <div className="p-4 md:p-8 max-w-4xl mx-auto">
       <Link
-        to={`/accounts/${accountId}`}
+        to={backLink}
         className="inline-flex items-center gap-1.5 text-sm text-text-secondary hover:text-text-primary transition-colors mb-6"
       >
         <ArrowLeft size={16} />
-        Back to Account
+        {backLabel}
       </Link>
 
       {/* Meeting header */}
