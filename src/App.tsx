@@ -88,6 +88,7 @@ export default function App() {
           <Route path="/tasks" element={<TasksPage />} />
           <Route path="/time-logs" element={<TimeLogsPage />} />
           <Route path="/meetings" element={<MeetingsPage />} />
+          <Route path="/meetings/:meetingId" element={<MeetingDetailPage />} />
           <Route path="/sops" element={<SOPsPage />} />
         </Route>
       </Routes>
