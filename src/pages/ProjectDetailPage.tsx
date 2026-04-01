@@ -61,16 +61,14 @@ export default function ProjectDetailPage() {
     end_date: '',
     status_id: 0,
   })
-  const [editingDates, setEditingDates] = useState(false)
+  const [editingDetails, setEditingDetails] = useState(false)
   const [editStart, setEditStart] = useState('')
   const [editEnd, setEditEnd] = useState('')
-  const [savingDates, setSavingDates] = useState(false)
+  const [editStatus, setEditStatus] = useState('')
+  const [savingDetails, setSavingDetails] = useState(false)
   const [editingDescription, setEditingDescription] = useState(false)
   const [editDescription, setEditDescription] = useState('')
   const [savingDescription, setSavingDescription] = useState(false)
-  const [editingStatus, setEditingStatus] = useState(false)
-  const [editStatus, setEditStatus] = useState('')
-  const [savingStatus, setSavingStatus] = useState(false)
 
   useEffect(() => {
     if (!projectId) return
@@ -170,27 +168,34 @@ export default function ProjectDetailPage() {
     return d.toISOString().slice(0, 10)
   }
 
-  function startEditingDates() {
+  function startEditingDetails() {
     setEditStart(toInputDate(project?.project_start ?? null))
     setEditEnd(toInputDate(project?.project_end ?? null))
-    setEditingDates(true)
+    setEditStatus(project?.status ?? '')
+    setEditingDetails(true)
   }
 
-  async function handleSaveDates() {
+  async function handleSaveDetails() {
     if (!projectId || !project) return
-    setSavingDates(true)
+    setSavingDetails(true)
     const { error } = await supabase
       .from('projects')
       .update({
+        status: editStatus || null,
         project_start: editStart || null,
         project_end: editEnd || null,
       })
       .eq('id', projectId)
     if (!error) {
-      setProject({ ...project, project_start: editStart || null, project_end: editEnd || null })
-      setEditingDates(false)
+      setProject({
+        ...project,
+        status: editStatus || null,
+        project_start: editStart || null,
+        project_end: editEnd || null,
+      })
+      setEditingDetails(false)
     }
-    setSavingDates(false)
+    setSavingDetails(false)
   }
 
   function startEditingDescription() {
@@ -212,25 +217,6 @@ export default function ProjectDetailPage() {
       setEditingDescription(false)
     }
     setSavingDescription(false)
-  }
-
-  function startEditingStatus() {
-    setEditStatus(project?.status ?? '')
-    setEditingStatus(true)
-  }
-
-  async function handleSaveStatus() {
-    if (!projectId || !project) return
-    setSavingStatus(true)
-    const { error } = await supabase
-      .from('projects')
-      .update({ status: editStatus || null })
-      .eq('id', projectId)
-    if (!error) {
-      setProject({ ...project, status: editStatus || null })
-      setEditingStatus(false)
-    }
-    setSavingStatus(false)
   }
 
   if (loading) {
@@ -289,22 +275,32 @@ export default function ProjectDetailPage() {
                   .join(' ')}
               </span>
             )}
-            {!editingStatus ? (
-              <span className="flex items-center gap-1">
+            {!editingDetails ? (
+              <>
                 <span
                   className={`text-xs font-medium px-2.5 py-0.5 rounded-full ${getProjectStatusColor(project.status)}`}
                 >
                   {project.status ? formatStatusLabel(project.status) : 'No Status'}
                 </span>
+                <span className="text-sm text-text-secondary flex items-center gap-1">
+                  <CalendarDays size={12} />
+                  {project.project_start
+                    ? new Date(project.project_start).toLocaleDateString()
+                    : 'TBD'}
+                  {' - '}
+                  {project.project_end
+                    ? new Date(project.project_end).toLocaleDateString()
+                    : 'Ongoing'}
+                </span>
                 <button
-                  onClick={startEditingStatus}
+                  onClick={startEditingDetails}
                   className="text-text-secondary hover:text-purple transition-colors"
                 >
                   <Pencil size={12} />
                 </button>
-              </span>
+              </>
             ) : (
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <select
                   value={editStatus}
                   onChange={(e) => setEditStatus(e.target.value)}
@@ -317,40 +313,6 @@ export default function ProjectDetailPage() {
                     </option>
                   ))}
                 </select>
-                <button
-                  onClick={handleSaveStatus}
-                  disabled={savingStatus}
-                  className="text-[11px] font-medium px-2.5 py-1 rounded bg-purple text-white hover:bg-purple-hover transition-colors disabled:opacity-50"
-                >
-                  {savingStatus ? '...' : 'Save'}
-                </button>
-                <button
-                  onClick={() => setEditingStatus(false)}
-                  className="text-text-secondary hover:text-text-primary transition-colors"
-                >
-                  <X size={14} />
-                </button>
-              </div>
-            )}
-            {!editingDates ? (
-              <span className="text-sm text-text-secondary flex items-center gap-1">
-                <CalendarDays size={12} />
-                {project.project_start
-                  ? new Date(project.project_start).toLocaleDateString()
-                  : 'TBD'}
-                {' - '}
-                {project.project_end
-                  ? new Date(project.project_end).toLocaleDateString()
-                  : 'Ongoing'}
-                <button
-                  onClick={startEditingDates}
-                  className="ml-1 text-text-secondary hover:text-purple transition-colors"
-                >
-                  <Pencil size={12} />
-                </button>
-              </span>
-            ) : (
-              <div className="flex items-center gap-2">
                 <input
                   type="date"
                   value={editStart}
@@ -365,14 +327,14 @@ export default function ProjectDetailPage() {
                   className="text-xs bg-surface border border-border rounded px-2 py-1 text-text-primary focus:outline-none focus:border-purple/50"
                 />
                 <button
-                  onClick={handleSaveDates}
-                  disabled={savingDates}
+                  onClick={handleSaveDetails}
+                  disabled={savingDetails}
                   className="text-[11px] font-medium px-2.5 py-1 rounded bg-purple text-white hover:bg-purple-hover transition-colors disabled:opacity-50"
                 >
-                  {savingDates ? '...' : 'Save'}
+                  {savingDetails ? '...' : 'Save'}
                 </button>
                 <button
-                  onClick={() => setEditingDates(false)}
+                  onClick={() => setEditingDetails(false)}
                   className="text-text-secondary hover:text-text-primary transition-colors"
                 >
                   <X size={14} />
