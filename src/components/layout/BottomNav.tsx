@@ -1,9 +1,11 @@
 import { NavLink } from 'react-router-dom'
-import { navItems, MAX_BOTTOM_NAV_ITEMS } from '@/lib/navItems'
-
-const visibleItems = navItems.slice(0, MAX_BOTTOM_NAV_ITEMS)
+import { getVisibleNavItems, MAX_BOTTOM_NAV_ITEMS } from '@/lib/navItems'
+import { useCurrentRole } from '@/hooks/useCurrentRole'
 
 export default function BottomNav() {
+  const role = useCurrentRole()
+  const visibleItems = getVisibleNavItems(role).slice(0, MAX_BOTTOM_NAV_ITEMS)
+
   return (
     <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 border-t border-border bg-surface pb-[env(safe-area-inset-bottom)] touch-none">
       <div className="flex items-center justify-around">
