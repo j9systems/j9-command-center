@@ -137,6 +137,91 @@ button, select, a, [role="button"], [tabindex="0"] {
   margin: 0.25em 0;
 }
 
+/* SOP Markdown styles (scoped to .sop-markdown) */
+.sop-markdown h1 {
+  font-size: 1.5em;
+  font-weight: 700;
+  margin: 0.75em 0 0.35em;
+}
+.sop-markdown h2 {
+  font-size: 1.25em;
+  font-weight: 600;
+  margin: 0.6em 0 0.3em;
+}
+.sop-markdown h3 {
+  font-size: 1.1em;
+  font-weight: 600;
+  margin: 0.5em 0 0.25em;
+}
+.sop-markdown p {
+  margin: 0.35em 0;
+}
+.sop-markdown ul, .sop-markdown ol {
+  padding-left: 1.5em;
+  margin: 0.35em 0;
+}
+.sop-markdown ul {
+  list-style: disc;
+}
+.sop-markdown ol {
+  list-style: decimal;
+}
+.sop-markdown li {
+  margin: 0.15em 0;
+}
+.sop-markdown hr {
+  border-color: #333;
+  margin: 0.75em 0;
+}
+.sop-markdown strong {
+  font-weight: 600;
+}
+.sop-markdown a {
+  color: #7C3AED;
+  text-decoration: underline;
+}
+.sop-markdown a:hover {
+  color: #6D28D9;
+}
+.sop-markdown table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.5em 0;
+}
+.sop-markdown th, .sop-markdown td {
+  border: 1px solid #333;
+  padding: 0.4em 0.6em;
+  text-align: left;
+  font-size: 0.875em;
+}
+.sop-markdown th {
+  font-weight: 600;
+  background: rgba(255,255,255,0.04);
+}
+.sop-markdown blockquote {
+  border-left: 3px solid #7C3AED;
+  padding-left: 1em;
+  margin: 0.5em 0;
+  color: #a3a3a3;
+}
+.sop-markdown code {
+  background: rgba(255,255,255,0.06);
+  padding: 0.15em 0.35em;
+  border-radius: 4px;
+  font-size: 0.875em;
+}
+.sop-markdown pre {
+  background: rgba(255,255,255,0.04);
+  padding: 0.75em 1em;
+  border-radius: 8px;
+  overflow-x: auto;
+  margin: 0.5em 0;
+}
+.sop-markdown pre code {
+  background: none;
+  padding: 0;
+}
+
 /* Scrollbar styling */
 ::-webkit-scrollbar {
   width: 6px;
