@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { ArrowLeft, User, Save, Mail, Phone } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import type { TeamMember, Role } from '@/types/database'
 
@@ -23,19 +24,15 @@ type TeamMemberFull = TeamMember & {
 export default function TeamMemberDetailPage() {
   const { teamId } = useParams<{ teamId: string }>()
   const [member, setMember] = useState<TeamMemberFull | null>(null)
-  const [roles, setRoles] = useState<Role[]>([])
-  const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [commission, setCommission] = useState('')
   const [salesCommission, setSalesCommission] = useState('')
   const [hourlyRate, setHourlyRate] = useState('')
   const [roleId, setRoleId] = useState('')
 
-  useEffect(() => {
-    if (!teamId) return
-
-    async function fetchMember() {
-      setLoading(true)
+  const { data: queryData, isLoading: loading } = useQuery({
+    queryKey: ['team-member', teamId],
+    queryFn: async () => {
       const [{ data }, { data: rolesData }] = await Promise.all([
         supabase
           .from('team')
@@ -63,12 +60,13 @@ export default function TeamMemberDetailPage() {
         setHourlyRate(data.payouts_contractor_rate ?? '')
         setRoleId(data.role_id?.toString() ?? '')
       }
-      if (rolesData) setRoles(rolesData as Role[])
-      setLoading(false)
-    }
 
-    fetchMember()
-  }, [teamId])
+      return { roles: (rolesData as Role[]) ?? [] }
+    },
+    enabled: !!teamId,
+  })
+
+  const roles = queryData?.roles ?? []
 
   async function handleSave() {
     if (!teamId) return

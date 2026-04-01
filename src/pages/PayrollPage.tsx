@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Wallet, Play, CheckCheck, Loader2, AlertTriangle, ChevronDown, ChevronUp, Trash2 } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 
 interface PayrollResult {
@@ -72,7 +73,6 @@ async function callEdgeFunction<T>(name: string, body: Record<string, unknown> =
 export default function PayrollPage() {
   const [payouts, setPayouts] = useState<PayoutRow[]>([])
   const [openTotals, setOpenTotals] = useState<Record<string, number>>({})
-  const [loading, setLoading] = useState(true)
 
   // Run Payroll state
   const [runningPayroll, setRunningPayroll] = useState(false)
@@ -90,14 +90,11 @@ export default function PayrollPage() {
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
 
   // Payroll Preview state
-  const [preview, setPreview] = useState<PreviewResult | null>(null)
-  const [previewLoading, setPreviewLoading] = useState(true)
   const [previewExpanded, setPreviewExpanded] = useState(true)
 
-  useEffect(() => {
-    async function fetchData() {
-      setLoading(true)
-
+  const { isLoading: loading } = useQuery({
+    queryKey: ['payroll'],
+    queryFn: async () => {
       const { data: payoutsData, error: payoutsError } = await supabase
         .from('payouts')
         .select('row_id, created_date, team_member_id, week_id, status_id, payout_from_time_logs, team(first_name, last_name, photo), options(option_label)')
@@ -107,8 +104,7 @@ export default function PayrollPage() {
       }
 
       if (!payoutsData) {
-        setLoading(false)
-        return
+        return { payouts: [], openTotals: {} }
       }
 
       const rows: PayoutRow[] = payoutsData.map((p: Record<string, unknown>) => ({
@@ -122,11 +118,11 @@ export default function PayrollPage() {
         status_option: p.options as PayoutRow['status_option'],
       }))
 
-      // Find open payouts and fetch their line totals in a single query
       const openRows = rows.filter(
         (r) => r.status_option?.option_label === 'Open'
       )
 
+      let totalsMap: Record<string, number> = {}
       if (openRows.length > 0) {
         const weekIds = [...new Set(openRows.map((r) => r.week_id).filter(Boolean))] as string[]
         const memberIds = [...new Set(openRows.map((r) => r.team_member_id).filter(Boolean))] as string[]
@@ -142,16 +138,13 @@ export default function PayrollPage() {
         }
 
         if (linesData) {
-          const totalsMap: Record<string, number> = {}
           for (const line of linesData as PayoutLine[]) {
             const key = `${line.week_id}|${line.assigned_to_id}`
             totalsMap[key] = (totalsMap[key] || 0) + (line.total || 0)
           }
-          setOpenTotals(totalsMap)
         }
       }
 
-      // Sort: Open first, then by created_date descending (most recent first)
       rows.sort((a, b) => {
         const aLabel = a.status_option?.option_label ?? ''
         const bLabel = b.status_option?.option_label ?? ''
@@ -163,31 +156,22 @@ export default function PayrollPage() {
       })
 
       setPayouts(rows)
-      setLoading(false)
-    }
+      setOpenTotals(totalsMap)
+      return { payouts: rows, openTotals: totalsMap }
+    },
+  })
 
-    fetchData()
-  }, [])
-
-  // Fetch payroll preview on mount
-  useEffect(() => {
-    async function fetchPreview() {
-      setPreviewLoading(true)
-      try {
-        const result = await callEdgeFunction<PreviewResult>('get-payroll-preview')
-        if (result.error) {
-          console.error('Preview error:', result.error)
-        } else {
-          setPreview(result)
-        }
-      } catch (err) {
-        console.error('Failed to load payroll preview:', err)
-      } finally {
-        setPreviewLoading(false)
+  const { data: preview, isLoading: previewLoading } = useQuery({
+    queryKey: ['payroll-preview'],
+    queryFn: async () => {
+      const result = await callEdgeFunction<PreviewResult>('get-payroll-preview')
+      if (result.error) {
+        console.error('Preview error:', result.error)
+        return null
       }
-    }
-    fetchPreview()
-  }, [])
+      return result
+    },
+  })
 
   async function handleRunPayroll() {
     setRunningPayroll(true)

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import {
   Target,
   Search,
@@ -12,6 +12,7 @@ import {
   Filter,
   X,
 } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import type { Lead, Option } from '@/types/database'
 
@@ -40,18 +41,14 @@ const statusColors: Record<string, string> = {
 }
 
 export default function LeadsPage() {
-  const [leads, setLeads] = useState<LeadWithStatus[]>([])
-  const [statusOptions, setStatusOptions] = useState<Option[]>([])
-  const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<TabKey>('kill_list')
   const [statusFilter, setStatusFilter] = useState<string>('')
   const [searchQuery, setSearchQuery] = useState('')
   const [contactModal, setContactModal] = useState<{ phone: string; action: 'call' | 'text' } | null>(null)
 
-  useEffect(() => {
-    async function fetchData() {
-      setLoading(true)
-
+  const { data: queryData, isLoading: loading } = useQuery({
+    queryKey: ['leads'],
+    queryFn: async () => {
       const [{ data: leadsData }, { data: statusOpts }] = await Promise.all([
         supabase
           .from('leads')
@@ -63,22 +60,22 @@ export default function LeadsPage() {
           .eq('category', 'lead_status'),
       ])
 
-      if (leadsData) {
-        setLeads(
-          leadsData.map((l) => ({
+      const leads: LeadWithStatus[] = leadsData
+        ? leadsData.map((l) => ({
             ...l,
             status_option: l.options as unknown as Option | null,
             options: undefined,
           })) as LeadWithStatus[]
-        )
-      }
+        : []
 
-      if (statusOpts) setStatusOptions(statusOpts as Option[])
-      setLoading(false)
-    }
+      const statusOptions: Option[] = (statusOpts as Option[]) ?? []
 
-    fetchData()
-  }, [])
+      return { leads, statusOptions }
+    },
+  })
+
+  const leads = queryData?.leads ?? []
+  const statusOptions = queryData?.statusOptions ?? []
 
   function getFilteredLeads(): LeadWithStatus[] {
     let filtered = leads

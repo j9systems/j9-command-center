@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import {
   ArrowLeft,
@@ -10,6 +10,7 @@ import {
   ArrowUp,
   X,
 } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import type { Feature, Option } from '@/types/database'
 
@@ -28,11 +29,8 @@ export default function FeatureDetailPage() {
     featureId: string
   }>()
   const [feature, setFeature] = useState<FeatureWithStatus | null>(null)
-  const [siblingFeatures, setSiblingFeatures] = useState<FeatureWithStatus[]>([])
   const [followsFeature, setFollowsFeature] = useState<FeatureWithStatus | null>(null)
   const [precedesFeature, setPrecedesFeature] = useState<FeatureWithStatus | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [featureStatuses, setFeatureStatuses] = useState<Option[]>([])
   const [savingDep, setSavingDep] = useState<'follows' | 'precedes' | null>(null)
   const [editingDetails, setEditingDetails] = useState(false)
   const [editStart, setEditStart] = useState('')
@@ -40,65 +38,65 @@ export default function FeatureDetailPage() {
   const [editStatusId, setEditStatusId] = useState<number | null>(null)
   const [savingDetails, setSavingDetails] = useState(false)
 
-  useEffect(() => {
-    if (!featureId || !projectId) return
-
-    async function fetchData() {
-      setLoading(true)
+  const { data: queryData, isLoading: loading } = useQuery({
+    queryKey: ['feature', featureId, projectId],
+    queryFn: async () => {
+      if (!featureId || !projectId) return null
 
       const { data: featureData } = await supabase
         .from('features')
         .select('*, options(id, option_key, option_label)')
-        .eq('id', featureId!)
+        .eq('id', featureId)
         .single()
 
+      let mapped: FeatureWithStatus | null = null
+      let followsData: FeatureWithStatus | null = null
+      let precedesData: FeatureWithStatus | null = null
+
       if (featureData) {
-        const mapped: FeatureWithStatus = {
+        mapped = {
           ...featureData,
           status_option: featureData.options as unknown as Option | null,
           options: undefined,
         } as FeatureWithStatus
-        setFeature(mapped)
 
-        // Load dependency features if set
         if (featureData.follows_id) {
-          const { data: followsData } = await supabase
+          const { data } = await supabase
             .from('features')
             .select('*, options(id, option_key, option_label)')
             .eq('id', featureData.follows_id)
             .single()
-          if (followsData) {
-            setFollowsFeature({
-              ...followsData,
-              status_option: followsData.options as unknown as Option | null,
+          if (data) {
+            followsData = {
+              ...data,
+              status_option: data.options as unknown as Option | null,
               options: undefined,
-            } as FeatureWithStatus)
+            } as FeatureWithStatus
           }
         }
 
         if (featureData.precedes_id) {
-          const { data: precedesData } = await supabase
+          const { data } = await supabase
             .from('features')
             .select('*, options(id, option_key, option_label)')
             .eq('id', featureData.precedes_id)
             .single()
-          if (precedesData) {
-            setPrecedesFeature({
-              ...precedesData,
-              status_option: precedesData.options as unknown as Option | null,
+          if (data) {
+            precedesData = {
+              ...data,
+              status_option: data.options as unknown as Option | null,
               options: undefined,
-            } as FeatureWithStatus)
+            } as FeatureWithStatus
           }
         }
       }
 
-      // Load sibling features and status options
       const [siblingsRes, statusRes] = await Promise.all([
         supabase
           .from('features')
           .select('*, options(id, option_key, option_label)')
-          .eq('project_id', projectId!)
-          .neq('id', featureId!)
+          .eq('project_id', projectId)
+          .neq('id', featureId)
           .order('name'),
         supabase
           .from('options')
@@ -106,25 +104,28 @@ export default function FeatureDetailPage() {
           .eq('category', 'feature_status'),
       ])
 
-      if (siblingsRes.data) {
-        setSiblingFeatures(
-          siblingsRes.data.map((f) => ({
+      const siblingFeatures: FeatureWithStatus[] = siblingsRes.data
+        ? siblingsRes.data.map((f) => ({
             ...f,
             status_option: f.options as unknown as Option | null,
             options: undefined,
           })) as FeatureWithStatus[]
-        )
-      }
+        : []
 
-      if (statusRes.data) {
-        setFeatureStatuses(statusRes.data as Option[])
-      }
+      const featureStatuses: Option[] = (statusRes.data as Option[]) ?? []
 
-      setLoading(false)
-    }
+      // Sync mutable state
+      setFeature(mapped)
+      setFollowsFeature(followsData)
+      setPrecedesFeature(precedesData)
 
-    fetchData()
-  }, [featureId, projectId])
+      return { feature: mapped, siblingFeatures, featureStatuses, followsFeature: followsData, precedesFeature: precedesData }
+    },
+    enabled: !!featureId && !!projectId,
+  })
+
+  const siblingFeatures = queryData?.siblingFeatures ?? []
+  const featureStatuses = queryData?.featureStatuses ?? []
 
   async function handleDependencyChange(type: 'follows' | 'precedes', targetId: string | null) {
     if (!featureId || !feature) return

@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import {
   Search,
   Mail,
   Phone,
   Building2,
 } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import type { Contact } from '@/types/database'
 
@@ -33,23 +34,19 @@ function getInterestClass(level: string | null): string {
 }
 
 export default function ContactsPage() {
-  const [contacts, setContacts] = useState<Contact[]>([])
-  const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
 
-  useEffect(() => {
-    async function fetchContacts() {
-      setLoading(true)
+  const { data: contacts = [], isLoading: loading } = useQuery({
+    queryKey: ['contacts'],
+    queryFn: async () => {
       const { data } = await supabase
         .from('contacts')
         .select('*')
         .order('first_name', { ascending: true })
 
-      if (data) setContacts(data as Contact[])
-      setLoading(false)
-    }
-    fetchContacts()
-  }, [])
+      return (data as Contact[]) ?? []
+    },
+  })
 
   const filtered = contacts.filter((c) => {
     if (!search.trim()) return true

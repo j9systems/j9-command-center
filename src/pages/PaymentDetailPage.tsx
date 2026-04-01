@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import {
   ArrowLeft,
@@ -8,6 +7,7 @@ import {
   CheckCircle2,
   Clock,
 } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import type { Payment, RetainerPayoutQuarter } from '@/types/database'
 
@@ -17,16 +17,10 @@ type PaymentWithAccount = Payment & {
 
 export default function PaymentDetailPage() {
   const { paymentId } = useParams<{ paymentId: string }>()
-  const [payment, setPayment] = useState<PaymentWithAccount | null>(null)
-  const [payoutQuarters, setPayoutQuarters] = useState<RetainerPayoutQuarter[]>([])
-  const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    if (!paymentId) return
-
-    async function fetchData() {
-      setLoading(true)
-
+  const { data: queryData, isLoading: loading } = useQuery({
+    queryKey: ['payment', paymentId],
+    queryFn: async () => {
       const [{ data: paymentData }, { data: quartersData }] = await Promise.all([
         supabase
           .from('payments')
@@ -40,23 +34,24 @@ export default function PaymentDetailPage() {
           .order('created_date', { ascending: true }),
       ])
 
-      if (paymentData) {
-        setPayment({
-          ...paymentData,
-          account: paymentData.accounts as { id: string; company_name: string | null } | null,
-          accounts: undefined,
-        } as PaymentWithAccount)
+      const payment: PaymentWithAccount | null = paymentData
+        ? {
+            ...paymentData,
+            account: paymentData.accounts as { id: string; company_name: string | null } | null,
+            accounts: undefined,
+          } as PaymentWithAccount
+        : null
+
+      return {
+        payment,
+        payoutQuarters: (quartersData as RetainerPayoutQuarter[]) ?? [],
       }
+    },
+    enabled: !!paymentId,
+  })
 
-      if (quartersData) {
-        setPayoutQuarters(quartersData as RetainerPayoutQuarter[])
-      }
-
-      setLoading(false)
-    }
-
-    fetchData()
-  }, [paymentId])
+  const payment = queryData?.payment ?? null
+  const payoutQuarters = queryData?.payoutQuarters ?? []
 
   function formatDate(dateStr: string | null): string {
     if (!dateStr) return ''

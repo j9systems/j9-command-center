@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft,
@@ -8,6 +8,7 @@ import {
   User,
   Trash2,
 } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import type { TimeLog, TeamMember, Option } from '@/types/database'
 
@@ -27,18 +28,13 @@ type TimeLogWithDetails = TimeLog & {
 export default function TimeLogDetailPage() {
   const { id: accountId, timeLogId } = useParams<{ id: string; timeLogId: string }>()
   const navigate = useNavigate()
-  const [timeLog, setTimeLog] = useState<TimeLogWithDetails | null>(null)
-  const [loading, setLoading] = useState(true)
   const [deleting, setDeleting] = useState(false)
-  const [currentTeamMemberId, setCurrentTeamMemberId] = useState<string | null>(null)
 
-  useEffect(() => {
-    if (!timeLogId) return
+  const { data: queryData, isLoading: loading } = useQuery({
+    queryKey: ['time-log', timeLogId],
+    queryFn: async () => {
+      let currentTeamMemberId: string | null = null
 
-    async function fetchData() {
-      setLoading(true)
-
-      // Resolve current user's team member ID
       const { data: { user } } = await supabase.auth.getUser()
       if (user?.email) {
         const { data: teamData } = await supabase
@@ -46,7 +42,7 @@ export default function TimeLogDetailPage() {
           .select('id')
           .eq('email', user.email)
           .single()
-        if (teamData) setCurrentTeamMemberId(teamData.id)
+        if (teamData) currentTeamMemberId = teamData.id
       }
 
       const { data } = await supabase
@@ -55,23 +51,25 @@ export default function TimeLogDetailPage() {
         .eq('id', timeLogId!)
         .single()
 
-      if (data) {
-        setTimeLog({
-          ...data,
-          team_member: data.team as TeamMember | null,
-          project: data.projects as { name: string | null } | null,
-          status_option: data.options as Option | null,
-          team: undefined,
-          projects: undefined,
-          options: undefined,
-        } as TimeLogWithDetails)
-      }
+      const timeLog: TimeLogWithDetails | null = data
+        ? {
+            ...data,
+            team_member: data.team as TeamMember | null,
+            project: data.projects as { name: string | null } | null,
+            status_option: data.options as Option | null,
+            team: undefined,
+            projects: undefined,
+            options: undefined,
+          } as TimeLogWithDetails
+        : null
 
-      setLoading(false)
-    }
+      return { timeLog, currentTeamMemberId }
+    },
+    enabled: !!timeLogId,
+  })
 
-    fetchData()
-  }, [timeLogId])
+  const timeLog = queryData?.timeLog ?? null
+  const currentTeamMemberId = queryData?.currentTeamMemberId ?? null
 
   async function handleDelete() {
     if (!timeLogId || !timeLog) return
