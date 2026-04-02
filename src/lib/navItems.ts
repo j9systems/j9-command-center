@@ -14,16 +14,16 @@ export interface NavItem {
 
 export const navItems: NavItem[] = [
   { to: '/', icon: Home, label: 'Home' },
-  { to: '/accounts', icon: Building2, label: 'Accounts', deniedRoles: ['Contractor'] },
+  { to: '/accounts', icon: Building2, label: 'Accounts' },
   { to: '/contacts', icon: Users, label: 'Contacts', deniedRoles: ['Contractor'] },
-  { to: '/team', icon: UserCog, label: 'Team' },
-  { to: '/leads', icon: Target, label: 'Leads', deniedRoles: ['Contractor'] },
+  { to: '/team', icon: UserCog, label: 'Team', allowedRoles: ['Admin'] },
+  { to: '/leads', icon: Target, label: 'Leads', allowedRoles: ['Admin'] },
   { to: '/meetings', icon: CalendarDays, label: 'Meetings' },
   { to: '/tasks', icon: ClipboardList, label: 'Tasks' },
   { to: '/time-logs', icon: Timer, label: 'Time Logs' },
   { to: '/billing', icon: CreditCard, label: 'Billing', allowedRoles: ['Admin'] },
   { to: '/payroll', icon: Wallet, label: 'Payroll', allowedRoles: ['Admin'] },
-  { to: '/sops', icon: BookOpen, label: 'SOPs' },
+  { to: '/sops', icon: BookOpen, label: 'SOPs', allowedRoles: ['Admin'] },
 ]
 
 export const MAX_BOTTOM_NAV_ITEMS = 5
