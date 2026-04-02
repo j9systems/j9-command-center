@@ -20,6 +20,7 @@ export default function AccountsPage() {
   const [newStatusId, setNewStatusId] = useState('')
   const role = useCurrentRole()
   const canViewAll = role === 'Admin' || role === 'Sales'
+  const isContractor = role === 'Contractor'
   const [showAll, setShowAll] = useState(false)
 
   useEffect(() => {
@@ -122,8 +123,9 @@ export default function AccountsPage() {
   }
 
   const filtered = accounts.filter((a) => {
-    // Filter by team assignment unless showing all
-    if (!showAll && !assignedAccountIds.has(a.id)) return false
+    // Contractors: RLS already scopes to assigned accounts, show all returned rows
+    // Other roles: filter by team assignment unless showing all
+    if (!isContractor && !showAll && !assignedAccountIds.has(a.id)) return false
     if (!search) return true
     const q = search.toLowerCase()
     return (
@@ -201,8 +203,8 @@ export default function AccountsPage() {
         </MobileFormOverlay>
       )}
 
-      {/* All accounts toggle - Admin and Sales only */}
-      {canViewAll && (
+      {/* All accounts toggle - Admin and Sales only (hidden for Contractors) */}
+      {canViewAll && !isContractor && (
         <div className="flex items-center gap-3 mb-4">
           <button
             onClick={() => setShowAll(false)}
