@@ -206,13 +206,10 @@ export default function AccountDetailPage() {
         .filter((cl) => cl.contacts && cl.contacts.email)
         .map((cl) => (cl.contacts as Contact).email!.toLowerCase())
 
-      const phase2Promises: Promise<unknown>[] = []
-
       // Project tasks (depends on projectIds)
       const projectTasksPromise = projectIds.length > 0
-        ? supabase.from('tasks').select(taskSelect).in('project_id', projectIds).order('due', { ascending: true })
+        ? supabase.from('tasks').select(taskSelect).in('project_id', projectIds).order('due', { ascending: true }).then((r) => r)
         : Promise.resolve({ data: [] as typeof directTasks, error: null })
-      phase2Promises.push(projectTasksPromise)
 
       // Attendee meetings (depends on contactEmails)
       const attendeeMeetingsPromise = contactEmails.length > 0
@@ -227,12 +224,11 @@ export default function AccountDetailPage() {
             )
           )
         : Promise.resolve([] as { data: typeof directMeetings }[])
-      phase2Promises.push(attendeeMeetingsPromise)
 
-      const [projectTasksResult, attendeeMeetingsResult] = await Promise.all(phase2Promises) as [
-        { data: typeof directTasks; error: unknown },
-        { data: typeof directMeetings }[],
-      ]
+      const [projectTasksResult, attendeeMeetingsResult] = await Promise.all([
+        projectTasksPromise,
+        attendeeMeetingsPromise,
+      ])
 
       if (projectTasksResult.error) {
         console.error('Error fetching project tasks:', projectTasksResult.error)
