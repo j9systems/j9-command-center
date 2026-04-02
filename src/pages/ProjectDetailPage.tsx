@@ -206,6 +206,9 @@ export default function ProjectDetailPage() {
       )
       setEditingDetails(false)
       queryClient.invalidateQueries({ queryKey: ['project', projectId] })
+      if (accountId) {
+        queryClient.invalidateQueries({ queryKey: ['account', accountId] })
+      }
     }
     setSavingDetails(false)
   }
