@@ -24,7 +24,8 @@ type Tab = 'overview' | 'assigned' | 'all'
 export default function ProjectsPage() {
   const role = useCurrentRole()
   const isAdmin = role === 'Admin'
-  const [activeTab, setActiveTab] = useState<Tab>('overview')
+  const isAdminOrSales = role === 'Admin' || role === 'Sales'
+  const [activeTab, setActiveTab] = useState<Tab>(isAdminOrSales ? 'overview' : 'assigned')
   const [searchQuery, setSearchQuery] = useState('')
   const [filterStatus, setFilterStatus] = useState('')
   const [filterClient, setFilterClient] = useState('')
@@ -114,13 +115,18 @@ export default function ProjectsPage() {
     })
   }
 
-  const tabs: { key: Tab; label: string; adminOnly?: boolean }[] = [
-    { key: 'overview', label: 'Overview' },
+  const tabs: { key: Tab; label: string; adminOnly?: boolean; hideForContractor?: boolean }[] = [
+    { key: 'overview', label: 'Overview', hideForContractor: true },
     { key: 'assigned', label: 'Assigned' },
-    { key: 'all', label: 'All', adminOnly: true },
+    { key: 'all', label: 'All', adminOnly: true, hideForContractor: true },
   ]
 
-  const visibleTabs = tabs.filter((t) => !t.adminOnly || isAdmin)
+  const isContractor = role === 'Contractor'
+  const visibleTabs = tabs.filter((t) => {
+    if (t.adminOnly && !isAdmin) return false
+    if (t.hideForContractor && isContractor) return false
+    return true
+  })
 
   if (loading) {
     return (
