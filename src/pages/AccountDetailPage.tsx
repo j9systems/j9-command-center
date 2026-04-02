@@ -47,6 +47,7 @@ import GanttChart from '@/components/GanttChart'
 import MobileFormOverlay from '@/components/MobileFormOverlay'
 import NewMeetingModal from '@/components/NewMeetingModal'
 import StartTimeLogModal from '@/components/timelog/StartTimeLogModal'
+import { useCurrentRole } from '@/hooks/useCurrentRole'
 
 type AccountTeamMember = {
   id: string
@@ -134,6 +135,9 @@ export default function AccountDetailPage() {
   const [allTeamMembers, setAllTeamMembers] = useState<TeamMember[]>([])
   const [billingTypeOptions, setBillingTypeOptions] = useState<Option[]>([])
   const [refreshKey, setRefreshKey] = useState(0)
+  const [currentTeamMemberId, setCurrentTeamMemberId] = useState<string | null>(null)
+  const [accountTeamRoleName, setAccountTeamRoleName] = useState<string | null>(null)
+  const appRole = useCurrentRole()
 
   const { data: queryData, isLoading } = useQuery({
     queryKey: ['account', id, refreshKey],
@@ -473,6 +477,26 @@ export default function AccountDetailPage() {
         setMeetings(mappedMeetings)
       }
 
+      // Resolve the current user's team member ID and their role on this account
+      let resolvedTeamMemberId: string | null = null
+      let resolvedAccountTeamRole: string | null = null
+      const { data: { user: authUser } } = await supabase.auth.getUser()
+      if (authUser?.email && mappedAllTeamMembers) {
+        const myTeamRecord = mappedAllTeamMembers.find(
+          (t) => t.email?.toLowerCase() === authUser.email!.toLowerCase()
+        )
+        if (myTeamRecord) {
+          resolvedTeamMemberId = myTeamRecord.id
+          // Find this user's role on the account_team for this account
+          const myAccountTeam = mappedAccountTeamMembers?.find(
+            (at) => at.team_member?.id === myTeamRecord.id
+          )
+          resolvedAccountTeamRole = myAccountTeam?.role?.name ?? null
+        }
+      }
+      setCurrentTeamMemberId(resolvedTeamMemberId)
+      setAccountTeamRoleName(resolvedAccountTeamRole)
+
       return {
         account: mappedAccount,
         accountContacts: mappedContacts,
@@ -489,6 +513,8 @@ export default function AccountDetailPage() {
         partnerMember: mappedPartnerMember,
         invoices: mappedInvoices,
         meetings: mappedMeetings,
+        currentTeamMemberId: resolvedTeamMemberId,
+        accountTeamRoleName: resolvedAccountTeamRole,
       }
     },
     enabled: !!id,
@@ -511,6 +537,8 @@ export default function AccountDetailPage() {
     if (queryData.partnerMember) setPartnerMember(queryData.partnerMember)
     if (queryData.invoices) setInvoices(queryData.invoices)
     if (queryData.meetings) setMeetings(queryData.meetings)
+    if (queryData.currentTeamMemberId !== undefined) setCurrentTeamMemberId(queryData.currentTeamMemberId)
+    if (queryData.accountTeamRoleName !== undefined) setAccountTeamRoleName(queryData.accountTeamRoleName)
   }, [queryData])
 
   const loading = isLoading || (!!queryData && !account && !!queryData.account)
@@ -585,7 +613,13 @@ export default function AccountDetailPage() {
     )
   }
 
-  const tabs = [
+  // Determine if the current user has elevated access for this account
+  const isAdmin = appRole === 'Admin'
+  const isAccountManagerOnTeam = accountTeamRoleName === 'Account Manager'
+  const canViewSensitive = isAdmin || isAccountManagerOnTeam
+  const isDeveloperOnTeam = accountTeamRoleName === 'Developer'
+
+  const allTabs = [
     { key: 'projects' as const, label: 'Projects', icon: FolderKanban },
     { key: 'tasks' as const, label: 'Tasks', icon: ClipboardList },
     { key: 'time_logs' as const, label: 'Time Logs', icon: Timer },
@@ -595,6 +629,8 @@ export default function AccountDetailPage() {
     { key: 'meetings' as const, label: 'Meetings', icon: Calendar },
     { key: 'admin' as const, label: 'Admin', icon: Settings },
   ]
+  const restrictedTabs = new Set<string>(['invoices', 'team', 'admin'])
+  const tabs = canViewSensitive ? allTabs : allTabs.filter((t) => !restrictedTabs.has(t.key))
 
 
   return (
@@ -872,6 +908,9 @@ export default function AccountDetailPage() {
               projects={projects}
               accountId={id!}
               invoices={invoices}
+              canViewSensitive={canViewSensitive}
+              isDeveloperOnTeam={isDeveloperOnTeam}
+              currentTeamMemberId={currentTeamMemberId}
               onStatusUpdate={(logId, statusId) => {
                 setTimeLogs((prev) =>
                   prev.map((tl) =>
@@ -1210,6 +1249,9 @@ function TimeLogsTab({
   projects,
   accountId,
   invoices,
+  canViewSensitive,
+  isDeveloperOnTeam,
+  currentTeamMemberId,
   onStatusUpdate,
   onLogCreated,
 }: {
@@ -1218,6 +1260,9 @@ function TimeLogsTab({
   projects: (Project & { project_manager?: TeamMember | null; logged_hours: number })[]
   accountId: string
   invoices: (Invoice & { project?: { name: string | null } | null; status_option?: Option | null })[]
+  canViewSensitive: boolean
+  isDeveloperOnTeam: boolean
+  currentTeamMemberId: string | null
   onStatusUpdate: (logId: string, statusId: number) => void
   onLogCreated: (log: LogEntry) => void
 }) {
@@ -1342,7 +1387,11 @@ function TimeLogsTab({
     return true
   })
 
-  const totalHours = filteredLogs.reduce((sum, tl) => sum + (tl.hours ?? 0), 0)
+  // Developers only see their own hours in totals; admins/account managers see all
+  const logsForTotals = isDeveloperOnTeam && !canViewSensitive
+    ? filteredLogs.filter((l) => l.assigned_to_id === currentTeamMemberId)
+    : filteredLogs
+  const totalHours = logsForTotals.reduce((sum, tl) => sum + (tl.hours ?? 0), 0)
 
   // Group time logs by week
   const now = new Date()
@@ -1378,18 +1427,19 @@ function TimeLogsTab({
     .sort((a, b) => (b.created_date ?? '').localeCompare(a.created_date ?? ''))
     [0]?.rate ?? null
 
-  // Billable hours calculations
+  // Billable hours calculations - developers only see their own hours
   const billableStatuses = new Set(['approved', 'backlog', 'retainer'])
+  const devFilter = (l: LogEntry) => !isDeveloperOnTeam || canViewSensitive || l.assigned_to_id === currentTeamMemberId
   const thisWeekBillable = groups[0].logs
-    .filter((l) => billableStatuses.has(l.status_option?.option_key ?? '') || !l.status_option)
+    .filter((l) => devFilter(l) && (billableStatuses.has(l.status_option?.option_key ?? '') || !l.status_option))
     .reduce((sum, l) => sum + (l.hours ?? 0), 0)
   const lastWeekBillable = groups[1].logs
-    .filter((l) => billableStatuses.has(l.status_option?.option_key ?? '') || !l.status_option)
+    .filter((l) => devFilter(l) && (billableStatuses.has(l.status_option?.option_key ?? '') || !l.status_option))
     .reduce((sum, l) => sum + (l.hours ?? 0), 0)
   const unbilledHours = filteredLogs
     .filter((l) => {
       const key = l.status_option?.option_key
-      return key !== 'approved' && key !== 'will_not_bill'
+      return devFilter(l) && key !== 'approved' && key !== 'will_not_bill'
     })
     .reduce((sum, l) => sum + (l.hours ?? 0), 0)
 
@@ -1496,26 +1546,28 @@ function TimeLogsTab({
             )}
           </div>
         </div>
-        <div className="flex items-center gap-1.5 flex-shrink-0">
-          {approvedStatus && !isApproved && (
-            <button
-              onClick={(e) => { e.stopPropagation(); handleStatusUpdate(log.id, approvedStatus.id) }}
-              disabled={isUpdating}
-              className="text-[11px] font-medium px-2.5 py-1 rounded-md border border-emerald-500/30 text-emerald-400/70 hover:bg-emerald-500/15 hover:text-emerald-400 hover:border-emerald-500/50 transition-colors disabled:opacity-50"
-            >
-              {isUpdating ? '...' : 'Approve'}
-            </button>
-          )}
-          {willNotBillStatus && !isWillNotBill && (
-            <button
-              onClick={(e) => { e.stopPropagation(); handleStatusUpdate(log.id, willNotBillStatus.id) }}
-              disabled={isUpdating}
-              className="text-[11px] font-medium px-2.5 py-1 rounded-md border border-red-500/30 text-red-400/70 hover:bg-red-500/15 hover:text-red-400 hover:border-red-500/50 transition-colors disabled:opacity-50"
-            >
-              {isUpdating ? '...' : 'Will Not Bill'}
-            </button>
-          )}
-        </div>
+        {canViewSensitive && (
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            {approvedStatus && !isApproved && (
+              <button
+                onClick={(e) => { e.stopPropagation(); handleStatusUpdate(log.id, approvedStatus.id) }}
+                disabled={isUpdating}
+                className="text-[11px] font-medium px-2.5 py-1 rounded-md border border-emerald-500/30 text-emerald-400/70 hover:bg-emerald-500/15 hover:text-emerald-400 hover:border-emerald-500/50 transition-colors disabled:opacity-50"
+              >
+                {isUpdating ? '...' : 'Approve'}
+              </button>
+            )}
+            {willNotBillStatus && !isWillNotBill && (
+              <button
+                onClick={(e) => { e.stopPropagation(); handleStatusUpdate(log.id, willNotBillStatus.id) }}
+                disabled={isUpdating}
+                className="text-[11px] font-medium px-2.5 py-1 rounded-md border border-red-500/30 text-red-400/70 hover:bg-red-500/15 hover:text-red-400 hover:border-red-500/50 transition-colors disabled:opacity-50"
+              >
+                {isUpdating ? '...' : 'Will Not Bill'}
+              </button>
+            )}
+          </div>
+        )}
       </div>
     )
   }
@@ -1575,19 +1627,19 @@ function TimeLogsTab({
       </div>
 
       {/* Billable Hours Summary */}
-      <div className="grid grid-cols-3 gap-3 mb-5">
+      <div className={`grid ${canViewSensitive ? 'grid-cols-3' : 'grid-cols-2'} gap-3 mb-5`}>
         {[
-          { label: 'Last Week', hours: lastWeekBillable },
-          { label: 'This Week', hours: thisWeekBillable },
-          { label: 'Unbilled', hours: unbilledHours },
-        ].map((item) => (
+          { label: 'Last Week', hours: lastWeekBillable, sensitiveOnly: false },
+          { label: 'This Week', hours: thisWeekBillable, sensitiveOnly: false },
+          { label: 'Unbilled', hours: unbilledHours, sensitiveOnly: true },
+        ].filter((item) => !item.sensitiveOnly || canViewSensitive).map((item) => (
           <div
             key={item.label}
             className="bg-black/20 rounded-lg border border-border/50 p-4 text-center"
           >
             <p className="text-xs text-text-secondary uppercase tracking-wider mb-1">{item.label}</p>
             <p className="text-xl font-bold text-text-primary">{item.hours.toFixed(1)}h</p>
-            {hourlyRate != null && (
+            {canViewSensitive && hourlyRate != null && (
               <p className="text-xs text-text-secondary mt-0.5">
                 ${(item.hours * hourlyRate).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </p>
@@ -1596,8 +1648,8 @@ function TimeLogsTab({
         ))}
       </div>
 
-      {/* Weekly Hours Chart */}
-      {weeklyChartData.length > 0 && (
+      {/* Weekly Hours Chart - only visible to admins and account managers */}
+      {canViewSensitive && weeklyChartData.length > 0 && (
         <div className="bg-black/20 rounded-lg border border-border/50 p-4 mb-5">
           <div className="flex items-center justify-between mb-3">
             <h4 className="text-xs font-semibold text-text-secondary uppercase tracking-wider">
@@ -1754,7 +1806,7 @@ function TimeLogsTab({
                     {group.label}
                   </span>
                   <span className="text-xs text-text-secondary">
-                    ({group.logs.reduce((sum, tl) => sum + (tl.hours ?? 0), 0).toFixed(1)}h)
+                    ({group.logs.filter(devFilter).reduce((sum, tl) => sum + (tl.hours ?? 0), 0).toFixed(1)}h)
                   </span>
                 </div>
                 <div className="space-y-2">

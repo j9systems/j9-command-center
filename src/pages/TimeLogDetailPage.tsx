@@ -11,6 +11,7 @@ import {
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import type { TimeLog, TeamMember, Option } from '@/types/database'
+import { useCurrentRole } from '@/hooks/useCurrentRole'
 
 const timeLogStatusColors: Record<string, string> = {
   approved: 'bg-emerald-500/15 text-emerald-400',
@@ -29,11 +30,13 @@ export default function TimeLogDetailPage() {
   const { id: accountId, timeLogId } = useParams<{ id: string; timeLogId: string }>()
   const navigate = useNavigate()
   const [deleting, setDeleting] = useState(false)
+  const appRole = useCurrentRole()
 
   const { data: queryData, isLoading: loading } = useQuery({
     queryKey: ['time-log', timeLogId],
     queryFn: async () => {
       let currentTeamMemberId: string | null = null
+      let accountTeamRoleName: string | null = null
 
       const { data: { user } } = await supabase.auth.getUser()
       if (user?.email) {
@@ -42,7 +45,21 @@ export default function TimeLogDetailPage() {
           .select('id')
           .eq('email', user.email)
           .single()
-        if (teamData) currentTeamMemberId = teamData.id
+        if (teamData) {
+          currentTeamMemberId = teamData.id
+          // Fetch the user's role on this account's team
+          if (accountId) {
+            const { data: accountTeamData } = await supabase
+              .from('account_team')
+              .select('account_roles!account_team_role_id_fkey(name)')
+              .eq('account_id', accountId)
+              .eq('team_member_id', teamData.id)
+              .single()
+            if (accountTeamData) {
+              accountTeamRoleName = (accountTeamData.account_roles as unknown as { name: string } | null)?.name ?? null
+            }
+          }
+        }
       }
 
       const { data } = await supabase
@@ -63,13 +80,14 @@ export default function TimeLogDetailPage() {
           } as TimeLogWithDetails
         : null
 
-      return { timeLog, currentTeamMemberId }
+      return { timeLog, currentTeamMemberId, accountTeamRoleName }
     },
     enabled: !!timeLogId,
   })
 
   const timeLog = queryData?.timeLog ?? null
   const currentTeamMemberId = queryData?.currentTeamMemberId ?? null
+  const accountTeamRoleName = queryData?.accountTeamRoleName ?? null
 
   async function handleDelete() {
     if (!timeLogId || !timeLog) return
@@ -120,6 +138,13 @@ export default function TimeLogDetailPage() {
     ? [timeLog.team_member.first_name, timeLog.team_member.last_name].filter(Boolean).join(' ')
     : null
   const isOwnLog = currentTeamMemberId != null && timeLog.assigned_to_id === currentTeamMemberId
+  const isAdmin = appRole === 'Admin'
+  const isAccountManagerOnTeam = accountTeamRoleName === 'Account Manager'
+  const canViewSensitive = isAdmin || isAccountManagerOnTeam
+  // Admins/account managers can always delete; others can only delete their own backlog entries
+  const canDelete = canViewSensitive
+    ? isOwnLog
+    : isOwnLog && statusKey === 'backlog'
 
   return (
     <div className="p-4 md:p-8 max-w-4xl mx-auto">
@@ -163,7 +188,7 @@ export default function TimeLogDetailPage() {
             )}
           </div>
         </div>
-        {isOwnLog && (
+        {canDelete && (
           <button
             onClick={handleDelete}
             disabled={deleting}
