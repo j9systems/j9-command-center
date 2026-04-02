@@ -84,9 +84,6 @@ function statusBadgeClass(status: string | null): string {
 function startOfMonth(d: Date) {
   return new Date(d.getFullYear(), d.getMonth(), 1)
 }
-function endOfMonth(d: Date) {
-  return new Date(d.getFullYear(), d.getMonth() + 1, 0)
-}
 function startOfWeek(d: Date) {
   const day = d.getDay()
   const diff = day === 0 ? 6 : day - 1
@@ -121,35 +118,45 @@ function parseDate(s: string | null): Date | null {
 }
 
 /* ------------------------------------------------------------------ */
+/*  Zoom / scroll helpers                                             */
+/* ------------------------------------------------------------------ */
+
+/** How many days the viewport spans at each zoom level */
+function getSpanDays(timeframe: Timeframe): number {
+  if (timeframe === 'week') return 7
+  if (timeframe === 'month') return 30
+  return 91 // quarter
+}
+
+/** How many days one scroll tick moves */
+function getScrollStep(timeframe: Timeframe): number {
+  if (timeframe === 'week') return 1
+  if (timeframe === 'month') return 3
+  return 7 // quarter
+}
+
+/* ------------------------------------------------------------------ */
 /*  Compute visible date range for the timeframe                      */
 /* ------------------------------------------------------------------ */
 
-function getRange(timeframe: Timeframe, offset: number): [Date, Date] {
+function getRange(timeframe: Timeframe, dayOffset: number): [Date, Date] {
   const now = new Date()
+  let anchor: Date
   if (timeframe === 'week') {
-    const base = startOfWeek(now)
-    const s = addDays(base, offset * 7)
-    return [s, addDays(s, 6)]
+    anchor = startOfWeek(now)
+  } else if (timeframe === 'month') {
+    anchor = startOfMonth(now)
+  } else {
+    const qMonth = Math.floor(now.getMonth() / 3) * 3
+    anchor = new Date(now.getFullYear(), qMonth, 1)
   }
-  if (timeframe === 'month') {
-    const base = new Date(now.getFullYear(), now.getMonth() + offset, 1)
-    return [startOfMonth(base), endOfMonth(base)]
-  }
-  const qMonth = Math.floor(now.getMonth() / 3) * 3
-  const base = new Date(now.getFullYear(), qMonth + offset * 3, 1)
-  const end = new Date(base.getFullYear(), base.getMonth() + 3, 0)
-  return [base, end]
+  const start = addDays(anchor, dayOffset)
+  const span = getSpanDays(timeframe)
+  return [start, addDays(start, span - 1)]
 }
 
-function rangeLabel(timeframe: Timeframe, start: Date, end: Date): string {
-  if (timeframe === 'week') {
-    return `${fmtDisplay(start)} – ${fmtDisplay(end)}`
-  }
-  if (timeframe === 'month') {
-    return start.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
-  }
-  const q = Math.floor(start.getMonth() / 3) + 1
-  return `Q${q} ${start.getFullYear()}`
+function rangeLabel(_timeframe: Timeframe, start: Date, end: Date): string {
+  return `${fmtDisplay(start)} – ${fmtDisplay(end)}`
 }
 
 /* ------------------------------------------------------------------ */
@@ -572,8 +579,10 @@ export default function ProjectsGanttChart({
 
   const svgHeight = rows.length * ROW_HEIGHT
 
-  /* Wheel handler */
+  /* Wheel handler — scroll horizontally to pan through time */
   const wheelRef = useRef<HTMLDivElement>(null)
+  const timeframeRef = useRef(timeframe)
+  timeframeRef.current = timeframe
   useEffect(() => {
     const el = wheelRef.current
     if (!el) return
@@ -582,7 +591,8 @@ export default function ProjectsGanttChart({
       const dx = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.shiftKey ? e.deltaX || e.deltaY : e.deltaY
       if (Math.abs(dx) < 5) return
       e.preventDefault()
-      setOffset((o) => o + (dx > 0 ? 1 : -1))
+      const step = getScrollStep(timeframeRef.current)
+      setOffset((o) => o + (dx > 0 ? step : -step))
     }
     el.addEventListener('wheel', onWheel, { passive: false })
     return () => el.removeEventListener('wheel', onWheel)
@@ -610,16 +620,16 @@ export default function ProjectsGanttChart({
         </h3>
         <div className="flex items-center gap-2 flex-wrap">
           <button
-            onClick={() => setOffset((o) => o - 1)}
+            onClick={() => setOffset((o) => o - getSpanDays(timeframe))}
             className="text-xs px-2 py-1 rounded border border-border text-text-secondary hover:text-text-primary hover:border-purple/30 transition-colors"
           >
             &larr;
           </button>
-          <span className="text-xs text-text-secondary min-w-[140px] text-center">
+          <span className="text-xs text-text-secondary min-w-[180px] text-center">
             {rangeLabel(timeframe, rangeStart, rangeEnd)}
           </span>
           <button
-            onClick={() => setOffset((o) => o + 1)}
+            onClick={() => setOffset((o) => o + getSpanDays(timeframe))}
             className="text-xs px-2 py-1 rounded border border-border text-text-secondary hover:text-text-primary hover:border-purple/30 transition-colors"
           >
             &rarr;
