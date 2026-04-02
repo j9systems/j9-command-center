@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
-import { Menu, LogOut, X, Calendar } from 'lucide-react'
+import { Menu, LogOut, X, Calendar, User } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { navItems, MAX_BOTTOM_NAV_ITEMS } from '@/lib/navItems'
 
@@ -173,6 +173,15 @@ export default function MobileHeader() {
                   </button>
                 )
               )}
+
+              {/* Profile */}
+              <button
+                onClick={() => { setOpen(false); navigate('/profile') }}
+                className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-text-secondary hover:text-text-primary hover:bg-surface-hover transition-colors w-full"
+              >
+                <User size={18} />
+                Profile
+              </button>
 
               {/* Logout */}
               <button
