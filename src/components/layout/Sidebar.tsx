@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
-import { LogOut, Calendar, ChevronUp } from 'lucide-react'
+import { LogOut, Calendar, ChevronUp, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { getVisibleNavItems } from '@/lib/navItems'
 import { useCurrentRole } from '@/hooks/useCurrentRole'
@@ -12,6 +12,8 @@ interface UserProfile {
   photo: string | null
 }
 
+const SIDEBAR_COLLAPSED_KEY = 'sidebar-collapsed'
+
 export default function Sidebar() {
   const navigate = useNavigate()
   const role = useCurrentRole()
@@ -20,6 +22,21 @@ export default function Sidebar() {
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
+  const [collapsed, setCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === 'true'
+    } catch {
+      return false
+    }
+  })
+
+  function toggleCollapsed() {
+    setCollapsed((prev) => {
+      const next = !prev
+      try { localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(next)) } catch {}
+      return next
+    })
+  }
 
   useEffect(() => {
     async function loadProfile() {
@@ -90,30 +107,46 @@ export default function Sidebar() {
     : ''
 
   return (
-    <aside className="hidden md:flex flex-col w-56 bg-surface border-r border-border h-full">
-      <div className="p-5 border-b border-border flex items-center justify-center">
+    <aside
+      className={`hidden md:flex flex-col bg-surface border-r border-border h-full transition-all duration-200 ${
+        collapsed ? 'w-[68px]' : 'w-56'
+      }`}
+    >
+      {/* Header with logo and collapse toggle */}
+      <div className="p-5 border-b border-border flex items-center justify-between">
         <img
           src="https://res.cloudinary.com/duy32f0q4/image/upload/v1773874676/20A38445-8946-49E1-8330-AA60BFA12F74_1_1_fuobbj.png"
           alt="J9 Logo"
-          className="w-8 h-8 rounded"
+          className="w-8 h-8 rounded flex-shrink-0"
         />
+        <button
+          onClick={toggleCollapsed}
+          className="text-text-secondary hover:text-text-primary transition-colors flex-shrink-0"
+          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        >
+          {collapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
+        </button>
       </div>
+
       <nav className="flex-1 p-3 flex flex-col gap-1 overflow-y-auto min-h-0">
         {visibleNavItems.map(({ to, icon: Icon, label }) => (
           <NavLink
             key={to}
             to={to}
             end={to === '/'}
+            title={collapsed ? label : undefined}
             className={({ isActive }) =>
               `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
+                collapsed ? 'justify-center' : ''
+              } ${
                 isActive
                   ? 'bg-purple-muted text-purple'
                   : 'text-text-secondary hover:text-text-primary hover:bg-surface-hover'
               }`
             }
           >
-            <Icon size={20} />
-            {label}
+            <Icon size={20} className="flex-shrink-0" />
+            {!collapsed && label}
           </NavLink>
         ))}
       </nav>
@@ -121,7 +154,7 @@ export default function Sidebar() {
       {/* Profile menu */}
       <div ref={menuRef} className="relative p-3 border-t border-border flex-shrink-0">
         {menuOpen && (
-          <div className="absolute bottom-full left-3 right-3 mb-1 bg-surface border border-border rounded-lg shadow-lg overflow-hidden">
+          <div className={`absolute bottom-full mb-1 bg-surface border border-border rounded-lg shadow-lg overflow-hidden ${collapsed ? 'left-1 w-56' : 'left-3 right-3'}`}>
             {/* Profile info */}
             <div className="px-4 py-3 border-b border-border">
               <div className="flex items-center gap-3">
@@ -174,19 +207,23 @@ export default function Sidebar() {
 
         <button
           onClick={() => setMenuOpen(!menuOpen)}
-          className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg hover:bg-surface-hover transition-all duration-200"
+          className={`flex items-center gap-3 w-full px-3 py-2.5 rounded-lg hover:bg-surface-hover transition-all duration-200 ${collapsed ? 'justify-center' : ''}`}
         >
           {profile?.photo ? (
-            <img src={profile.photo} alt="" className="w-8 h-8 rounded-full object-cover" />
+            <img src={profile.photo} alt="" className="w-8 h-8 rounded-full object-cover flex-shrink-0" />
           ) : (
             <div className="w-8 h-8 rounded-full bg-purple-muted text-purple flex items-center justify-center text-xs font-semibold shrink-0">
               {initials}
             </div>
           )}
-          <span className="text-sm font-medium text-text-primary truncate flex-1 text-left">
-            {displayName}
-          </span>
-          <ChevronUp size={16} className={`text-text-secondary transition-transform duration-200 ${menuOpen ? '' : 'rotate-180'}`} />
+          {!collapsed && (
+            <>
+              <span className="text-sm font-medium text-text-primary truncate flex-1 text-left">
+                {displayName}
+              </span>
+              <ChevronUp size={16} className={`text-text-secondary transition-transform duration-200 ${menuOpen ? '' : 'rotate-180'}`} />
+            </>
+          )}
         </button>
       </div>
     </aside>

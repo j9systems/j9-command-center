@@ -603,6 +603,7 @@ export default function ProjectsGanttChart({
   const wheelRef = useRef<HTMLDivElement>(null)
   const timeframeRef = useRef(timeframe)
   timeframeRef.current = timeframe
+  const scrollAccum = useRef(0)
   useEffect(() => {
     const el = wheelRef.current
     if (!el) return
@@ -614,7 +615,14 @@ export default function ProjectsGanttChart({
       if (Math.abs(dx) < 2) return
       e.preventDefault()
       const step = getScrollStep(timeframeRef.current)
-      setOffset((o) => o + (dx > 0 ? step : -step))
+      // Accumulate delta and only step when threshold is reached
+      const threshold = step === 1 ? 60 : step === 3 ? 80 : 120
+      scrollAccum.current += dx
+      if (Math.abs(scrollAccum.current) >= threshold) {
+        const steps = Math.sign(scrollAccum.current) * Math.max(1, Math.floor(Math.abs(scrollAccum.current) / threshold))
+        setOffset((o) => o + steps * step)
+        scrollAccum.current = scrollAccum.current % threshold
+      }
     }
     el.addEventListener('wheel', onWheel, { passive: false })
     return () => el.removeEventListener('wheel', onWheel)

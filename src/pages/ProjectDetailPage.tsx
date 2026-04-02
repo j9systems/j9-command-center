@@ -8,7 +8,7 @@ import {
   Plus,
   X,
 } from 'lucide-react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import MobileFormOverlay from '@/components/MobileFormOverlay'
 import RichTextEditor from '@/components/RichTextEditor'
@@ -49,6 +49,7 @@ const featureStatusColors: Record<string, string> = {
 export default function ProjectDetailPage() {
   const { id: accountId, projectId } = useParams<{ id: string; projectId: string }>()
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const [project, setProject] = useState<(Project & { project_manager?: TeamMember | null }) | null>(null)
   const [features, setFeatures] = useState<(Feature & { status_option?: Option | null })[]>([])
   const [showAddForm, setShowAddForm] = useState(false)
@@ -193,13 +194,18 @@ export default function ProjectDetailPage() {
       })
       .eq('id', projectId)
     if (!error) {
-      setProject({
-        ...project,
-        status: editStatus || null,
-        project_start: editStart || null,
-        project_end: editEnd || null,
-      })
+      setProject((prev) =>
+        prev
+          ? {
+              ...prev,
+              status: editStatus || null,
+              project_start: editStart || null,
+              project_end: editEnd || null,
+            }
+          : prev
+      )
       setEditingDetails(false)
+      queryClient.invalidateQueries({ queryKey: ['project', projectId] })
     }
     setSavingDetails(false)
   }
@@ -219,8 +225,9 @@ export default function ProjectDetailPage() {
       .update({ description: isEmpty ? null : trimmed })
       .eq('id', projectId)
     if (!error) {
-      setProject({ ...project, description: isEmpty ? null : trimmed })
+      setProject((prev) => prev ? { ...prev, description: isEmpty ? null : trimmed } : prev)
       setEditingDescription(false)
+      queryClient.invalidateQueries({ queryKey: ['project', projectId] })
     }
     setSavingDescription(false)
   }
