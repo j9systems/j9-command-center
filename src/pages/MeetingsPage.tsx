@@ -44,10 +44,7 @@ function isSameDay(a: Date, b: Date): boolean {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
 }
 
-function parseDate(dateStr: string): Date {
-  // Handle formats like "July 28, 2025 at 9:00 AM" by stripping "at"
-  return new Date(dateStr.replace(/\bat\b/g, ''))
-}
+import { parseDate } from '../utils/dateHelpers'
 
 function formatTime(dateStr: string): string {
   return parseDate(dateStr).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })

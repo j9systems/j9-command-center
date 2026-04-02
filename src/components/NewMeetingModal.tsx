@@ -240,7 +240,7 @@ export default function NewMeetingModal({
       }
 
       const res = await fetch(
-        'https://yqggwvpprgpxjylpxinm.supabase.co/functions/v1/calendar-event-write',
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/calendar-event-write`,
         {
           method: 'POST',
           headers: {

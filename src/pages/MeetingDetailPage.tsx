@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { parseDate } from '../utils/dateHelpers'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft,
@@ -281,7 +282,7 @@ export default function MeetingDetailPage() {
 
   function formatDateTime(dateStr: string | null): string {
     if (!dateStr) return ''
-    const d = new Date(dateStr)
+    const d = parseDate(dateStr)
     return (
       d.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }) +
       ' at ' +
@@ -291,7 +292,7 @@ export default function MeetingDetailPage() {
 
   function formatTime(dateStr: string | null): string {
     if (!dateStr) return ''
-    return new Date(dateStr).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
+    return parseDate(dateStr).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
   }
 
   if (loading) {

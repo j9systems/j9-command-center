@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
+import { parseDate } from '../utils/dateHelpers'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft,
@@ -671,7 +672,7 @@ export default function AccountDetailPage() {
         const activeProjects = projects.filter((p) => p.status?.toLowerCase() === 'active')
         const now = new Date()
         const nextMeeting = [...meetings]
-          .filter((m) => m.meeting_start && new Date(m.meeting_start) >= now)
+          .filter((m) => m.meeting_start && parseDate(m.meeting_start) >= now)
           .sort((a, b) => (a.meeting_start ?? '').localeCompare(b.meeting_start ?? ''))
           [0] ?? null
 
@@ -757,9 +758,9 @@ export default function AccountDetailPage() {
                   <div className="flex items-center gap-2 mt-1">
                     <CalendarDays size={12} className="text-text-secondary flex-shrink-0" />
                     <p className="text-xs text-text-secondary">
-                      {new Date(nextMeeting.meeting_start!).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
+                      {parseDate(nextMeeting.meeting_start!).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
                       {' at '}
-                      {new Date(nextMeeting.meeting_start!).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
+                      {parseDate(nextMeeting.meeting_start!).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
                     </p>
                   </div>
                   {nextMeeting.attendees?.length > 0 && (
@@ -2791,7 +2792,7 @@ function MeetingsTab({
 
   function formatDateTime(dateStr: string | null): string {
     if (!dateStr) return ''
-    const d = new Date(dateStr)
+    const d = parseDate(dateStr)
     return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) +
       ' at ' +
       d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
@@ -2799,8 +2800,8 @@ function MeetingsTab({
 
   // Group meetings: Upcoming vs Past
   const now = new Date()
-  const upcoming = meetings.filter((m) => m.meeting_start && new Date(m.meeting_start) >= now)
-  const past = meetings.filter((m) => !m.meeting_start || new Date(m.meeting_start) < now)
+  const upcoming = meetings.filter((m) => m.meeting_start && parseDate(m.meeting_start) >= now)
+  const past = meetings.filter((m) => !m.meeting_start || parseDate(m.meeting_start) < now)
 
   // Sort upcoming ascending, past descending
   upcoming.sort((a, b) => (a.meeting_start ?? '').localeCompare(b.meeting_start ?? ''))
