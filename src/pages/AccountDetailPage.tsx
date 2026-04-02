@@ -142,13 +142,104 @@ export default function AccountDetailPage() {
   const { data: queryData, isLoading } = useQuery({
     queryKey: ['account', id, refreshKey],
     queryFn: async () => {
-      // Fetch account
-      const { data: accountData } = await supabase
-        .from('accounts')
-        .select('*, options!fk_accounts_status(option_key, option_label)')
-        .eq('id', id!)
-        .single()
+      const taskSelect = '*, team!fk_tasks_assigned_to_id_internal(id, first_name, last_name, photo), options!fk_tasks_status_id(id, option_key, option_label)'
+      const meetingSelect = 'row_id, name, meeting_start, meeting_end, duration, description_agenda, meeting_notes, gmeet_link, meeting_link, location, status, meeting_type, account_id, raw_attendees'
 
+      // Phase 1: Fire all independent queries in parallel
+      const [
+        accountResult,
+        contactLinksResult,
+        projectsResult,
+        directTasksResult,
+        projectHoursResult,
+        timelogStatusResult,
+        taskStatusResult,
+        billingTypeResult,
+        timeLogsResult,
+        accountTeamResult,
+        accountRolesResult,
+        allTeamResult,
+        invoicesResult,
+        directMeetingsResult,
+        authUserResult,
+      ] = await Promise.all([
+        supabase.from('accounts').select('*, options!fk_accounts_status(option_key, option_label)').eq('id', id!).single(),
+        supabase.from('account_contacts').select('*, contacts(*)').eq('account_id', id!),
+        supabase.from('projects').select('*, team(first_name, last_name)').eq('account_id', id!),
+        supabase.from('tasks').select(taskSelect).eq('account_id', id!).order('due', { ascending: true }),
+        supabase.from('time_logs').select('project_id, hours').eq('account_id', id!),
+        supabase.from('options').select('*').eq('category', 'timelog_status'),
+        supabase.from('options').select('*').eq('category', 'task_status'),
+        supabase.from('options').select('*').eq('category', 'billing_type').order('option_label'),
+        supabase.from('time_logs').select('*, team(first_name, last_name, photo), projects(name), options(id, option_key, option_label)').eq('account_id', id!).order('date', { ascending: false }).limit(50),
+        supabase.from('account_team').select('id, expected_weekly_hrs, rate_override, commission_override, role_id, team(id, first_name, last_name, email, photo, payouts_contractor_rate, payouts_commission_), account_roles!account_team_role_id_fkey(id, name)').eq('account_id', id!),
+        supabase.from('account_roles').select('*').order('name'),
+        supabase.from('team').select('id, first_name, last_name, email, photo, role, role_id, desired_hr_capacity, active, phone, personal_email'),
+        supabase.from('invoices').select('*, projects(name), options(id, option_key, option_label)').eq('account_id', id!).order('created_date', { ascending: false }),
+        supabase.from('meetings').select(meetingSelect).eq('account_id', id!).neq('status', 'cancelled').order('meeting_start', { ascending: false }),
+        supabase.auth.getUser(),
+      ])
+
+      const accountData = accountResult.data
+      const contactLinks = contactLinksResult.data
+      const projectsData = projectsResult.data
+      const directTasks = directTasksResult.data
+      const projectHoursData = projectHoursResult.data
+      const statusOptions = timelogStatusResult.data
+      const taskStatusOptions = taskStatusResult.data
+      const billingTypeOpts = billingTypeResult.data
+      const timeLogsData = timeLogsResult.data
+      const accountTeamData = accountTeamResult.data
+      const accountRolesData = accountRolesResult.data
+      const allTeamData = allTeamResult.data
+      const invoicesData = invoicesResult.data
+      const directMeetings = directMeetingsResult.data
+      const authUser = authUserResult.data?.user
+
+      if (directTasksResult.error) {
+        console.error('Error fetching direct tasks:', directTasksResult.error)
+      }
+
+      // Phase 2: Queries that depend on Phase 1 results
+      const projectIds = (projectsData ?? []).map((p) => p.id)
+      const contactEmails = (contactLinks ?? [])
+        .filter((cl) => cl.contacts && cl.contacts.email)
+        .map((cl) => (cl.contacts as Contact).email!.toLowerCase())
+
+      const phase2Promises: Promise<unknown>[] = []
+
+      // Project tasks (depends on projectIds)
+      const projectTasksPromise = projectIds.length > 0
+        ? supabase.from('tasks').select(taskSelect).in('project_id', projectIds).order('due', { ascending: true })
+        : Promise.resolve({ data: [] as typeof directTasks, error: null })
+      phase2Promises.push(projectTasksPromise)
+
+      // Attendee meetings (depends on contactEmails)
+      const attendeeMeetingsPromise = contactEmails.length > 0
+        ? Promise.all(
+            contactEmails.map((email) =>
+              supabase
+                .from('meetings')
+                .select(meetingSelect)
+                .contains('raw_attendees', JSON.stringify([{ email }]))
+                .neq('status', 'cancelled')
+                .order('meeting_start', { ascending: false })
+            )
+          )
+        : Promise.resolve([] as { data: typeof directMeetings }[])
+      phase2Promises.push(attendeeMeetingsPromise)
+
+      const [projectTasksResult, attendeeMeetingsResult] = await Promise.all(phase2Promises) as [
+        { data: typeof directTasks; error: unknown },
+        { data: typeof directMeetings }[],
+      ]
+
+      if (projectTasksResult.error) {
+        console.error('Error fetching project tasks:', projectTasksResult.error)
+      }
+      const projectTasks = projectTasksResult.data ?? []
+
+      // Map account
       let mappedAccount: AccountWithStatus | null = null
       if (accountData) {
         const opt = accountData.options as { option_key: string; option_label: string } | null
@@ -161,12 +252,7 @@ export default function AccountDetailPage() {
         setAccount(mappedAccount)
       }
 
-      // Fetch all account contacts
-      const { data: contactLinks } = await supabase
-        .from('account_contacts')
-        .select('*, contacts(*)')
-        .eq('account_id', id!)
-
+      // Map contacts
       let mappedContacts: (AccountContact & { contact: Contact })[] | null = null
       if (contactLinks) {
         mappedContacts = contactLinks
@@ -178,41 +264,7 @@ export default function AccountDetailPage() {
         setAccountContacts(mappedContacts)
       }
 
-      // Fetch projects first (needed for task lookup)
-      const { data: projectsData } = await supabase
-        .from('projects')
-        .select('*, team(first_name, last_name)')
-        .eq('account_id', id!)
-
-      const projectIds = (projectsData ?? []).map((p) => p.id)
-
-      // Fetch all tasks related to this account (directly or via project)
-      const taskSelect = '*, team!fk_tasks_assigned_to_id_internal(id, first_name, last_name, photo), options!fk_tasks_status_id(id, option_key, option_label)'
-
-      const { data: directTasks, error: directErr } = await supabase
-        .from('tasks')
-        .select(taskSelect)
-        .eq('account_id', id!)
-        .order('due', { ascending: true })
-
-      if (directErr) {
-        console.error('Error fetching direct tasks:', directErr)
-      }
-
-      let projectTasks: typeof directTasks = []
-      if (projectIds.length > 0) {
-        const { data: ptData, error: ptErr } = await supabase
-          .from('tasks')
-          .select(taskSelect)
-          .in('project_id', projectIds)
-          .order('due', { ascending: true })
-
-        if (ptErr) {
-          console.error('Error fetching project tasks:', ptErr)
-        }
-        projectTasks = ptData ?? []
-      }
-
+      // Map tasks (merge direct + project tasks)
       const allTasksRaw = [...(directTasks ?? []), ...projectTasks]
       console.log('Tasks fetched:', { directCount: directTasks?.length ?? 0, projectCount: projectTasks.length, accountId: id })
 
@@ -239,12 +291,7 @@ export default function AccountDetailPage() {
       })) as (Task & { assigned_to?: TeamMember | null; status_option?: Option | null })[]
       setTasks(mappedTasks)
 
-      // Fetch time log hours grouped by project
-      const { data: projectHoursData } = await supabase
-        .from('time_logs')
-        .select('project_id, hours')
-        .eq('account_id', id!)
-
+      // Map project hours
       const hoursByProject: Record<string, number> = {}
       if (projectHoursData) {
         for (const tl of projectHoursData) {
@@ -265,23 +312,12 @@ export default function AccountDetailPage() {
         setProjects(mappedProjects)
       }
 
-      // Fetch timelog status options
-      const { data: statusOptions } = await supabase
-        .from('options')
-        .select('*')
-        .eq('category', 'timelog_status')
-
+      // Map option lookups
       let mappedTimeLogStatuses: Option[] | null = null
       if (statusOptions) {
         mappedTimeLogStatuses = statusOptions as Option[]
         setTimeLogStatuses(mappedTimeLogStatuses)
       }
-
-      // Fetch task status options
-      const { data: taskStatusOptions } = await supabase
-        .from('options')
-        .select('*')
-        .eq('category', 'task_status')
 
       let mappedTaskStatuses: Option[] | null = null
       if (taskStatusOptions) {
@@ -289,27 +325,13 @@ export default function AccountDetailPage() {
         setTaskStatuses(mappedTaskStatuses)
       }
 
-      // Fetch billing type options
-      const { data: billingTypeOpts } = await supabase
-        .from('options')
-        .select('*')
-        .eq('category', 'billing_type')
-        .order('option_label')
-
       let mappedBillingTypeOptions: Option[] | null = null
       if (billingTypeOpts) {
         mappedBillingTypeOptions = billingTypeOpts as Option[]
         setBillingTypeOptions(mappedBillingTypeOptions)
       }
 
-      // Fetch time logs with status option
-      const { data: timeLogsData } = await supabase
-        .from('time_logs')
-        .select('*, team(first_name, last_name, photo), projects(name), options(id, option_key, option_label)')
-        .eq('account_id', id!)
-        .order('date', { ascending: false })
-        .limit(50)
-
+      // Map time logs
       let mappedTimeLogs: (TimeLog & { team_member?: TeamMember | null; project?: { name: string | null } | null; status_option?: Option | null })[] | null = null
       if (timeLogsData) {
         mappedTimeLogs = timeLogsData.map((tl) => ({
@@ -324,12 +346,7 @@ export default function AccountDetailPage() {
         setTimeLogs(mappedTimeLogs)
       }
 
-      // Fetch account team members with roles
-      const { data: accountTeamData } = await supabase
-        .from('account_team')
-        .select('id, expected_weekly_hrs, rate_override, commission_override, role_id, team(id, first_name, last_name, email, photo, payouts_contractor_rate, payouts_commission_), account_roles!account_team_role_id_fkey(id, name)')
-        .eq('account_id', id!)
-
+      // Map account team members
       let mappedAccountTeamMembers: AccountTeamMember[] | null = null
       if (accountTeamData) {
         mappedAccountTeamMembers = accountTeamData.map((at) => {
@@ -349,23 +366,14 @@ export default function AccountDetailPage() {
         setAccountTeamMembers(mappedAccountTeamMembers)
       }
 
-      // Fetch account roles for add team member form
-      const { data: accountRolesData } = await supabase
-        .from('account_roles')
-        .select('*')
-        .order('name')
-
+      // Map account roles
       let mappedAccountRoles: AccountRole[] | null = null
       if (accountRolesData) {
         mappedAccountRoles = accountRolesData as AccountRole[]
         setAccountRoles(mappedAccountRoles)
       }
 
-      // Fetch all team members for admin tab lookups
-      const { data: allTeamData } = await supabase
-        .from('team')
-        .select('id, first_name, last_name, email, photo, role, role_id, desired_hr_capacity, active, phone, personal_email')
-
+      // Map all team members + admin lookups
       let mappedAllTeamMembers: TeamMember[] | null = null
       let mappedClosedByMember: TeamMember | null = null
       let mappedPartnerMember: TeamMember | null = null
@@ -389,13 +397,7 @@ export default function AccountDetailPage() {
         }
       }
 
-      // Fetch invoices
-      const { data: invoicesData } = await supabase
-        .from('invoices')
-        .select('*, projects(name), options(id, option_key, option_label)')
-        .eq('account_id', id!)
-        .order('created_date', { ascending: false })
-
+      // Map invoices
       let mappedInvoices: (Invoice & { project?: { name: string | null } | null; status_option?: Option | null })[] | null = null
       if (invoicesData) {
         mappedInvoices = invoicesData.map((inv) => ({
@@ -408,37 +410,11 @@ export default function AccountDetailPage() {
         setInvoices(mappedInvoices)
       }
 
-      // Fetch meetings
-      const meetingSelect = 'row_id, name, meeting_start, meeting_end, duration, description_agenda, meeting_notes, gmeet_link, meeting_link, location, status, meeting_type, account_id, raw_attendees'
-
-      const { data: directMeetings } = await supabase
-        .from('meetings')
-        .select(meetingSelect)
-        .eq('account_id', id!)
-        .neq('status', 'cancelled')
-        .order('meeting_start', { ascending: false })
-
-      const contactEmails = (contactLinks ?? [])
-        .filter((cl) => cl.contacts && cl.contacts.email)
-        .map((cl) => (cl.contacts as Contact).email!.toLowerCase())
-
-      let attendeeMeetings: typeof directMeetings = []
-      if (contactEmails.length > 0) {
-        const emailPromises = contactEmails.map((email) =>
-          supabase
-            .from('meetings')
-            .select(meetingSelect)
-            .contains('raw_attendees', JSON.stringify([{ email }]))
-            .neq('status', 'cancelled')
-            .order('meeting_start', { ascending: false })
-        )
-        const emailResults = await Promise.all(emailPromises)
-        const allEmailMeetings = emailResults.flatMap((r) => r.data ?? [])
-        attendeeMeetings = allEmailMeetings
-      }
+      // Map meetings (merge direct + attendee meetings)
+      const attendeeMeetings = (attendeeMeetingsResult as { data: typeof directMeetings }[]).flatMap((r) => r.data ?? [])
 
       const allMeetingsMap = new Map<string, Meeting>()
-      for (const m of [...(directMeetings ?? []), ...(attendeeMeetings ?? [])]) {
+      for (const m of [...(directMeetings ?? []), ...attendeeMeetings]) {
         if (!allMeetingsMap.has(m.row_id)) {
           allMeetingsMap.set(m.row_id, m as Meeting)
         }
@@ -448,11 +424,11 @@ export default function AccountDetailPage() {
       // Sort by meeting_start descending
       allMeetings.sort((a, b) => (b.meeting_start ?? '').localeCompare(a.meeting_start ?? ''))
 
+      // Phase 3: Meeting attendees (depends on all meeting IDs)
       let mappedMeetings: (Meeting & { attendees: { contact: Contact | null; team_member: TeamMember | null }[] })[] = []
       if (allMeetings.length > 0) {
         const meetingIds = allMeetings.map((m) => m.row_id)
 
-        // Fetch all attendees for these meetings
         const { data: allAttendees } = await supabase
           .from('meeting_attendees')
           .select('row_id, meeting_id, external_attendee_id, internal_attendee_id, attendee_group, contacts(id, first_name, last_name, email), team(id, first_name, last_name, email, photo)')
@@ -477,17 +453,15 @@ export default function AccountDetailPage() {
         setMeetings(mappedMeetings)
       }
 
-      // Resolve the current user's team member ID and their role on this account
+      // Resolve current user's team member ID and account role
       let resolvedTeamMemberId: string | null = null
       let resolvedAccountTeamRole: string | null = null
-      const { data: { user: authUser } } = await supabase.auth.getUser()
       if (authUser?.email && mappedAllTeamMembers) {
         const myTeamRecord = mappedAllTeamMembers.find(
           (t) => t.email?.toLowerCase() === authUser.email!.toLowerCase()
         )
         if (myTeamRecord) {
           resolvedTeamMemberId = myTeamRecord.id
-          // Find this user's role on the account_team for this account
           const myAccountTeam = mappedAccountTeamMembers?.find(
             (at) => at.team_member?.id === myTeamRecord.id
           )
