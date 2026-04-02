@@ -196,6 +196,10 @@ export default function GanttChart({
   const didDragRef = useRef(false)
   const [dragDelta, setDragDelta] = useState<{ id: string; dStart: number; dEnd: number } | null>(null)
 
+  // Pan state (drag on chart background to scroll)
+  const panRef = useRef<{ startX: number; startOffset: number } | null>(null)
+  const [isPanning, setIsPanning] = useState(false)
+
   /* Fetch features for all projects */
   useEffect(() => {
     async function fetchFeatures() {
@@ -372,6 +376,17 @@ export default function GanttChart({
 
   useEffect(() => {
     function onMouseMove(e: MouseEvent) {
+      // Handle background pan
+      if (panRef.current) {
+        const dx = e.clientX - panRef.current.startX
+        const dDays = Math.round(dx / pxPerDay)
+        if (dDays !== 0) {
+          setOffset(panRef.current.startOffset - dDays)
+          panRef.current.startX = e.clientX
+          panRef.current.startOffset = panRef.current.startOffset - dDays
+        }
+        return
+      }
       if (!dragRef.current) return
       const dx = e.clientX - dragRef.current.startX
       const dDays = Math.round(dx / pxPerDay)
@@ -392,6 +407,11 @@ export default function GanttChart({
     }
 
     async function onMouseUp() {
+      if (panRef.current) {
+        panRef.current = null
+        setIsPanning(false)
+        return
+      }
       if (!dragRef.current) return
       const { rowId, origStart, origEnd, lastDStart, lastDEnd } = dragRef.current
 
@@ -586,10 +606,11 @@ export default function GanttChart({
     const el = wheelRef.current
     if (!el) return
     function onWheel(e: WheelEvent) {
-      if (dragRef.current) return
-      // Only handle horizontal-ish scroll or shift+scroll
-      const dx = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.shiftKey ? e.deltaX || e.deltaY : e.deltaY
-      if (Math.abs(dx) < 5) return
+      if (dragRef.current || panRef.current) return
+      // Horizontal swipe, shift+scroll, or plain vertical scroll all pan the chart
+      const isHorizontal = Math.abs(e.deltaX) > Math.abs(e.deltaY)
+      const dx = isHorizontal ? e.deltaX : (e.shiftKey ? (e.deltaX || e.deltaY) : e.deltaY)
+      if (Math.abs(dx) < 2) return
       e.preventDefault()
       const step = getScrollStep(timeframeRef.current)
       setOffset((o) => o + (dx > 0 ? step : -step))
@@ -697,7 +718,15 @@ export default function GanttChart({
             width={chartWidth}
             height={svgHeight}
             className="block"
-            style={{ minWidth: chartWidth }}
+            style={{ minWidth: chartWidth, cursor: isPanning ? 'grabbing' : 'grab' }}
+            onMouseDown={(e) => {
+              // Only start pan if clicking on the SVG background (not on a bar)
+              if ((e.target as Element).tagName === 'svg' || (e.target as Element).tagName === 'line' || (e.target as Element).tagName === 'text') {
+                e.preventDefault()
+                panRef.current = { startX: e.clientX, startOffset: offset }
+                setIsPanning(true)
+              }
+            }}
           >
             {/* Grid columns */}
             {columns.map((col, i) => (
