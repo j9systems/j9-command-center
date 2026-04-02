@@ -1,4 +1,4 @@
-import { Home, Building2, Users, UserCog, Target, CreditCard, Wallet, ClipboardList, Timer, BookOpen, CalendarDays } from 'lucide-react'
+import { Home, Building2, Users, UserCog, Target, CreditCard, Wallet, ClipboardList, Timer, BookOpen, CalendarDays, FolderKanban } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import type { AppRole } from '@/hooks/useCurrentRole'
 
@@ -18,6 +18,7 @@ export const navItems: NavItem[] = [
   { to: '/contacts', icon: Users, label: 'Contacts', deniedRoles: ['Contractor'] },
   { to: '/team', icon: UserCog, label: 'Team', allowedRoles: ['Admin'] },
   { to: '/leads', icon: Target, label: 'Leads', allowedRoles: ['Admin'] },
+  { to: '/projects', icon: FolderKanban, label: 'Projects' },
   { to: '/meetings', icon: CalendarDays, label: 'Meetings' },
   { to: '/tasks', icon: ClipboardList, label: 'Tasks' },
   { to: '/time-logs', icon: Timer, label: 'Time Logs' },
