@@ -255,13 +255,31 @@ export default function GanttChart({
     return start <= rangeEnd && end >= rangeStart
   }
 
+  /* Compute effective project dates: use project's own dates, but fall back
+     to min/max of feature dates when missing, and expand if any feature
+     extends beyond the project's date range. */
+  function effectiveProjectDates(
+    proj: ProjectWithFeatures
+  ): { start: Date | null; end: Date | null } {
+    let start = parseDate(proj.project_start)
+    let end = parseDate(proj.project_end)
+
+    for (const feat of proj.features) {
+      const fs = parseDate(feat.start_date)
+      const fe = parseDate(feat.end_date)
+      if (fs) start = start ? (fs < start ? fs : start) : fs
+      if (fe) end = end ? (fe > end ? fe : end) : fe
+    }
+
+    return { start, end }
+  }
+
   /* Build rows — include projects if their dates or any feature dates overlap the range.
      Once a project is visible, show ALL its features that have dates. */
   const rows: GanttRow[] = []
   for (const proj of projectsWithFeatures) {
-    const projStart = parseDate(proj.project_start)
-    const projEnd = parseDate(proj.project_end)
-    const projectInRange = overlapsRange(projStart, projEnd)
+    const { start: effStart, end: effEnd } = effectiveProjectDates(proj)
+    const projectInRange = overlapsRange(effStart, effEnd)
 
     const featuresWithDates = proj.features.filter((feat) =>
       parseDate(feat.start_date) && parseDate(feat.end_date)
@@ -276,8 +294,8 @@ export default function GanttChart({
       type: 'project',
       id: proj.id,
       name: proj.name ?? 'Unnamed Project',
-      start: projStart,
-      end: projEnd,
+      start: effStart,
+      end: effEnd,
       status: proj.status,
       projectId: proj.id,
     })
