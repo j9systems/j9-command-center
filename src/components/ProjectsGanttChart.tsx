@@ -566,11 +566,35 @@ export default function ProjectsGanttChart({
       }
     }
 
+    function onTouchMove(e: TouchEvent) {
+      if (panRef.current && e.touches.length === 1) {
+        e.preventDefault()
+        const dx = e.touches[0].clientX - panRef.current.startX
+        const dDays = Math.round(dx / pxPerDay)
+        if (dDays !== 0) {
+          setOffset(panRef.current.startOffset - dDays)
+          panRef.current.startX = e.touches[0].clientX
+          panRef.current.startOffset = panRef.current.startOffset - dDays
+        }
+      }
+    }
+
+    function onTouchEnd() {
+      if (panRef.current) {
+        panRef.current = null
+        setIsPanning(false)
+      }
+    }
+
     window.addEventListener('mousemove', onMouseMove)
     window.addEventListener('mouseup', onMouseUp)
+    window.addEventListener('touchmove', onTouchMove, { passive: false })
+    window.addEventListener('touchend', onTouchEnd)
     return () => {
       window.removeEventListener('mousemove', onMouseMove)
       window.removeEventListener('mouseup', onMouseUp)
+      window.removeEventListener('touchmove', onTouchMove)
+      window.removeEventListener('touchend', onTouchEnd)
     }
   }, [pxPerDay, rows, clientGroups])
 
@@ -666,7 +690,20 @@ export default function ProjectsGanttChart({
           </button>
           {!todayInView && (
             <button
-              onClick={() => setOffset(0)}
+              onClick={() => {
+                // Center today in the visible range
+                const now = new Date()
+                let anchor: Date
+                if (timeframe === 'week') anchor = startOfWeek(now)
+                else if (timeframe === 'month') anchor = startOfMonth(now)
+                else {
+                  const qMonth = Math.floor(now.getMonth() / 3) * 3
+                  anchor = new Date(now.getFullYear(), qMonth, 1)
+                }
+                const todayFromAnchor = diffDays(anchor, today)
+                const halfSpan = Math.floor(getSpanDays(timeframe) / 2)
+                setOffset(todayFromAnchor - halfSpan)
+              }}
               className="text-[11px] px-2.5 py-1 font-medium rounded border border-purple/30 text-purple hover:bg-purple/10 transition-colors"
             >
               Today
@@ -750,6 +787,12 @@ export default function ProjectsGanttChart({
                 if ((e.target as Element).tagName === 'svg' || (e.target as Element).tagName === 'line' || (e.target as Element).tagName === 'text') {
                   e.preventDefault()
                   panRef.current = { startX: e.clientX, startOffset: offset }
+                  setIsPanning(true)
+                }
+              }}
+              onTouchStart={(e) => {
+                if ((e.target as Element).tagName === 'svg' || (e.target as Element).tagName === 'line' || (e.target as Element).tagName === 'text') {
+                  panRef.current = { startX: e.touches[0].clientX, startOffset: offset }
                   setIsPanning(true)
                 }
               }}
