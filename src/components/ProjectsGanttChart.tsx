@@ -618,7 +618,7 @@ export default function ProjectsGanttChart({
     }
     el.addEventListener('wheel', onWheel, { passive: false })
     return () => el.removeEventListener('wheel', onWheel)
-  }, [])
+  }, [loading])
 
   const todayInView = today >= rangeStart && today <= rangeEnd
 

@@ -617,7 +617,7 @@ export default function GanttChart({
     }
     el.addEventListener('wheel', onWheel, { passive: false })
     return () => el.removeEventListener('wheel', onWheel)
-  }, [])
+  }, [loading])
 
   /* Whether today is in the current view */
   const todayInView = today >= rangeStart && today <= rangeEnd
