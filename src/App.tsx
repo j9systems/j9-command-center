@@ -31,6 +31,7 @@ import TasksPage from './pages/TasksPage'
 import TimeLogsPage from './pages/TimeLogsPage'
 import SOPsPage from './pages/SOPsPage'
 import MeetingsPage from './pages/MeetingsPage'
+import ProjectsPage from './pages/ProjectsPage'
 
 export default function App() {
   const [session, setSession] = useState<Session | null>(null)
@@ -86,6 +87,7 @@ export default function App() {
           <Route path="/billing/invoices/:invoiceId" element={<RoleGuard allowedRoles={['Admin']}><BillingInvoiceDetailPage /></RoleGuard>} />
           <Route path="/billing/payments/:paymentId" element={<RoleGuard allowedRoles={['Admin']}><PaymentDetailPage /></RoleGuard>} />
           <Route path="/payroll" element={<RoleGuard allowedRoles={['Admin']}><PayrollPage /></RoleGuard>} />
+          <Route path="/projects" element={<ProjectsPage />} />
           <Route path="/tasks" element={<TasksPage />} />
           <Route path="/time-logs" element={<TimeLogsPage />} />
           <Route path="/meetings" element={<MeetingsPage />} />
