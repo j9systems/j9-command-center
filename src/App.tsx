@@ -32,6 +32,7 @@ import TimeLogsPage from './pages/TimeLogsPage'
 import SOPsPage from './pages/SOPsPage'
 import MeetingsPage from './pages/MeetingsPage'
 import ProjectsPage from './pages/ProjectsPage'
+import ProfilePage from './pages/ProfilePage'
 
 export default function App() {
   const [session, setSession] = useState<Session | null>(null)
@@ -93,6 +94,7 @@ export default function App() {
           <Route path="/meetings" element={<MeetingsPage />} />
           <Route path="/meetings/:meetingId" element={<MeetingDetailPage />} />
           <Route path="/sops" element={<RoleGuard allowedRoles={['Admin']}><SOPsPage /></RoleGuard>} />
+          <Route path="/profile" element={<ProfilePage />} />
         </Route>
       </Routes>
     </ActiveTimeLogProvider>

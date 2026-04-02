@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
-import { LogOut, Calendar, ChevronUp, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
+import { LogOut, Calendar, ChevronUp, PanelLeftClose, PanelLeftOpen, User } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { getVisibleNavItems } from '@/lib/navItems'
 import { useCurrentRole } from '@/hooks/useCurrentRole'
@@ -193,6 +193,15 @@ export default function Sidebar() {
                 </button>
               )
             )}
+
+            {/* Profile */}
+            <button
+              onClick={() => { setMenuOpen(false); navigate('/profile') }}
+              className="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-text-secondary hover:text-text-primary hover:bg-surface-hover transition-colors w-full"
+            >
+              <User size={18} />
+              Profile
+            </button>
 
             {/* Logout */}
             <button
