@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import {
   ArrowLeft,
-  Mail,
   Phone,
   PhoneCall,
   MessageSquare,
@@ -201,14 +200,14 @@ export default function LeadDetailPage() {
   const followUpDays = lead.follow_up_on ? daysSince(lead.follow_up_on) : null
 
   const infoFields: { label: string; value: string | null | undefined; type?: 'phone' | 'email' | 'link' }[] = [
-    { label: 'Phone', value: lead.phone, type: 'phone' },
-    { label: 'Email', value: lead.email, type: 'email' },
+    { label: 'Phone', value: lead.phone, type: 'phone' as const },
+    { label: 'Email', value: lead.email, type: 'email' as const },
     { label: 'Source', value: lead.source },
     { label: 'Industry', value: lead.industry?.replace(/[\[\]]/g, '').replace(/_/g, ' ') },
     { label: 'Other Industry', value: lead.other_industry },
     { label: 'Company Size', value: lead.company_size },
     { label: 'Business Annual Revenue', value: lead.business_annual_revenue },
-    { label: 'Website', value: lead.website, type: 'link' },
+    { label: 'Website', value: lead.website, type: 'link' as const },
     { label: 'Submission Date', value: formatDate(lead.submission_date) || null },
     { label: 'Booked Sales Call', value: formatDateTime(lead.booked_sales_call_date_time) || null },
     { label: 'Scheduled Callback', value: formatDateTime(lead.scheduled_callback_date_time) || null },
