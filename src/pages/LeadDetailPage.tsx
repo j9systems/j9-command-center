@@ -102,11 +102,16 @@ export default function LeadDetailPage() {
       // Match interactions by from_email, to_email, or phone_from — no direct FK yet
       const orFilters: string[] = []
       if (mappedLead.email) {
-        orFilters.push(`from_email.eq.${mappedLead.email}`)
-        orFilters.push(`to_email.eq.${mappedLead.email}`)
+        orFilters.push(`from_email.ilike.${mappedLead.email}`)
+        orFilters.push(`to_email.ilike.${mappedLead.email}`)
       }
       if (mappedLead.phone) {
-        orFilters.push(`phone_from.eq.${mappedLead.phone}`)
+        // Normalize phone to digits-only for comparison
+        const digitsOnly = mappedLead.phone.replace(/\D/g, '')
+        const e164 = `+${digitsOnly}`
+        const last10 = digitsOnly.slice(-10)
+        orFilters.push(`phone_from.eq.${e164}`)
+        orFilters.push(`phone_from.like.%${last10}`)
       }
 
       const interactionsResult = orFilters.length > 0
