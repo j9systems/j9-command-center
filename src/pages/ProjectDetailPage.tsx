@@ -3,9 +3,11 @@ import { useParams, Link, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft,
   CalendarDays,
+  CheckCircle2,
   FolderKanban,
   Pencil,
   Plus,
+  User,
   X,
 } from 'lucide-react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
@@ -16,6 +18,7 @@ import type {
   Project,
   Feature,
   Option,
+  Task,
   TeamMember,
 } from '@/types/database'
 
@@ -38,6 +41,17 @@ function formatStatusLabel(status: string): string {
     .split('_')
     .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
     .join(' ')
+}
+
+const taskStatusColors: Record<string, string> = {
+  backlog: 'bg-blue-500/15 text-blue-400',
+  in_progress: 'bg-amber-500/15 text-amber-400',
+  complete: 'bg-emerald-500/15 text-emerald-400',
+}
+
+function getTaskStatusColor(key: string | null | undefined): string {
+  if (!key) return 'bg-zinc-500/15 text-zinc-400'
+  return taskStatusColors[key.toLowerCase()] ?? 'bg-purple-muted text-purple'
 }
 
 const featureStatusColors: Record<string, string> = {
@@ -69,6 +83,11 @@ export default function ProjectDetailPage() {
   const [editingDescription, setEditingDescription] = useState(false)
   const [editDescription, setEditDescription] = useState('')
   const [savingDescription, setSavingDescription] = useState(false)
+  const [tasks, setTasks] = useState<(Task & { assigned_to?: TeamMember | null; status_option?: Option | null })[]>([])
+  const [showAddTaskForm, setShowAddTaskForm] = useState(false)
+  const [savingTask, setSavingTask] = useState(false)
+  const [newTask, setNewTask] = useState({ name: '', due: '', assigneeId: '' })
+  const [completingTaskId, setCompletingTaskId] = useState<string | null>(null)
 
   const { data: queryData, isLoading } = useQuery({
     queryKey: ['project', projectId],
@@ -89,10 +108,26 @@ export default function ProjectDetailPage() {
 
       setProject(mappedProject)
 
-      const { data: statusOptions } = await supabase
-        .from('options')
-        .select('*')
-        .eq('category', 'feature_status')
+      const [
+        { data: statusOptions },
+        { data: taskStatusOptions },
+        { data: teamData },
+        { data: featuresData },
+        { data: tasksData },
+      ] = await Promise.all([
+        supabase.from('options').select('*').eq('category', 'feature_status'),
+        supabase.from('options').select('*').eq('category', 'task_status'),
+        supabase.from('team').select('*'),
+        supabase
+          .from('features')
+          .select('*, options(id, option_key, option_label)')
+          .eq('project_id', projectId!)
+          .order('created_at', { ascending: true }),
+        supabase
+          .from('tasks')
+          .select('*, team!fk_tasks_assigned_to_id_internal(id, first_name, last_name, photo), options!fk_tasks_status_id(id, option_key, option_label)')
+          .eq('project_id', projectId!),
+      ])
 
       const featureStatuses = (statusOptions as Option[]) ?? []
       if (featureStatuses.length > 0) {
@@ -102,11 +137,8 @@ export default function ProjectDetailPage() {
         }
       }
 
-      const { data: featuresData } = await supabase
-        .from('features')
-        .select('*, options(id, option_key, option_label)')
-        .eq('project_id', projectId!)
-        .order('created_at', { ascending: true })
+      const taskStatuses = (taskStatusOptions as Option[]) ?? []
+      const allTeamMembers = (teamData as TeamMember[]) ?? []
 
       if (featuresData) {
         setFeatures(
@@ -118,7 +150,19 @@ export default function ProjectDetailPage() {
         )
       }
 
-      return { project: mappedProject, featureStatuses }
+      if (tasksData) {
+        setTasks(
+          tasksData.map((t) => ({
+            ...t,
+            assigned_to: t.team as unknown as TeamMember | null,
+            status_option: t.options as unknown as Option | null,
+            team: undefined,
+            options: undefined,
+          })) as (Task & { assigned_to?: TeamMember | null; status_option?: Option | null })[]
+        )
+      }
+
+      return { project: mappedProject, featureStatuses, taskStatuses, teamMembers: allTeamMembers }
     },
     enabled: !!projectId,
   })
@@ -131,6 +175,8 @@ export default function ProjectDetailPage() {
   const loading = isLoading || (!!queryData && !project && !!queryData.project)
 
   const featureStatuses = queryData?.featureStatuses ?? []
+  const taskStatuses = queryData?.taskStatuses ?? []
+  const teamMembers = queryData?.teamMembers ?? []
 
   async function handleAddFeature() {
     if (!newFeature.name.trim() || !projectId) return
@@ -234,6 +280,74 @@ export default function ProjectDetailPage() {
     }
     setSavingDescription(false)
   }
+
+  async function handleAddTask() {
+    if (!newTask.name.trim() || !projectId) return
+    setSavingTask(true)
+    const rowId = crypto.randomUUID()
+    const backlogStatus = taskStatuses.find((s) => s.option_key === 'backlog')
+    const { data, error } = await supabase
+      .from('tasks')
+      .insert({
+        row_id: rowId,
+        name: newTask.name.trim(),
+        account_id: project?.account_id ?? accountId ?? null,
+        project_id: projectId,
+        due: newTask.due || null,
+        status_id: backlogStatus?.id ?? null,
+        assigned_to_id_internal: newTask.assigneeId || null,
+      })
+      .select('*, team!fk_tasks_assigned_to_id_internal(id, first_name, last_name, photo), options!fk_tasks_status_id(id, option_key, option_label)')
+      .single()
+
+    if (data && !error) {
+      setTasks((prev) => [
+        ...prev,
+        {
+          ...data,
+          assigned_to: data.team as unknown as TeamMember | null,
+          status_option: data.options as unknown as Option | null,
+          team: undefined,
+          options: undefined,
+        } as Task & { assigned_to?: TeamMember | null; status_option?: Option | null },
+      ])
+      setNewTask({ name: '', due: '', assigneeId: '' })
+      setShowAddTaskForm(false)
+    }
+    setSavingTask(false)
+  }
+
+  async function handleMarkTaskComplete(taskId: string) {
+    const completeStatus = taskStatuses.find((s) => s.option_key === 'complete')
+    if (!completeStatus) return
+    setCompletingTaskId(taskId)
+    const { error } = await supabase
+      .from('tasks')
+      .update({ status_id: completeStatus.id })
+      .eq('row_id', taskId)
+    if (!error) {
+      setTasks((prev) =>
+        prev.map((t) =>
+          t.row_id === taskId
+            ? { ...t, status_id: completeStatus.id, status_option: completeStatus }
+            : t
+        )
+      )
+    }
+    setCompletingTaskId(null)
+  }
+
+  const taskGroups = [
+    { key: 'backlog', label: 'Backlog', optionKeys: ['backlog'] },
+    { key: 'in_progress', label: 'In Progress', optionKeys: ['in_progress'] },
+    { key: 'complete', label: 'Complete', optionKeys: ['complete'] },
+  ].map((group) => ({
+    ...group,
+    tasks: tasks.filter((t) => {
+      const key = t.status_option?.option_key?.toLowerCase() ?? 'backlog'
+      return group.optionKeys.includes(key)
+    }),
+  }))
 
   if (loading) {
     return (
@@ -394,6 +508,177 @@ export default function ProjectDetailPage() {
             <p className="text-sm text-text-secondary">
               No description yet. Click "Edit" to add one.
             </p>
+          )}
+        </div>
+      </div>
+
+      {/* Tasks section */}
+      <div className="bg-surface rounded-xl border border-border overflow-hidden mb-6">
+        <div className="flex items-center justify-between px-5 py-3 border-b border-border">
+          <h2 className="text-sm font-semibold text-text-secondary uppercase tracking-wider">
+            Tasks
+          </h2>
+          <button
+            onClick={() => setShowAddTaskForm(true)}
+            className="flex items-center gap-1.5 text-xs font-medium text-purple hover:text-purple-hover transition-colors"
+          >
+            <Plus size={14} />
+            Add Task
+          </button>
+        </div>
+
+        <div className="p-5">
+          {showAddTaskForm && (
+            <MobileFormOverlay title="New Task" onClose={() => setShowAddTaskForm(false)}>
+              <div className="mb-4 p-4 md:bg-black/20 rounded-lg md:border md:border-border/50">
+                <div className="hidden md:flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-medium text-text-primary">New Task</h3>
+                  <button
+                    onClick={() => setShowAddTaskForm(false)}
+                    className="text-text-secondary hover:text-text-primary transition-colors"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+                <div className="space-y-3">
+                  <input
+                    type="text"
+                    placeholder="Task name"
+                    value={newTask.name}
+                    onChange={(e) => setNewTask((prev) => ({ ...prev, name: e.target.value }))}
+                    className="w-full bg-black/30 border border-border rounded-md px-3 py-2 text-sm text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:border-purple/50"
+                  />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[11px] text-text-secondary mb-1 block">Due Date</label>
+                      <input
+                        type="date"
+                        value={newTask.due}
+                        onChange={(e) => setNewTask((prev) => ({ ...prev, due: e.target.value }))}
+                        className="w-full bg-black/30 border border-border rounded-md px-3 py-1.5 text-sm text-text-primary focus:outline-none focus:border-purple/50"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] text-text-secondary mb-1 block">Assignee</label>
+                      <select
+                        value={newTask.assigneeId}
+                        onChange={(e) => setNewTask((prev) => ({ ...prev, assigneeId: e.target.value }))}
+                        className="w-full bg-black/30 border border-border rounded-md px-3 py-1.5 text-sm text-text-primary focus:outline-none focus:border-purple/50"
+                      >
+                        <option value="">Unassigned</option>
+                        {teamMembers
+                          .filter((t) => t.active === 'true' || t.active === '3')
+                          .map((tm) => (
+                            <option key={tm.id} value={tm.id}>
+                              {[tm.first_name, tm.last_name].filter(Boolean).join(' ')}
+                            </option>
+                          ))}
+                      </select>
+                    </div>
+                  </div>
+                  <div className="flex justify-end gap-2">
+                    <button
+                      onClick={() => setShowAddTaskForm(false)}
+                      className="px-4 py-1.5 text-sm font-medium border border-border text-text-secondary hover:text-text-primary rounded-md transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleAddTask}
+                      disabled={!newTask.name.trim() || savingTask}
+                      className="px-4 py-1.5 text-sm font-medium bg-purple hover:bg-purple-hover text-white rounded-md transition-colors disabled:opacity-50"
+                    >
+                      {savingTask ? 'Creating...' : 'Add Task'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </MobileFormOverlay>
+          )}
+
+          {tasks.length === 0 && !showAddTaskForm ? (
+            <p className="text-sm text-text-secondary text-center py-8">
+              No tasks yet. Click "Add Task" to get started.
+            </p>
+          ) : (
+            <div className="space-y-4">
+              {taskGroups.map((group) =>
+                group.tasks.length > 0 ? (
+                  <div key={group.key}>
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-xs font-semibold text-text-secondary uppercase tracking-wider">
+                        {group.label}
+                      </span>
+                      <span className="text-xs text-text-secondary">
+                        ({group.tasks.length})
+                      </span>
+                    </div>
+                    <div className="space-y-2">
+                      {group.tasks.map((task) => {
+                        const isComplete = task.status_option?.option_key === 'complete'
+                        return (
+                          <div
+                            key={task.row_id}
+                            onClick={() => navigate(`/accounts/${accountId}/tasks/${task.row_id}`)}
+                            className="flex items-center gap-4 p-3 bg-black/20 rounded-lg border border-border/50 cursor-pointer hover:border-purple/20 transition-colors"
+                          >
+                            <div className="w-7 h-7 rounded-full bg-purple-muted flex items-center justify-center flex-shrink-0">
+                              {task.assigned_to?.photo ? (
+                                <img
+                                  src={task.assigned_to.photo}
+                                  alt=""
+                                  className="w-7 h-7 rounded-full object-cover"
+                                />
+                              ) : (
+                                <User size={14} className="text-purple" />
+                              )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-text-primary truncate">
+                                {task.name ?? 'Untitled Task'}
+                              </p>
+                              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-0.5">
+                                {task.status_option && (
+                                  <span
+                                    className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${getTaskStatusColor(task.status_option.option_key)}`}
+                                  >
+                                    {task.status_option.option_label}
+                                  </span>
+                                )}
+                                {task.due && (
+                                  <span className="text-xs text-text-secondary flex items-center gap-1">
+                                    <CalendarDays size={10} />
+                                    {new Date(task.due).toLocaleDateString()}
+                                  </span>
+                                )}
+                                {task.assigned_to && (
+                                  <span className="text-xs text-text-secondary">
+                                    {[task.assigned_to.first_name, task.assigned_to.last_name].filter(Boolean).join(' ')}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            {!isComplete && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  handleMarkTaskComplete(task.row_id)
+                                }}
+                                disabled={completingTaskId === task.row_id}
+                                className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-1 rounded-lg bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25 transition-colors flex-shrink-0 disabled:opacity-50"
+                              >
+                                <CheckCircle2 size={12} />
+                                {completingTaskId === task.row_id ? '...' : 'Complete'}
+                              </button>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                ) : null
+              )}
+            </div>
           )}
         </div>
       </div>
