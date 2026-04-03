@@ -23,6 +23,7 @@ import AccountLeadsPage from './pages/AccountLeadsPage'
 import AccountBillingPage from './pages/AccountBillingPage'
 import AccountPayrollPage from './pages/AccountPayrollPage'
 import LeadsPage from './pages/LeadsPage'
+import LeadDetailPage from './pages/LeadDetailPage'
 import BillingPage from './pages/BillingPage'
 import BillingInvoiceDetailPage from './pages/BillingInvoiceDetailPage'
 import PaymentDetailPage from './pages/PaymentDetailPage'
@@ -84,6 +85,7 @@ export default function App() {
           <Route path="/team" element={<RoleGuard allowedRoles={['Admin']}><TeamPage /></RoleGuard>} />
           <Route path="/team/:teamId" element={<RoleGuard allowedRoles={['Admin']}><TeamMemberDetailPage /></RoleGuard>} />
           <Route path="/leads" element={<RoleGuard allowedRoles={['Admin']}><LeadsPage /></RoleGuard>} />
+          <Route path="/leads/:id" element={<RoleGuard allowedRoles={['Admin']}><LeadDetailPage /></RoleGuard>} />
           <Route path="/billing" element={<RoleGuard allowedRoles={['Admin']}><BillingPage /></RoleGuard>} />
           <Route path="/billing/invoices/:invoiceId" element={<RoleGuard allowedRoles={['Admin']}><BillingInvoiceDetailPage /></RoleGuard>} />
           <Route path="/billing/payments/:paymentId" element={<RoleGuard allowedRoles={['Admin']}><PaymentDetailPage /></RoleGuard>} />

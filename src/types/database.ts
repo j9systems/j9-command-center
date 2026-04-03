@@ -259,6 +259,36 @@ export interface Payment {
   qb_invoice_id_ref: string | null
 }
 
+export interface Interaction {
+  id: string
+  subject: string | null
+  inbound_outbound: string | null       // 'Inbound' | 'Outbound'
+  opened: string | null
+  opened_at: string | null
+  from_email: string | null
+  body: string | null
+  date: string | null                   // timestamptz — primary date field
+  to_email: string | null
+  contact_id: string | null
+  type: string | null                   // legacy text column, kept for reference
+  type_id: number | null               // FK → options(id), category = 'interaction_type'
+  meeting_id: string | null
+  duration: string | null
+  meeting_duration: string | null
+  notes: string | null
+  phone_from: string | null
+  phone_to: string | null
+  automated: string | null
+  from_template_id: string | null
+  clicked: string | null
+  postman_email_id: string | null
+  lead_id: string | null
+}
+
+export interface InteractionWithType extends Interaction {
+  type_option: Option | null
+}
+
 export interface RetainerPayoutQuarter {
   row_id: string
   retainer_payment_id: string | null

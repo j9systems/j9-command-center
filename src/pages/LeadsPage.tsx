@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   Target,
   Search,
@@ -44,6 +45,7 @@ export default function LeadsPage() {
   const [activeTab, setActiveTab] = useState<TabKey>('kill_list')
   const [statusFilter, setStatusFilter] = useState<string>('')
   const [searchQuery, setSearchQuery] = useState('')
+  const navigate = useNavigate()
   const [contactModal, setContactModal] = useState<{ phone: string; action: 'call' | 'text' } | null>(null)
 
   const { data: queryData, isLoading: loading } = useQuery({
@@ -228,7 +230,8 @@ export default function LeadsPage() {
             return (
               <div
                 key={lead.id}
-                className="p-4 bg-surface rounded-xl border border-border hover:border-border transition-colors"
+                onClick={() => navigate(`/leads/${lead.id}`)}
+                className="p-4 bg-surface rounded-xl border border-border cursor-pointer hover:border-purple/40 transition-colors"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
