@@ -630,7 +630,7 @@ export default function AccountDetailPage() {
           <img
             src={account.logo_path}
             alt={account.company_name ?? 'Account logo'}
-            className="w-16 h-16 rounded-xl object-cover bg-black flex-shrink-0"
+            className="h-16 max-h-16 rounded-xl object-contain bg-black flex-shrink-0"
             onError={(e) => {
               const target = e.currentTarget
               target.style.display = 'none'
@@ -3145,7 +3145,7 @@ function AdminTab({
         <label className="text-xs font-medium text-text-secondary uppercase tracking-wide">Logo</label>
         {logoPath && (
           <div className="mb-2">
-            <img src={logoPath} alt="Account logo" className="w-16 h-16 rounded-xl object-cover border border-border" />
+            <img src={logoPath} alt="Account logo" className="h-16 max-h-16 rounded-xl object-contain border border-border" />
           </div>
         )}
         <div className="flex gap-2 mb-2">
