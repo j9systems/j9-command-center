@@ -272,8 +272,8 @@ export interface Interaction {
   id: string
   subject: string | null
   inbound_outbound: string | null       // 'Inbound' | 'Outbound'
-  opened: string | null
-  opened_at: string | null
+  opened: boolean | null                // boolean — was the interaction opened
+  opened_at: string | null              // timestamptz
   from_email: string | null
   body: string | null
   date: string | null                   // timestamptz — primary date field
@@ -287,9 +287,9 @@ export interface Interaction {
   notes: string | null
   phone_from: string | null
   phone_to: string | null
-  automated: string | null
+  automated: boolean | null             // boolean — was this automated
   from_template_id: string | null
-  clicked: string | null
+  clicked: boolean | null               // boolean — was the interaction clicked
   postman_email_id: string | null
   lead_id: string | null
 }
