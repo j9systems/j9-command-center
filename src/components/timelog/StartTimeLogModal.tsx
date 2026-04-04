@@ -71,7 +71,7 @@ export default function StartTimeLogModal({ open, onClose, preSelectedAccount }:
     setSearch('')
     supabase
       .from('projects')
-      .select('id, name, status, account_id')
+      .select('id, name, status_id, account_id')
       .eq('account_id', selectedAccount.id)
       .order('name', { ascending: true })
       .then(({ data }) => {
