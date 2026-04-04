@@ -35,6 +35,7 @@ const statusColors: Record<string, string> = {
 const interactionTypeColors: Record<string, string> = {
   email: 'bg-blue-500/15 text-blue-400',
   text: 'bg-emerald-500/15 text-emerald-400',
+  call: 'bg-orange-500/15 text-orange-400',
   meeting: 'bg-purple-muted text-purple',
   linkedin: 'bg-cyan-500/15 text-cyan-400',
   in_person: 'bg-amber-500/15 text-amber-400',
