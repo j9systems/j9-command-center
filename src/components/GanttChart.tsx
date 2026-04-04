@@ -42,6 +42,7 @@ const LABEL_WIDTH_DESKTOP = 220
 const LABEL_WIDTH_MOBILE = 100
 const BAR_V_PAD = 6
 const MIN_BAR_WIDTH = 12
+const HEADER_HEIGHT = 22
 
 const statusBarColors: Record<string, string> = {
   backlog: '#3b82f6',
@@ -638,7 +639,7 @@ export default function GanttChart({
     if (!dragRef.current) setTooltip(null)
   }
 
-  const svgHeight = rows.length * ROW_HEIGHT
+  const svgHeight = rows.length * ROW_HEIGHT + HEADER_HEIGHT
 
   /* Wheel handler — scroll horizontally to pan through time */
   const wheelRef = useRef<HTMLDivElement>(null)
@@ -757,6 +758,7 @@ export default function GanttChart({
       <div ref={wheelRef} className="flex overflow-hidden relative select-none max-w-full">
         {/* Labels column */}
         <div className="flex-shrink-0 overflow-hidden" style={{ width: labelWidth }}>
+          <div style={{ height: HEADER_HEIGHT }} />
           {rows.map((row) => (
             <div
               key={row.id}
@@ -837,9 +839,9 @@ export default function GanttChart({
               <line
                 key={i}
                 x1={0}
-                y1={(i + 1) * ROW_HEIGHT}
+                y1={(i + 1) * ROW_HEIGHT + HEADER_HEIGHT}
                 x2={chartWidth}
-                y2={(i + 1) * ROW_HEIGHT}
+                y2={(i + 1) * ROW_HEIGHT + HEADER_HEIGHT}
                 stroke="#1a1a1a"
                 strokeWidth={1}
               />
@@ -854,7 +856,7 @@ export default function GanttChart({
               const pos = barPos(row.start, row.end, dd.dStart, dd.dEnd)
               if (!pos) return null
 
-              const y = i * ROW_HEIGHT + BAR_V_PAD
+              const y = i * ROW_HEIGHT + BAR_V_PAD + HEADER_HEIGHT
               const h = ROW_HEIGHT - BAR_V_PAD * 2
               const color = barColor(row.status)
               const isProject = row.type === 'project'
