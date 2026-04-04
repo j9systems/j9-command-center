@@ -24,44 +24,51 @@ export default function AccountsPage() {
   const [showAll, setShowAll] = useState(false)
 
   useEffect(() => {
-    async function fetchAccounts() {
+    async function fetchData() {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session?.user) {
         setLoading(false)
         return
       }
 
-      // Get current user's team record to find their ID and role
-      const { data: teamData } = await supabase
-        .from('team')
-        .select('id')
-        .eq('email', session.user.email!)
-        .maybeSingle()
+      // Run team lookup, accounts query, and status options in parallel
+      const [teamResult, accountsResult, statusResult] = await Promise.all([
+        supabase
+          .from('team')
+          .select('id')
+          .eq('email', session.user.email!)
+          .maybeSingle(),
+        supabase
+          .from('accounts')
+          .select('id, company_name, logo_path, options!fk_accounts_status(option_key, option_label)')
+          .order('company_name'),
+        supabase
+          .from('options')
+          .select('id, option_label')
+          .eq('category', 'account_status'),
+      ])
 
-      // Get accounts assigned to this user
-      if (teamData?.id) {
+      // Fetch assigned accounts (depends on team lookup)
+      if (teamResult.data?.id) {
         const { data: accountTeamData } = await supabase
           .from('account_team')
           .select('account_id')
-          .eq('team_member_id', teamData.id)
+          .eq('team_member_id', teamResult.data.id)
 
         if (accountTeamData) {
           setAssignedAccountIds(new Set(accountTeamData.map((at) => at.account_id).filter(Boolean) as string[]))
         }
       }
 
-      const { data, error } = await supabase
-        .from('accounts')
-        .select('*, options!fk_accounts_status(option_key, option_label)')
-        .order('company_name')
+      if (statusResult.data) setStatusOptions(statusResult.data as Option[])
 
-      if (error) {
-        console.error('Error fetching accounts:', error)
+      if (accountsResult.error) {
+        console.error('Error fetching accounts:', accountsResult.error)
         setLoading(false)
         return
       }
 
-      const mapped: AccountWithStatus[] = (data ?? []).map((row) => {
+      const mapped: AccountWithStatus[] = (accountsResult.data ?? []).map((row) => {
         const opt = row.options as { option_key: string; option_label: string } | null
         return {
           ...row,
@@ -75,16 +82,7 @@ export default function AccountsPage() {
       setLoading(false)
     }
 
-    async function fetchStatusOptions() {
-      const { data } = await supabase
-        .from('options')
-        .select('*')
-        .eq('category', 'account_status')
-      if (data) setStatusOptions(data as Option[])
-    }
-
-    fetchAccounts()
-    fetchStatusOptions()
+    fetchData()
   }, [])
 
   async function handleCreateAccount(e: React.FormEvent) {

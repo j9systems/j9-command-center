@@ -40,6 +40,7 @@ export default function AccountCard({ account }: AccountCardProps) {
           <img
             src={account.logo_path}
             alt={account.company_name ?? 'Account logo'}
+            loading="lazy"
             className="w-11 h-11 rounded-lg object-cover bg-black flex-shrink-0"
             onError={(e) => {
               const target = e.currentTarget
