@@ -63,8 +63,7 @@ export default function LeadsPage() {
           .eq('category', 'lead_status'),
         supabase
           .from('interactions')
-          .select('lead_id, date')
-          .not('lead_id', 'is', null)
+          .select('lead_id, date, from_email, to_email, phone_from, phone_to')
           .not('date', 'is', null)
           .order('date', { ascending: false }),
       ])
@@ -79,11 +78,47 @@ export default function LeadsPage() {
 
       const statusOptions: Option[] = (statusOpts as Option[]) ?? []
 
-      // Build map of lead_id -> most recent interaction date
+      // Build map of lead id -> most recent interaction date
+      // Match interactions by lead_id, email, or phone (same logic as detail page)
+      const allInteractions = interactionsData ?? []
       const lastInteractionMap: Record<string, string> = {}
-      for (const interaction of interactionsData ?? []) {
-        if (interaction.lead_id && !lastInteractionMap[interaction.lead_id]) {
-          lastInteractionMap[interaction.lead_id] = interaction.date!
+
+      for (const lead of leads) {
+        const emailLower = lead.email?.toLowerCase() ?? null
+        const phoneDigits = lead.phone?.replace(/\D/g, '') ?? null
+        const phoneLast10 = phoneDigits ? phoneDigits.slice(-10) : null
+
+        for (const interaction of allInteractions) {
+          if (!interaction.date) continue
+
+          let matched = false
+
+          // Match by lead_id FK
+          if (interaction.lead_id === lead.id) matched = true
+
+          // Match by email
+          if (!matched && emailLower) {
+            if (
+              interaction.from_email?.toLowerCase() === emailLower ||
+              interaction.to_email?.toLowerCase() === emailLower
+            ) matched = true
+          }
+
+          // Match by phone (last 10 digits)
+          if (!matched && phoneLast10) {
+            const fromDigits = interaction.phone_from?.replace(/\D/g, '') ?? ''
+            const toDigits = interaction.phone_to?.replace(/\D/g, '') ?? ''
+            if (
+              fromDigits.slice(-10) === phoneLast10 ||
+              toDigits.slice(-10) === phoneLast10
+            ) matched = true
+          }
+
+          if (matched) {
+            // Interactions are already sorted desc, so first match is most recent
+            lastInteractionMap[lead.id] = interaction.date
+            break
+          }
         }
       }
 
