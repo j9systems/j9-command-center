@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import {
   CheckCircle2,
   CalendarDays,
@@ -8,11 +8,34 @@ import {
   ChevronLeft,
   ChevronRight,
   Play,
+  Target,
+  Phone,
+  PhoneCall,
+  MessageSquare,
+  Mail,
+  Globe,
+  Building2,
+  Calendar,
 } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
-import type { Task, Meeting, TeamMember, Option } from '@/types/database'
+import type { Task, Meeting, TeamMember, Option, Lead } from '@/types/database'
 import StartTimeLogModal from '@/components/timelog/StartTimeLogModal'
+
+type LeadWithStatus = Lead & {
+  status_option?: Option | null
+}
+
+const leadStatusColors: Record<string, string> = {
+  lead: 'bg-blue-500/15 text-blue-400',
+  booked: 'bg-emerald-500/15 text-emerald-400',
+  callback_set: 'bg-amber-500/15 text-amber-400',
+  closed: 'bg-purple-muted text-purple',
+  networking: 'bg-cyan-500/15 text-cyan-400',
+  no_show: 'bg-red-500/15 text-red-400',
+  not_a_fit: 'bg-zinc-500/15 text-zinc-400',
+  rejected: 'bg-red-500/15 text-red-400',
+}
 
 type TaskWithDetails = Task & {
   assigned_to?: TeamMember | null
@@ -43,6 +66,7 @@ export default function HomePage() {
   const [taskPage, setTaskPage] = useState(0)
   const [showTimerModal, setShowTimerModal] = useState(false)
   const [completingTaskId, setCompletingTaskId] = useState<string | null>(null)
+  const navigate = useNavigate()
 
   const { data: queryData, isLoading: loading } = useQuery({
     queryKey: ['home'],
@@ -146,12 +170,88 @@ export default function HomePage() {
         }
       }
 
-      return { displayName, tasks: fetchedTasks, meetings: fetchedMeetings }
+      // Fetch kill list leads needing follow-up for ben@j9systems.com
+      let killListLeads: LeadWithStatus[] = []
+      const lastInteractionMap: Record<string, string> = {}
+
+      if (session.user.email === 'ben@j9systems.com') {
+        const [{ data: leadsData }, { data: interactionsData }] = await Promise.all([
+          supabase
+            .from('leads')
+            .select('*, options!fk_leads_status_id(id, option_key, option_label)')
+            .eq('kill_list', true)
+            .order('submission_date', { ascending: false }),
+          supabase
+            .from('interactions')
+            .select('lead_id, date, from_email, to_email, phone_from, phone_to')
+            .not('date', 'is', null)
+            .order('date', { ascending: false }),
+        ])
+
+        const allLeads: LeadWithStatus[] = leadsData
+          ? leadsData.map((l) => ({
+              ...l,
+              status_option: l.options as unknown as Option | null,
+              options: undefined,
+            })) as LeadWithStatus[]
+          : []
+
+        const allInteractions = interactionsData ?? []
+
+        for (const lead of allLeads) {
+          const emailLower = lead.email?.toLowerCase() ?? null
+          const phoneDigits = lead.phone?.replace(/\D/g, '') ?? null
+          const phoneLast10 = phoneDigits ? phoneDigits.slice(-10) : null
+
+          for (const interaction of allInteractions) {
+            if (!interaction.date) continue
+            let matched = false
+            if (interaction.lead_id === lead.id) matched = true
+            if (!matched && emailLower) {
+              if (
+                interaction.from_email?.toLowerCase() === emailLower ||
+                interaction.to_email?.toLowerCase() === emailLower
+              ) matched = true
+            }
+            if (!matched && phoneLast10) {
+              const fromDigits = interaction.phone_from?.replace(/\D/g, '') ?? ''
+              const toDigits = interaction.phone_to?.replace(/\D/g, '') ?? ''
+              if (
+                fromDigits.slice(-10) === phoneLast10 ||
+                toDigits.slice(-10) === phoneLast10
+              ) matched = true
+            }
+            if (matched) {
+              lastInteractionMap[lead.id] = interaction.date
+              break
+            }
+          }
+        }
+
+        // Filter to only those needing follow-up
+        killListLeads = allLeads.filter((lead) => {
+          const lastInteraction = lastInteractionMap[lead.id] ?? null
+          if (!lastInteraction) return true
+          const days = Math.floor((Date.now() - new Date(lastInteraction).getTime()) / 86400000)
+          if (!lead.follow_up_on && days > 3) return true
+          if (lead.follow_up_on && lastInteraction) {
+            const followUpDate = new Date(lead.follow_up_on).getTime()
+            const lastInteractionDate = new Date(lastInteraction).getTime()
+            if (followUpDate < lastInteractionDate) return true
+          }
+          return false
+        })
+      }
+
+      return { displayName, tasks: fetchedTasks, meetings: fetchedMeetings, killListLeads, lastInteractionMap, userEmail: session.user.email }
     },
   })
 
   const displayName = queryData?.displayName ?? ''
   const meetings = queryData?.meetings ?? []
+  const killListLeads = queryData?.killListLeads ?? []
+  const lastInteractionMap = queryData?.lastInteractionMap ?? {}
+  const userEmail = queryData?.userEmail ?? ''
 
   useEffect(() => {
     if (queryData?.tasks) setTasks(queryData.tasks)
@@ -192,6 +292,20 @@ export default function HomePage() {
     if (d.toDateString() === today.toDateString()) return 'Today'
     if (d.toDateString() === tomorrow.toDateString()) return 'Tomorrow'
     return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })
+  }
+
+  function formatLeadDate(dateStr: string | null): string {
+    if (!dateStr) return ''
+    return new Date(dateStr).toLocaleDateString(undefined, {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    })
+  }
+
+  function daysSince(dateStr: string | null): number | null {
+    if (!dateStr) return null
+    return Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000)
   }
 
   function formatMeetingTime(dateStr: string | null): string {
@@ -321,6 +435,143 @@ export default function HomePage() {
           </p>
         )}
       </div>
+
+      {/* Kill List — Needs Follow-Up (ben@j9systems.com only) */}
+      {userEmail === 'ben@j9systems.com' && killListLeads.length > 0 && (
+        <div className="bg-surface rounded-xl border border-border p-5 mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-semibold text-text-secondary uppercase tracking-wider flex items-center gap-2">
+              <Target size={14} className="text-red-400" />
+              <span className="text-red-400">Kill List — Needs Follow-Up</span>
+            </h3>
+            <Link
+              to="/leads"
+              className="text-xs text-purple hover:text-purple-hover transition-colors"
+            >
+              View All Leads
+            </Link>
+          </div>
+          <div className="space-y-2">
+            {killListLeads.map((lead) => {
+              const statusKey = lead.status_option?.option_key ?? ''
+              const days = daysSince(lastInteractionMap[lead.id] ?? null)
+              return (
+                <div
+                  key={lead.id}
+                  onClick={() => navigate(`/leads/${lead.id}`)}
+                  className="p-4 bg-black/20 rounded-lg border border-border/50 cursor-pointer hover:border-border transition-colors"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-sm font-medium text-text-primary">
+                          {lead.name ?? 'Unnamed Lead'}
+                        </p>
+                        <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-red-500/15 text-red-400">
+                          Kill List
+                        </span>
+                        {lead.status_option && (
+                          <span
+                            className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${
+                              leadStatusColors[statusKey] ?? 'bg-zinc-500/15 text-zinc-400'
+                            }`}
+                          >
+                            {lead.status_option.option_label}
+                          </span>
+                        )}
+                      </div>
+                      {lead.business_name && (
+                        <div className="flex items-center gap-1 mt-1">
+                          <Building2 size={11} className="text-text-secondary flex-shrink-0" />
+                          <span className="text-xs text-text-secondary">{lead.business_name}</span>
+                        </div>
+                      )}
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1.5">
+                        {lead.email && (
+                          <span className="text-xs text-text-secondary flex items-center gap-1">
+                            <Mail size={10} />
+                            {lead.email}
+                          </span>
+                        )}
+                        {lead.phone && (
+                          <span className="text-xs text-text-secondary flex items-center gap-1">
+                            <Phone size={10} />
+                            {lead.phone}
+                          </span>
+                        )}
+                        {lead.website && (
+                          <span className="text-xs text-text-secondary flex items-center gap-1">
+                            <Globe size={10} />
+                            {lead.website}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1">
+                        {lead.follow_up_on && (
+                          <span className="text-xs text-amber-400 flex items-center gap-1">
+                            <Calendar size={10} />
+                            Follow-up {formatLeadDate(lead.follow_up_on)}
+                          </span>
+                        )}
+                        <span className={`text-xs flex items-center gap-1 ${
+                          days === null
+                            ? 'text-zinc-500'
+                            : days <= 7
+                            ? 'text-emerald-400'
+                            : days <= 30
+                            ? 'text-amber-400'
+                            : 'text-red-400'
+                        }`}>
+                          <Clock size={10} />
+                          {days !== null ? `${days}d since last interaction` : 'No interactions'}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                      {lead.phone && (
+                        <>
+                          <a
+                            href={`tel:${lead.phone.replace(/[^+\d]/g, '')}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="p-1.5 rounded-lg text-text-secondary hover:text-emerald-400 hover:bg-emerald-500/10 transition-colors"
+                            title="Call"
+                          >
+                            <PhoneCall size={14} />
+                          </a>
+                          <a
+                            href={`sms:${lead.phone.replace(/[^+\d]/g, '')}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="p-1.5 rounded-lg text-text-secondary hover:text-blue-400 hover:bg-blue-500/10 transition-colors"
+                            title="Text"
+                          >
+                            <MessageSquare size={14} />
+                          </a>
+                        </>
+                      )}
+                      {lead.email && (
+                        <a
+                          href={`mailto:${lead.email}`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="p-1.5 rounded-lg text-text-secondary hover:text-purple hover:bg-purple/10 transition-colors"
+                          title="Email"
+                        >
+                          <Mail size={14} />
+                        </a>
+                      )}
+                      {lead.interest_level != null && (
+                        <div className="text-center ml-1">
+                          <p className="text-[10px] text-text-secondary uppercase tracking-wider">Interest</p>
+                          <p className="text-sm font-semibold text-text-primary">{lead.interest_level}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Upcoming Meetings */}
       <div className="bg-surface rounded-xl border border-border p-5">
