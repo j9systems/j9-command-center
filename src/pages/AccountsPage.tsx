@@ -2,14 +2,14 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Search, Plus, X } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
-import type { AccountWithStatus, Option } from '@/types/database'
+import type { AccountListItem, Option } from '@/types/database'
 import AccountCard from '@/components/accounts/AccountCard'
 import MobileFormOverlay from '@/components/MobileFormOverlay'
 import { useCurrentRole } from '@/hooks/useCurrentRole'
 
 export default function AccountsPage() {
   const navigate = useNavigate()
-  const [accounts, setAccounts] = useState<AccountWithStatus[]>([])
+  const [accounts, setAccounts] = useState<AccountListItem[]>([])
   const [assignedAccountIds, setAssignedAccountIds] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -68,14 +68,15 @@ export default function AccountsPage() {
         return
       }
 
-      const mapped: AccountWithStatus[] = (accountsResult.data ?? []).map((row) => {
+      const mapped: AccountListItem[] = (accountsResult.data ?? []).map((row) => {
         const opt = row.options as { option_key: string; option_label: string } | null
         return {
-          ...row,
+          id: row.id,
+          company_name: row.company_name,
+          logo_path: row.logo_path,
           status_label: opt?.option_label ?? null,
           status_key: opt?.option_key ?? null,
-          options: undefined,
-        } as AccountWithStatus
+        }
       })
 
       setAccounts(mapped)
@@ -98,17 +99,18 @@ export default function AccountsPage() {
         company_name: newName.trim(),
         status: newStatusId ? Number(newStatusId) : null,
       })
-      .select('*, options!fk_accounts_status(option_key, option_label)')
+      .select('id, company_name, logo_path, options!fk_accounts_status(option_key, option_label)')
       .single()
 
     if (data && !error) {
       const opt = data.options as { option_key: string; option_label: string } | null
-      const newAccount: AccountWithStatus = {
-        ...data,
+      const newAccount: AccountListItem = {
+        id: data.id,
+        company_name: data.company_name,
+        logo_path: data.logo_path,
         status_label: opt?.option_label ?? null,
         status_key: opt?.option_key ?? null,
-        options: undefined,
-      } as AccountWithStatus
+      }
       setAccounts((prev) => [newAccount, ...prev].sort((a, b) =>
         (a.company_name ?? '').localeCompare(b.company_name ?? '')
       ))

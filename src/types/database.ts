@@ -21,6 +21,15 @@ export interface AccountWithStatus extends Account {
   status_key: string | null
 }
 
+/** Slim projection used by the accounts list page. */
+export interface AccountListItem {
+  id: string
+  company_name: string | null
+  logo_path: string | null
+  status_label: string | null
+  status_key: string | null
+}
+
 export interface Contact {
   id: string
   first_name: string | null

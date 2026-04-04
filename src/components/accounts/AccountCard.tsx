@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import type { AccountWithStatus } from '@/types/database'
+import type { AccountListItem } from '@/types/database'
 
 const statusColors: Record<string, string> = {
   active: 'bg-emerald-500/15 text-emerald-400',
@@ -29,7 +29,7 @@ function getInitials(name: string | null): string {
 }
 
 interface AccountCardProps {
-  account: AccountWithStatus
+  account: AccountListItem
 }
 
 export default function AccountCard({ account }: AccountCardProps) {
