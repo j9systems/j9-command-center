@@ -14,7 +14,11 @@ interface FeatureWithStatus extends Feature {
   status_option?: Option | null
 }
 
-interface ProjectWithFeatures extends Project {
+interface ProjectWithStatus extends Project {
+  status_option?: Option | null
+}
+
+interface ProjectWithFeatures extends ProjectWithStatus {
   features: FeatureWithStatus[]
 }
 
@@ -48,10 +52,12 @@ const BAR_V_PAD = 6
 const MIN_BAR_WIDTH = 12
 
 const statusBarColors: Record<string, string> = {
-  active: '#10b981',
+  backlog: '#3b82f6',
+  active: '#f59e0b',
   in_progress: '#f59e0b',
-  completed: '#3b82f6',
-  on_hold: '#f59e0b',
+  completed: '#10b981',
+  complete: '#10b981',
+  on_hold: '#a855f7',
   cancelled: '#ef4444',
   open: '#3b82f6',
   planned: '#8b5cf6',
@@ -65,10 +71,12 @@ function barColor(status: string | null): string {
 }
 
 const statusLabelColors: Record<string, string> = {
-  active: 'bg-emerald-500/15 text-emerald-400',
+  backlog: 'bg-blue-500/15 text-blue-400',
+  active: 'bg-amber-500/15 text-amber-400',
   in_progress: 'bg-amber-500/15 text-amber-400',
-  completed: 'bg-blue-500/15 text-blue-400',
-  on_hold: 'bg-amber-500/15 text-amber-400',
+  completed: 'bg-emerald-500/15 text-emerald-400',
+  complete: 'bg-emerald-500/15 text-emerald-400',
+  on_hold: 'bg-purple-500/15 text-purple-400',
   cancelled: 'bg-red-500/15 text-red-400',
   open: 'bg-blue-500/15 text-blue-400',
   planned: 'bg-purple-500/15 text-purple-400',
@@ -167,7 +175,7 @@ export default function ProjectsGanttChart({
   projects,
   accounts,
 }: {
-  projects: Project[]
+  projects: (Project & { status_option?: Option | null })[]
   accounts: { id: string; company_name: string | null }[]
 }) {
   const navigate = useNavigate()
@@ -380,7 +388,7 @@ export default function ProjectsGanttChart({
         name: proj.name ?? 'Unnamed Project',
         start: effStart,
         end: effEnd,
-        status: proj.status,
+        status: proj.status_option?.option_key ?? null,
         projectId: proj.id,
         accountId: group.accountId,
       })
