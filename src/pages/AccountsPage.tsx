@@ -69,7 +69,7 @@ export default function AccountsPage() {
       }
 
       const mapped: AccountListItem[] = (accountsResult.data ?? []).map((row) => {
-        const opt = row.options as { option_key: string; option_label: string } | null
+        const opt = row.options as unknown as { option_key: string; option_label: string } | null
         return {
           id: row.id,
           company_name: row.company_name,
@@ -103,7 +103,7 @@ export default function AccountsPage() {
       .single()
 
     if (data && !error) {
-      const opt = data.options as { option_key: string; option_label: string } | null
+      const opt = data.options as unknown as { option_key: string; option_label: string } | null
       const newAccount: AccountListItem = {
         id: data.id,
         company_name: data.company_name,
