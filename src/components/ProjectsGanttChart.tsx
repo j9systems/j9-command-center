@@ -665,9 +665,9 @@ export default function ProjectsGanttChart({
     if (!el) return
     function onWheel(e: WheelEvent) {
       if (dragRef.current || panRef.current) return
-      // Horizontal swipe, shift+scroll, or plain vertical scroll all pan the chart
+      // Horizontal swipe or shift+scroll pan the chart; plain vertical scroll is ignored
       const isHorizontal = Math.abs(e.deltaX) > Math.abs(e.deltaY)
-      const dx = isHorizontal ? e.deltaX : (e.shiftKey ? (e.deltaX || e.deltaY) : e.deltaY)
+      const dx = isHorizontal ? e.deltaX : (e.shiftKey ? (e.deltaX || e.deltaY) : 0)
       if (Math.abs(dx) < 2) return
       e.preventDefault()
       const step = getScrollStep(timeframeRef.current)
