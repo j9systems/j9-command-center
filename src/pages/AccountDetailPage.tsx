@@ -89,15 +89,16 @@ function getInitials(name: string | null): string {
 }
 
 const projectStatusColors: Record<string, string> = {
+  backlog: 'bg-blue-500/15 text-blue-400',
   active: 'bg-emerald-500/15 text-emerald-400',
-  completed: 'bg-blue-500/15 text-blue-400',
+  completed: 'bg-emerald-500/15 text-emerald-400',
   on_hold: 'bg-amber-500/15 text-amber-400',
   cancelled: 'bg-red-500/15 text-red-400',
 }
 
-function getProjectStatusColor(status: string | null): string {
-  if (!status) return 'bg-zinc-500/15 text-zinc-400'
-  return projectStatusColors[status.toLowerCase()] ?? 'bg-purple-muted text-purple'
+function getProjectStatusColor(key: string | null): string {
+  if (!key) return 'bg-zinc-500/15 text-zinc-400'
+  return projectStatusColors[key.toLowerCase()] ?? 'bg-purple-muted text-purple'
 }
 
 const taskStatusColors: Record<string, string> = {
@@ -116,7 +117,7 @@ export default function AccountDetailPage() {
   const [account, setAccount] = useState<AccountWithStatus | null>(null)
   const [tasks, setTasks] = useState<(Task & { assigned_to?: TeamMember | null; status_option?: Option | null })[]>([])
   const [taskStatuses, setTaskStatuses] = useState<Option[]>([])
-  const [projects, setProjects] = useState<(Project & { project_manager?: TeamMember | null; logged_hours: number })[]>([])
+  const [projects, setProjects] = useState<(Project & { project_manager?: TeamMember | null; status_option?: Option | null; logged_hours: number })[]>([])
   const [timeLogs, setTimeLogs] = useState<(TimeLog & { team_member?: TeamMember | null; project?: { name: string | null } | null; status_option?: Option | null })[]>([])
   const [timeLogStatuses, setTimeLogStatuses] = useState<Option[]>([])
   const [accountTeamMembers, setAccountTeamMembers] = useState<AccountTeamMember[]>([])
@@ -165,7 +166,7 @@ export default function AccountDetailPage() {
       ] = await Promise.all([
         supabase.from('accounts').select('*, options!fk_accounts_status(option_key, option_label)').eq('id', id!).single(),
         supabase.from('account_contacts').select('*, contacts(*)').eq('account_id', id!),
-        supabase.from('projects').select('*, team(first_name, last_name)').eq('account_id', id!),
+        supabase.from('projects').select('*, team(first_name, last_name), options!projects_status_id_fkey(id, option_key, option_label)').eq('account_id', id!),
         supabase.from('tasks').select(taskSelect).eq('account_id', id!).order('due', { ascending: true }),
         supabase.from('time_logs').select('project_id, hours').eq('account_id', id!),
         supabase.from('options').select('*').eq('category', 'timelog_status'),
@@ -297,14 +298,16 @@ export default function AccountDetailPage() {
         }
       }
 
-      let mappedProjects: (Project & { project_manager?: TeamMember | null; logged_hours: number })[] | null = null
+      let mappedProjects: (Project & { project_manager?: TeamMember | null; status_option?: Option | null; logged_hours: number })[] | null = null
       if (projectsData) {
         mappedProjects = projectsData.map((p) => ({
           ...p,
           project_manager: p.team as TeamMember | null,
+          status_option: p.options as unknown as Option | null,
           logged_hours: hoursByProject[p.id] ?? 0,
           team: undefined,
-        })) as (Project & { project_manager?: TeamMember | null; logged_hours: number })[]
+          options: undefined,
+        })) as (Project & { project_manager?: TeamMember | null; status_option?: Option | null; logged_hours: number })[]
         setProjects(mappedProjects)
       }
 
@@ -675,7 +678,7 @@ export default function AccountDetailPage() {
           const key = t.status_option?.option_key?.toLowerCase()
           return key !== 'complete'
         })
-        const activeProjects = projects.filter((p) => p.status?.toLowerCase() === 'active')
+        const activeProjects = projects.filter((p) => p.status_option?.option_key === 'active')
         const now = new Date()
         const nextMeeting = [...meetings]
           .filter((m) => m.meeting_start && parseDate(m.meeting_start) >= now)
@@ -961,13 +964,15 @@ export default function AccountDetailPage() {
 }
 
 const statusOrder: Record<string, number> = {
-  active: 0,
-  on_hold: 1,
-  completed: 2,
-  cancelled: 3,
+  backlog: 0,
+  active: 1,
+  on_hold: 2,
+  completed: 3,
+  cancelled: 4,
 }
 
 const statusGroupLabels: Record<string, string> = {
+  backlog: 'Backlog',
   active: 'Active',
   on_hold: 'On Hold',
   completed: 'Completed',
@@ -979,9 +984,9 @@ function ProjectsTab({
   accountId,
   onProjectCreated,
 }: {
-  projects: (Project & { project_manager?: TeamMember | null; logged_hours: number })[]
+  projects: (Project & { project_manager?: TeamMember | null; status_option?: Option | null; logged_hours: number })[]
   accountId: string
-  onProjectCreated: (p: Project & { project_manager?: TeamMember | null; logged_hours: number }) => void
+  onProjectCreated: (p: Project & { project_manager?: TeamMember | null; status_option?: Option | null; logged_hours: number }) => void
 }) {
   const navigate = useNavigate()
   const [showForm, setShowForm] = useState(false)
@@ -994,13 +999,21 @@ function ProjectsTab({
     if (!newName.trim()) return
     setSaving(true)
     const id = crypto.randomUUID()
+    // Look up the 'active' status option id
+    const { data: activeOpt } = await supabase
+      .from('options')
+      .select('id, option_key, option_label')
+      .eq('category', 'project_status')
+      .eq('option_key', 'active')
+      .single()
+
     const { data, error } = await supabase
       .from('projects')
       .insert({
         id,
         name: newName.trim(),
         account_id: accountId,
-        status: 'active',
+        status_id: activeOpt?.id ?? null,
         project_start: newStart || null,
         project_end: newEnd || null,
       })
@@ -1008,7 +1021,7 @@ function ProjectsTab({
       .single()
 
     if (data && !error) {
-      onProjectCreated({ ...data, project_manager: null, logged_hours: 0 } as Project & { project_manager?: TeamMember | null; logged_hours: number })
+      onProjectCreated({ ...data, project_manager: null, status_option: activeOpt as Option | null, logged_hours: 0 } as Project & { project_manager?: TeamMember | null; status_option?: Option | null; logged_hours: number })
       setNewName('')
       setNewStart('')
       setNewEnd('')
@@ -1019,7 +1032,7 @@ function ProjectsTab({
 
   // Group projects by status
   const grouped = projects.reduce<Record<string, typeof projects>>((acc, project) => {
-    const key = project.status?.toLowerCase() ?? 'unknown'
+    const key = project.status_option?.option_key?.toLowerCase() ?? 'unknown'
     if (!acc[key]) acc[key] = []
     acc[key].push(project)
     return acc

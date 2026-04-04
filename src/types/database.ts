@@ -61,7 +61,7 @@ export interface Project {
   id: string
   name: string | null
   account_id: string | null
-  status: string | null
+  status_id: number | null
   project_manager_id: string | null
   project_start: string | null
   project_end: string | null

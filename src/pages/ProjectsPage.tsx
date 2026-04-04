@@ -4,17 +4,19 @@ import { FolderKanban, Search, CalendarDays, User } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { useCurrentRole } from '@/hooks/useCurrentRole'
-import type { Project, TeamMember } from '@/types/database'
+import type { Project, TeamMember, Option } from '@/types/database'
 import ProjectsGanttChart from '@/components/ProjectsGanttChart'
 
 type ProjectWithDetails = Project & {
   project_manager?: TeamMember | null
   account?: { id: string; company_name: string | null } | null
+  status_option?: Option | null
 }
 
 const projectStatusColors: Record<string, string> = {
+  backlog: 'bg-blue-500/15 text-blue-400',
   active: 'bg-emerald-500/15 text-emerald-400',
-  completed: 'bg-blue-500/15 text-blue-400',
+  completed: 'bg-emerald-500/15 text-emerald-400',
   on_hold: 'bg-amber-500/15 text-amber-400',
   cancelled: 'bg-red-500/15 text-red-400',
 }
@@ -58,18 +60,20 @@ export default function ProjectsPage() {
           .filter(Boolean) as string[]
       }
 
-      // Fetch all projects with account and PM info
+      // Fetch all projects with account, PM, and status info
       const { data: projectsData } = await supabase
         .from('projects')
-        .select('*, team(id, first_name, last_name, photo), accounts!fk_projects_account_id(id, company_name)')
+        .select('*, team(id, first_name, last_name, photo), accounts!fk_projects_account_id(id, company_name), options!projects_status_id_fkey(id, option_key, option_label)')
         .order('name')
 
       const projects: ProjectWithDetails[] = (projectsData ?? []).map((p) => ({
         ...p,
         project_manager: p.team as unknown as TeamMember | null,
         account: p.accounts as unknown as { id: string; company_name: string | null } | null,
+        status_option: p.options as unknown as Option | null,
         team: undefined,
         accounts: undefined,
+        options: undefined,
       })) as ProjectWithDetails[]
 
       // Get unique accounts for filter dropdown
@@ -82,11 +86,17 @@ export default function ProjectsPage() {
       const accounts = Array.from(accountsMap, ([id, company_name]) => ({ id, company_name }))
         .sort((a, b) => (a.company_name ?? '').localeCompare(b.company_name ?? ''))
 
+      const { data: projectStatusOptions } = await supabase
+        .from('options')
+        .select('*')
+        .eq('category', 'project_status')
+
       return {
         projects,
         accounts,
         assignedAccountIds,
         currentTeamMemberId,
+        projectStatuses: (projectStatusOptions as Option[]) ?? [],
       }
     },
   })
@@ -103,7 +113,7 @@ export default function ProjectsPage() {
   // Filter function for list tabs
   function filterProjects(list: ProjectWithDetails[]) {
     return list.filter((p) => {
-      if (filterStatus && p.status !== filterStatus) return false
+      if (filterStatus && p.status_option?.option_key !== filterStatus) return false
       if (filterClient && p.account_id !== filterClient) return false
       if (searchQuery) {
         const q = searchQuery.toLowerCase()
@@ -200,10 +210,11 @@ export default function ProjectsPage() {
               className="text-sm bg-surface border border-border rounded-lg px-3 py-2 text-text-primary focus:outline-none focus:border-purple/50"
             >
               <option value="">All Statuses</option>
-              <option value="active">Active</option>
-              <option value="on_hold">On Hold</option>
-              <option value="completed">Completed</option>
-              <option value="cancelled">Cancelled</option>
+              {(queryData?.projectStatuses ?? []).map((s) => (
+                <option key={s.id} value={s.option_key!}>
+                  {s.option_label}
+                </option>
+              ))}
             </select>
             <select
               value={filterClient}
@@ -255,13 +266,13 @@ function ProjectList({ projects }: { projects: ProjectWithDetails[] }) {
                 <span className="text-sm font-semibold text-text-primary truncate">
                   {project.name ?? 'Unnamed Project'}
                 </span>
-                {project.status && (
+                {project.status_option && (
                   <span
                     className={`text-[10px] font-medium px-2 py-0.5 rounded-full whitespace-nowrap ${
-                      projectStatusColors[project.status] ?? 'bg-zinc-500/15 text-zinc-400'
+                      projectStatusColors[project.status_option.option_key ?? ''] ?? 'bg-zinc-500/15 text-zinc-400'
                     }`}
                   >
-                    {project.status.replace(/_/g, ' ')}
+                    {project.status_option.option_label}
                   </span>
                 )}
               </div>

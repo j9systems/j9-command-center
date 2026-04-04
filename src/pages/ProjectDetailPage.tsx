@@ -22,25 +22,17 @@ import type {
   TeamMember,
 } from '@/types/database'
 
-const PROJECT_STATUSES = ['active', 'on_hold', 'completed', 'cancelled'] as const
-
 const projectStatusColors: Record<string, string> = {
+  backlog: 'bg-blue-500/15 text-blue-400',
   active: 'bg-emerald-500/15 text-emerald-400',
-  completed: 'bg-blue-500/15 text-blue-400',
+  completed: 'bg-emerald-500/15 text-emerald-400',
   on_hold: 'bg-amber-500/15 text-amber-400',
   cancelled: 'bg-red-500/15 text-red-400',
 }
 
-function getProjectStatusColor(status: string | null): string {
-  if (!status) return 'bg-zinc-500/15 text-zinc-400'
-  return projectStatusColors[status.toLowerCase()] ?? 'bg-purple-muted text-purple'
-}
-
-function formatStatusLabel(status: string): string {
-  return status
-    .split('_')
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-    .join(' ')
+function getProjectStatusColor(key: string | null): string {
+  if (!key) return 'bg-zinc-500/15 text-zinc-400'
+  return projectStatusColors[key.toLowerCase()] ?? 'bg-purple-muted text-purple'
 }
 
 const taskStatusColors: Record<string, string> = {
@@ -64,7 +56,7 @@ export default function ProjectDetailPage() {
   const { id: accountId, projectId } = useParams<{ id: string; projectId: string }>()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const [project, setProject] = useState<(Project & { project_manager?: TeamMember | null }) | null>(null)
+  const [project, setProject] = useState<(Project & { project_manager?: TeamMember | null; status_option?: Option | null }) | null>(null)
   const [features, setFeatures] = useState<(Feature & { status_option?: Option | null })[]>([])
   const [showAddForm, setShowAddForm] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -78,7 +70,7 @@ export default function ProjectDetailPage() {
   const [editingDetails, setEditingDetails] = useState(false)
   const [editStart, setEditStart] = useState('')
   const [editEnd, setEditEnd] = useState('')
-  const [editStatus, setEditStatus] = useState('')
+  const [editStatusId, setEditStatusId] = useState<number | null>(null)
   const [savingDetails, setSavingDetails] = useState(false)
   const [editingDescription, setEditingDescription] = useState(false)
   const [editDescription, setEditDescription] = useState('')
@@ -94,7 +86,7 @@ export default function ProjectDetailPage() {
     queryFn: async () => {
       const { data: projectData } = await supabase
         .from('projects')
-        .select('*, team(first_name, last_name)')
+        .select('*, team(first_name, last_name), options!projects_status_id_fkey(id, option_key, option_label)')
         .eq('id', projectId!)
         .single()
 
@@ -102,8 +94,10 @@ export default function ProjectDetailPage() {
         ? {
             ...projectData,
             project_manager: projectData.team as unknown as TeamMember | null,
+            status_option: projectData.options as unknown as Option | null,
             team: undefined,
-          } as Project & { project_manager?: TeamMember | null }
+            options: undefined,
+          } as Project & { project_manager?: TeamMember | null; status_option?: Option | null }
         : null
 
       setProject(mappedProject)
@@ -111,12 +105,14 @@ export default function ProjectDetailPage() {
       const [
         { data: statusOptions },
         { data: taskStatusOptions },
+        { data: projectStatusOptions },
         { data: teamData },
         { data: featuresData },
         { data: tasksData },
       ] = await Promise.all([
         supabase.from('options').select('*').eq('category', 'feature_status'),
         supabase.from('options').select('*').eq('category', 'task_status'),
+        supabase.from('options').select('*').eq('category', 'project_status'),
         supabase.from('team').select('*'),
         supabase
           .from('features')
@@ -162,7 +158,8 @@ export default function ProjectDetailPage() {
         )
       }
 
-      return { project: mappedProject, featureStatuses, taskStatuses, teamMembers: allTeamMembers }
+      const projectStatuses = (projectStatusOptions as Option[]) ?? []
+      return { project: mappedProject, featureStatuses, taskStatuses, projectStatuses, teamMembers: allTeamMembers }
     },
     enabled: !!projectId,
   })
@@ -176,6 +173,7 @@ export default function ProjectDetailPage() {
 
   const featureStatuses = queryData?.featureStatuses ?? []
   const taskStatuses = queryData?.taskStatuses ?? []
+  const projectStatuses = queryData?.projectStatuses ?? []
   const teamMembers = queryData?.teamMembers ?? []
 
   async function handleAddFeature() {
@@ -224,7 +222,7 @@ export default function ProjectDetailPage() {
   function startEditingDetails() {
     setEditStart(toInputDate(project?.project_start ?? null))
     setEditEnd(toInputDate(project?.project_end ?? null))
-    setEditStatus(project?.status ?? '')
+    setEditStatusId(project?.status_id ?? null)
     setEditingDetails(true)
   }
 
@@ -234,17 +232,19 @@ export default function ProjectDetailPage() {
     const { error } = await supabase
       .from('projects')
       .update({
-        status: editStatus || null,
+        status_id: editStatusId || null,
         project_start: editStart || null,
         project_end: editEnd || null,
       })
       .eq('id', projectId)
     if (!error) {
+      const newStatusOption = projectStatuses.find((s) => s.id === editStatusId) ?? null
       setProject((prev) =>
         prev
           ? {
               ...prev,
-              status: editStatus || null,
+              status_id: editStatusId || null,
+              status_option: newStatusOption,
               project_start: editStart || null,
               project_end: editEnd || null,
             }
@@ -408,9 +408,9 @@ export default function ProjectDetailPage() {
             {!editingDetails ? (
               <>
                 <span
-                  className={`text-xs font-medium px-2.5 py-0.5 rounded-full ${getProjectStatusColor(project.status)}`}
+                  className={`text-xs font-medium px-2.5 py-0.5 rounded-full ${getProjectStatusColor(project.status_option?.option_key ?? null)}`}
                 >
-                  {project.status ? formatStatusLabel(project.status) : 'No Status'}
+                  {project.status_option?.option_label ?? 'No Status'}
                 </span>
                 <span className="text-sm text-text-secondary flex items-center gap-1">
                   <CalendarDays size={12} />
@@ -432,14 +432,14 @@ export default function ProjectDetailPage() {
             ) : (
               <div className="flex flex-wrap items-center gap-2">
                 <select
-                  value={editStatus}
-                  onChange={(e) => setEditStatus(e.target.value)}
+                  value={editStatusId ?? ''}
+                  onChange={(e) => setEditStatusId(e.target.value ? Number(e.target.value) : null)}
                   className="text-xs bg-surface border border-border rounded px-2 py-1 text-text-primary focus:outline-none focus:border-purple/50"
                 >
                   <option value="">No Status</option>
-                  {PROJECT_STATUSES.map((s) => (
-                    <option key={s} value={s}>
-                      {formatStatusLabel(s)}
+                  {projectStatuses.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.option_label}
                     </option>
                   ))}
                 </select>
