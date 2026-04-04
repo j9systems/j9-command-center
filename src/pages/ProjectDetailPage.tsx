@@ -268,7 +268,7 @@ export default function ProjectDetailPage() {
     if (!projectId || !project) return
     setSavingDescription(true)
     const trimmed = html.trim()
-    const isEmpty = !trimmed || trimmed === '<p></p>'
+    const isEmpty = !trimmed || !trimmed.replace(/<p><\/p>/g, '').trim()
     const { error } = await supabase
       .from('projects')
       .update({ description: isEmpty ? null : trimmed })
