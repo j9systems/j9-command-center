@@ -21,6 +21,7 @@ import {
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import type { Lead, Option } from '@/types/database'
+import NewLeadModal from '@/components/NewLeadModal'
 
 type LeadWithStatus = Lead & {
   status_option?: Option | null
@@ -124,6 +125,7 @@ export default function LeadsPage() {
   const [quickLogText, setQuickLogText] = useState('')
   const [quickLogSaving, setQuickLogSaving] = useState(false)
   const quickLogSpeech = useSpeechRecognition()
+  const [showNewLeadModal, setShowNewLeadModal] = useState(false)
 
   const { data: queryData, isLoading: loading } = useQuery({
     queryKey: ['leads'],
@@ -553,7 +555,16 @@ export default function LeadsPage() {
         <span className="text-sm text-text-secondary ml-auto">
           {filteredLeads.length} {filteredLeads.length === 1 ? 'lead' : 'leads'}
         </span>
+        <button
+          onClick={() => setShowNewLeadModal(true)}
+          className="flex items-center gap-2 px-4 py-2.5 bg-purple hover:bg-purple-hover text-white text-sm font-medium rounded-lg transition-colors"
+        >
+          <Plus size={14} />
+          New Lead
+        </button>
       </div>
+
+      <NewLeadModal open={showNewLeadModal} onClose={() => setShowNewLeadModal(false)} />
 
       {/* Tabs */}
       <div className="flex gap-1 mb-4 overflow-x-auto scrollbar-hide border-b border-border">
