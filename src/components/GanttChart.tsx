@@ -292,10 +292,20 @@ export default function GanttChart({
     return { start, end }
   }
 
+  /* Sort projects by effective start date (earliest first, null-dated last) */
+  const sortedProjects = [...projectsWithFeatures].sort((a, b) => {
+    const aStart = effectiveProjectDates(a).start
+    const bStart = effectiveProjectDates(b).start
+    if (!aStart && !bStart) return 0
+    if (!aStart) return 1
+    if (!bStart) return -1
+    return aStart.getTime() - bStart.getTime()
+  })
+
   /* Build rows — include projects if their dates or any feature dates overlap the range.
      Once a project is visible, show ALL its features that have dates. */
   const rows: GanttRow[] = []
-  for (const proj of projectsWithFeatures) {
+  for (const proj of sortedProjects) {
     const { start: effStart, end: effEnd } = effectiveProjectDates(proj)
     const projectInRange = overlapsRange(effStart, effEnd)
 

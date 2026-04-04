@@ -273,6 +273,29 @@ export default function ProjectsGanttChart({
       }
       groups.sort((a, b) => a.accountName.localeCompare(b.accountName))
 
+      // Sort projects within each group by effective start date (earliest first)
+      for (const group of groups) {
+        group.projects.sort((a, b) => {
+          const aStart = a.project_start ? new Date(a.project_start) : null
+          const bStart = b.project_start ? new Date(b.project_start) : null
+          // Also consider feature dates as fallback
+          const aEffective = aStart ?? a.features.reduce<Date | null>((min, f) => {
+            const fs = f.start_date ? new Date(f.start_date) : null
+            if (!fs) return min
+            return min ? (fs < min ? fs : min) : fs
+          }, null)
+          const bEffective = bStart ?? b.features.reduce<Date | null>((min, f) => {
+            const fs = f.start_date ? new Date(f.start_date) : null
+            if (!fs) return min
+            return min ? (fs < min ? fs : min) : fs
+          }, null)
+          if (!aEffective && !bEffective) return 0
+          if (!aEffective) return 1
+          if (!bEffective) return -1
+          return aEffective.getTime() - bEffective.getTime()
+        })
+      }
+
       setClientGroups(groups)
       setLoading(false)
     }
