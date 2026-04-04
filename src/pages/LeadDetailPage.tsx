@@ -5,6 +5,7 @@ import {
   Phone,
   PhoneCall,
   MessageSquare,
+  Mail,
   Globe,
   Building2,
   Calendar,
@@ -274,6 +275,37 @@ export default function LeadDetailPage() {
             </span>
           )}
         </div>
+      </div>
+
+      {/* Action buttons */}
+      <div className="flex flex-wrap gap-2 mb-4">
+        {lead.phone && (
+          <>
+            <button
+              onClick={() => setContactModal({ phone: lead.phone!, action: 'call' })}
+              className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20 transition-colors"
+            >
+              <PhoneCall size={13} />
+              Call
+            </button>
+            <button
+              onClick={() => setContactModal({ phone: lead.phone!, action: 'text' })}
+              className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border bg-blue-500/10 text-blue-400 border-blue-500/20 hover:bg-blue-500/20 transition-colors"
+            >
+              <MessageSquare size={13} />
+              Text
+            </button>
+          </>
+        )}
+        {lead.email && (
+          <a
+            href={`mailto:${lead.email}`}
+            className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border bg-purple/10 text-purple border-purple/20 hover:bg-purple/20 transition-colors"
+          >
+            <Mail size={13} />
+            Email
+          </a>
+        )}
       </div>
 
       {/* Stats row */}

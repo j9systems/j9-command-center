@@ -10,6 +10,7 @@ import {
   Globe,
   Building2,
   Calendar,
+  Clock,
   Filter,
   X,
 } from 'lucide-react'
@@ -51,7 +52,7 @@ export default function LeadsPage() {
   const { data: queryData, isLoading: loading } = useQuery({
     queryKey: ['leads'],
     queryFn: async () => {
-      const [{ data: leadsData }, { data: statusOpts }] = await Promise.all([
+      const [{ data: leadsData }, { data: statusOpts }, { data: interactionsData }] = await Promise.all([
         supabase
           .from('leads')
           .select('*, options!fk_leads_status_id(id, option_key, option_label)')
@@ -60,6 +61,12 @@ export default function LeadsPage() {
           .from('options')
           .select('*')
           .eq('category', 'lead_status'),
+        supabase
+          .from('interactions')
+          .select('lead_id, date')
+          .not('lead_id', 'is', null)
+          .not('date', 'is', null)
+          .order('date', { ascending: false }),
       ])
 
       const leads: LeadWithStatus[] = leadsData
@@ -72,12 +79,26 @@ export default function LeadsPage() {
 
       const statusOptions: Option[] = (statusOpts as Option[]) ?? []
 
-      return { leads, statusOptions }
+      // Build map of lead_id -> most recent interaction date
+      const lastInteractionMap: Record<string, string> = {}
+      for (const interaction of interactionsData ?? []) {
+        if (interaction.lead_id && !lastInteractionMap[interaction.lead_id]) {
+          lastInteractionMap[interaction.lead_id] = interaction.date!
+        }
+      }
+
+      return { leads, statusOptions, lastInteractionMap }
     },
   })
 
   const leads = queryData?.leads ?? []
   const statusOptions = queryData?.statusOptions ?? []
+  const lastInteractionMap = queryData?.lastInteractionMap ?? {}
+
+  function daysSince(dateStr: string | null): number | null {
+    if (!dateStr) return null
+    return Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000)
+  }
 
   function getFilteredLeads(): LeadWithStatus[] {
     let filtered = leads
@@ -298,6 +319,23 @@ export default function LeadsPage() {
                           Follow-up {formatDate(lead.follow_up_on)}
                         </span>
                       )}
+                      {(() => {
+                        const days = daysSince(lastInteractionMap[lead.id] ?? null)
+                        return (
+                          <span className={`text-xs flex items-center gap-1 ${
+                            days === null
+                              ? 'text-zinc-500'
+                              : days <= 7
+                              ? 'text-emerald-400'
+                              : days <= 30
+                              ? 'text-amber-400'
+                              : 'text-red-400'
+                          }`}>
+                            <Clock size={10} />
+                            {days !== null ? `${days}d since last interaction` : 'No interactions'}
+                          </span>
+                        )
+                      })()}
                       {lead.industry && (
                         <span className="text-xs text-text-secondary">
                           {lead.industry.replace(/[\[\]]/g, '').replace(/_/g, ' ').split(',').slice(0, 2).join(', ')}
@@ -323,6 +361,16 @@ export default function LeadsPage() {
                           <MessageSquare size={14} />
                         </button>
                       </>
+                    )}
+                    {lead.email && (
+                      <a
+                        href={`mailto:${lead.email}`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="p-1.5 rounded-lg text-text-secondary hover:text-purple hover:bg-purple/10 transition-colors"
+                        title="Email"
+                      >
+                        <Mail size={14} />
+                      </a>
                     )}
                     {lead.interest_level != null && (
                       <div className="text-center ml-1">
