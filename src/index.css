@@ -85,6 +85,10 @@ button, select, a, [role="button"], [tabindex="0"] {
 .tiptap p {
   margin: 0.25em 0;
 }
+.tiptap p:empty,
+.tiptap p:has(> br:only-child) {
+  min-height: 1em;
+}
 .tiptap h2 {
   font-size: 1.15em;
   font-weight: 600;
@@ -135,6 +139,9 @@ button, select, a, [role="button"], [tabindex="0"] {
 }
 .rich-text-display p {
   margin: 0.25em 0;
+}
+.rich-text-display p:empty {
+  min-height: 1em;
 }
 
 /* SOP Markdown styles (scoped to .sop-markdown) */
