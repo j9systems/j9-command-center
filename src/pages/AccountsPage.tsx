@@ -2,14 +2,14 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Search, Plus, X } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
-import type { AccountWithStatus, Option } from '@/types/database'
+import type { AccountListItem, Option } from '@/types/database'
 import AccountCard from '@/components/accounts/AccountCard'
 import MobileFormOverlay from '@/components/MobileFormOverlay'
 import { useCurrentRole } from '@/hooks/useCurrentRole'
 
 export default function AccountsPage() {
   const navigate = useNavigate()
-  const [accounts, setAccounts] = useState<AccountWithStatus[]>([])
+  const [accounts, setAccounts] = useState<AccountListItem[]>([])
   const [assignedAccountIds, setAssignedAccountIds] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -24,67 +24,66 @@ export default function AccountsPage() {
   const [showAll, setShowAll] = useState(false)
 
   useEffect(() => {
-    async function fetchAccounts() {
+    async function fetchData() {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session?.user) {
         setLoading(false)
         return
       }
 
-      // Get current user's team record to find their ID and role
-      const { data: teamData } = await supabase
-        .from('team')
-        .select('id')
-        .eq('email', session.user.email!)
-        .maybeSingle()
+      // Run team lookup, accounts query, and status options in parallel
+      const [teamResult, accountsResult, statusResult] = await Promise.all([
+        supabase
+          .from('team')
+          .select('id')
+          .eq('email', session.user.email!)
+          .maybeSingle(),
+        supabase
+          .from('accounts')
+          .select('id, company_name, logo_path, options!fk_accounts_status(option_key, option_label)')
+          .order('company_name'),
+        supabase
+          .from('options')
+          .select('id, option_label')
+          .eq('category', 'account_status'),
+      ])
 
-      // Get accounts assigned to this user
-      if (teamData?.id) {
+      // Fetch assigned accounts (depends on team lookup)
+      if (teamResult.data?.id) {
         const { data: accountTeamData } = await supabase
           .from('account_team')
           .select('account_id')
-          .eq('team_member_id', teamData.id)
+          .eq('team_member_id', teamResult.data.id)
 
         if (accountTeamData) {
           setAssignedAccountIds(new Set(accountTeamData.map((at) => at.account_id).filter(Boolean) as string[]))
         }
       }
 
-      const { data, error } = await supabase
-        .from('accounts')
-        .select('*, options!fk_accounts_status(option_key, option_label)')
-        .order('company_name')
+      if (statusResult.data) setStatusOptions(statusResult.data as Option[])
 
-      if (error) {
-        console.error('Error fetching accounts:', error)
+      if (accountsResult.error) {
+        console.error('Error fetching accounts:', accountsResult.error)
         setLoading(false)
         return
       }
 
-      const mapped: AccountWithStatus[] = (data ?? []).map((row) => {
-        const opt = row.options as { option_key: string; option_label: string } | null
+      const mapped: AccountListItem[] = (accountsResult.data ?? []).map((row) => {
+        const opt = row.options as unknown as { option_key: string; option_label: string } | null
         return {
-          ...row,
+          id: row.id,
+          company_name: row.company_name,
+          logo_path: row.logo_path,
           status_label: opt?.option_label ?? null,
           status_key: opt?.option_key ?? null,
-          options: undefined,
-        } as AccountWithStatus
+        }
       })
 
       setAccounts(mapped)
       setLoading(false)
     }
 
-    async function fetchStatusOptions() {
-      const { data } = await supabase
-        .from('options')
-        .select('*')
-        .eq('category', 'account_status')
-      if (data) setStatusOptions(data as Option[])
-    }
-
-    fetchAccounts()
-    fetchStatusOptions()
+    fetchData()
   }, [])
 
   async function handleCreateAccount(e: React.FormEvent) {
@@ -100,17 +99,18 @@ export default function AccountsPage() {
         company_name: newName.trim(),
         status: newStatusId ? Number(newStatusId) : null,
       })
-      .select('*, options!fk_accounts_status(option_key, option_label)')
+      .select('id, company_name, logo_path, options!fk_accounts_status(option_key, option_label)')
       .single()
 
     if (data && !error) {
-      const opt = data.options as { option_key: string; option_label: string } | null
-      const newAccount: AccountWithStatus = {
-        ...data,
+      const opt = data.options as unknown as { option_key: string; option_label: string } | null
+      const newAccount: AccountListItem = {
+        id: data.id,
+        company_name: data.company_name,
+        logo_path: data.logo_path,
         status_label: opt?.option_label ?? null,
         status_key: opt?.option_key ?? null,
-        options: undefined,
-      } as AccountWithStatus
+      }
       setAccounts((prev) => [newAccount, ...prev].sort((a, b) =>
         (a.company_name ?? '').localeCompare(b.company_name ?? '')
       ))
