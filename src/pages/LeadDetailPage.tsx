@@ -68,12 +68,29 @@ function formatDateTime(dateStr: string | null): string {
   })
 }
 
+function normalizePhone(phone: string | null | undefined): string {
+  if (!phone) return ''
+  return phone.replace(/\D/g, '').slice(-10)
+}
+
 function getMatchReason(i: InteractionWithType, lead: LeadWithStatus): string {
-  if (lead.email && (i.from_email === lead.email || i.to_email === lead.email)) {
-    return 'matched via email'
+  if (i.lead_id && i.lead_id === lead.id) {
+    return 'matched via lead ID'
   }
-  if (lead.phone && i.phone_from === lead.phone) {
-    return 'matched via phone'
+  if (lead.email) {
+    const email = lead.email.toLowerCase()
+    if (i.from_email?.toLowerCase() === email || i.to_email?.toLowerCase() === email) {
+      return 'matched via email'
+    }
+  }
+  if (lead.phone) {
+    const leadDigits = normalizePhone(lead.phone)
+    if (
+      leadDigits &&
+      (normalizePhone(i.phone_from) === leadDigits || normalizePhone(i.phone_to) === leadDigits)
+    ) {
+      return 'matched via phone'
+    }
   }
   return ''
 }
@@ -99,8 +116,12 @@ export default function LeadDetailPage() {
         options: undefined,
       } as LeadWithStatus
 
-      // Match interactions by from_email, to_email, or phone_from — no direct FK yet
+      // Match interactions by lead_id, email, or phone (from/to)
       const orFilters: string[] = []
+
+      // Direct FK match
+      orFilters.push(`lead_id.eq.${mappedLead.id}`)
+
       if (mappedLead.email) {
         orFilters.push(`from_email.ilike.${mappedLead.email}`)
         orFilters.push(`to_email.ilike.${mappedLead.email}`)
@@ -110,17 +131,19 @@ export default function LeadDetailPage() {
         const digitsOnly = mappedLead.phone.replace(/\D/g, '')
         const e164 = `+${digitsOnly}`
         const last10 = digitsOnly.slice(-10)
+        // Match phone_from (caller) in both E.164 and last-10-digits formats
         orFilters.push(`phone_from.eq.${e164}`)
         orFilters.push(`phone_from.like.%${last10}`)
+        // Match phone_to (recipient) in both E.164 and last-10-digits formats
+        orFilters.push(`phone_to.eq.${e164}`)
+        orFilters.push(`phone_to.like.%${last10}`)
       }
 
-      const interactionsResult = orFilters.length > 0
-        ? await supabase
-            .from('interactions')
-            .select('*, options!fk_interactions_type_id(id, option_key, option_label)')
-            .or(orFilters.join(','))
-            .order('date', { ascending: false })
-        : { data: [], error: null }
+      const interactionsResult = await supabase
+        .from('interactions')
+        .select('*, options!fk_interactions_type_id(id, option_key, option_label)')
+        .or(orFilters.join(','))
+        .order('date', { ascending: false })
 
       const interactions: InteractionWithType[] = (interactionsResult.data ?? []).map((i) => ({
         ...i,
