@@ -69,32 +69,6 @@ function formatDateTime(dateStr: string | null): string {
   })
 }
 
-function normalizePhone(phone: string | null | undefined): string {
-  if (!phone) return ''
-  return phone.replace(/\D/g, '').slice(-10)
-}
-
-function getMatchReason(i: InteractionWithType, lead: LeadWithStatus): string {
-  if (i.lead_id && i.lead_id === lead.id) {
-    return 'matched via lead ID'
-  }
-  if (lead.email) {
-    const email = lead.email.toLowerCase()
-    if (i.from_email?.toLowerCase() === email || i.to_email?.toLowerCase() === email) {
-      return 'matched via email'
-    }
-  }
-  if (lead.phone) {
-    const leadDigits = normalizePhone(lead.phone)
-    if (
-      leadDigits &&
-      (normalizePhone(i.phone_from) === leadDigits || normalizePhone(i.phone_to) === leadDigits)
-    ) {
-      return 'matched via phone'
-    }
-  }
-  return ''
-}
 
 export default function LeadDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -426,8 +400,6 @@ export default function LeadDetailPage() {
             const typeKey = interaction.type_option?.option_key ?? ''
             const typeLabel = interaction.type_option?.option_label ?? interaction.type ?? 'Unknown'
             const typeColor = interactionTypeColors[typeKey] ?? 'bg-zinc-500/15 text-zinc-400'
-            const matchReason = getMatchReason(interaction, lead)
-
             return (
               <div
                 key={interaction.id}
@@ -462,11 +434,6 @@ export default function LeadDetailPage() {
                 {(interaction.body || interaction.notes) && (
                   <p className="text-xs text-text-secondary line-clamp-3 mt-1">
                     {interaction.body ?? interaction.notes}
-                  </p>
-                )}
-                {matchReason && (
-                  <p className="text-xs text-text-secondary/60 italic mt-1">
-                    {matchReason}
                   </p>
                 )}
               </div>
